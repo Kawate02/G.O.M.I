@@ -1,0 +1,13 @@
+#include "resource.h"
+
+IDR_PLAYER_PNG RCDATA "assets/images/player.png"
+IDR_BG_PNG     RCDATA "assets/images/bg.png"
+IDR_MG_PNG     RCDATA "assets/images/mg.png"
+IDR_FG_PNG     RCDATA "assets/images/fg.png"
+IDR_AG_PNG     RCDATA "assets/images/ag.png"
+IDR_SCREEN_PNG RCDATA "assets/images/screen.png"
+IDR_UI_FRAME_PNG  RCDATA "assets/images/UIFrame.png"
+IDR_UI_HOVER_PNG RCDATA "assets/images/UIHover.png"
+
+IDR_CURSOR_MOVE_WAV   RCDATA "assets/sounds/cursor_move.wav"
+IDR_CURSOR_CLICK_WAV  RCDATA "assets/sounds/cursor_click.wav"
