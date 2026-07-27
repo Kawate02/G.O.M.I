@@ -447,8 +447,10 @@
               swap-removeを採用しています。要素をシフトしないため削除コストはO(1)で、
               密配列は常に隙間なく詰まった状態を保てます。
             </p>
-            <div class="tradeoff"><b>トレードオフ：</b>削除の度に配列内の要素順が入れ替わるため、
-              「挿入順を保持したい」用途には向きません（このエンジンでは順序に意味を持たせていません）。</div>
+            <div class="tradeoff"><b>補足：</b>削除のたびに密配列内の要素順は入れ替わりますが、
+              swap-removeと同時に<code class="inline">entityToIndex</code>も更新しているため、
+              外部は常にEntity経由でアクセスすればよく、生のindexを自分で追跡する必要はありません。
+              順序が変わること自体は、この設計では問題になりません。</div>
           </div>
           <div>
             <div class="code-file">ComponentArray.h — removeComponent</div>
