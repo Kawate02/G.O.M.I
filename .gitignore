@@ -416,3 +416,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# DxLib SDK (third-party, download separately from https://dxlib.xsrv.jp/)
+GomiEngine/Dx/
