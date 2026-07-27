@@ -1,5 +1,15 @@
 #include "Game.h"
 
+std::string Game::addWorld(const std::string& name, const StageDefinition& stageDef)
+{
+	return world.addWorld(name, stageDef);
+}
+
+std::string Game::addWorld(const StageDefinition& stageDef)
+{
+	return world.addWorld(stageDef);
+}
+
 void Game::init()
 {
 	window->init(SettingManager::getInstance().getValue<int>("windowWidth"), SettingManager::getInstance().getValue<int>("windowHeight"), "Gomi", SettingManager::getInstance().getValue<bool>("fullscreen"));
@@ -15,19 +25,19 @@ void Game::run()
     {
 		if (quitRequest.trigger()) break;
 		frameCount++;
-		int nowTime = GetNowCount(); //ƒtƒŒ[ƒ€ƒŒ[ƒg§Œä—p
+		int nowTime = GetNowCount(); //ï¿½tï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½gï¿½ï¿½ï¿½ï¿½p
 		float deltaTime = (nowTime - lastTime) / 1000.0f;
 		lastTime = nowTime;
 
         input->inputStateUpdate();
-        inputState = input->getInputState(); //“ü—Íî•ñ‚Ì’Šo
+        inputState = input->getInputState(); //ï¿½ï¿½ï¿½Íï¿½ï¿½Ì’ï¿½ï¿½o
 
-		world.update(deltaTime); //ƒƒCƒ“ˆ—
+		world.update(deltaTime); //ï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 		if (AudioCommand e; audioRequest.trigger(e)) audioQueue.addCommand({ e.audioID, e.volume });
 
-        renderer.render(*drawer, renderQueue, world.getWorld().getCamera()); //•`‰æˆ—
-		audioPlayer.play(*audioBackend, audioQueue); //‰¹ºˆ—
+        renderer.render(*drawer, renderQueue, world.getWorld().getCamera()); //ï¿½`ï¿½æˆï¿½ï¿½
+		audioPlayer.play(*audioBackend, audioQueue); //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 		if (nowTime - lastTime >= 1000)
 		{
@@ -35,7 +45,7 @@ void Game::run()
 			frameCount = 0;
 			lastTime = nowTime;
 		}
-		//ƒtƒŒ[ƒ€ƒŒ[ƒg§Œä
+		//ï¿½tï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½gï¿½ï¿½ï¿½ï¿½
 		int frameTime = GetNowCount() - nowTime;
 		if (frameTime < TERGET_FRAME_TIME)
 		{

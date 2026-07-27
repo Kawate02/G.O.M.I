@@ -29,6 +29,7 @@ public:
 	virtual bool hitTest(const InputState& inputState) { return false; }
 	UIBase(const Vec2& pos, const Vec2& size, int layer, int order, bool blockInput) : pos(pos), size(size), layer(layer + 1000), order(order), blockInput(blockInput) {}
 	inline void addChild(UIHandle handle) { childHandles.push_back(handle); }
+	inline void move(const Vec2& delta) { pos += delta; }
 	inline const std::vector<UIHandle>& getChildren() const { return childHandles; }
 	void update(const InputState& inputState, RenderQueue& renderQueue);
 	inline void setVisible(bool visible) { this->visible = visible; }

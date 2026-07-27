@@ -5,7 +5,6 @@
 #include "UIManager.h"
 #include "WorldEventBus.h"
 #include "Camera.h"
-#include "Stage.h"
 #include "Prefab.h"
 #include "UIPrefab.h"
 #include "CollisionContext.h"
@@ -14,6 +13,16 @@
 #include "RenderQueue.h"
 #include "AudioQueue.h"
 #include "EventRequest.h"
+
+using StageID = int;
+
+struct StageDefinition
+{
+	std::string name;
+	std::vector<std::function<std::unique_ptr<ISystem>()>> systems;
+	std::vector<SpawnOverride> prefabs;
+	std::vector<UISpawnOverride> uiPrefabs;
+};
 
 class World
 {
@@ -40,11 +49,12 @@ protected:
 	float deltaTime = 0.0f;
 public:
 	World(InputState& input, RenderQueue& rend, AudioQueue& aud) : inputState(input), renderQueue(rend), audioQueue(aud) {}
-	void initialize(StageID stageID);
+	void initialize(const StageDefinition& prefab);
 	void update(float dt);
 	void release();
 	Entity createEntity();
 	void destroyEntity(Entity e);
+	UIHandle spawnUIPrefab(const UIPrefabDefinition& prefab, Vec2 pos, int layer);
 	inline ComponentManager& getComponentManager() { return component; }
 	inline Camera& getCamera() { return camera; }
 	inline bool alive(Entity e) { return e.generation == generations[e.id]; }

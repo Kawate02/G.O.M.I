@@ -1,21 +1,33 @@
 #pragma once
-#include "EntityHash.h"
-#include "SpawnDef.h"
+#include "ComponentManager.h"
+#include "Vec3.h"
 
-#include <unordered_map>
+#include <vector>
+#include <functional>
+#include <optional>
 
-class World;
-using PrefabFunc = Entity(*)(World& world, const SpawnDef& def);
-using PrefabID = std::string;
+using ComponentFactory = std::function<void(ComponentManager&, Entity)>;
 
-struct PrefabDef
+template <typename T>
+ComponentFactory Component(T value)
 {
-	PrefabID prefab;
-	PrefabFunc func;
+	return [value](ComponentManager& cm, Entity e) { cm.addComponent<T>(e, value); };
+}
+
+struct EntityDefinition
+{
+	std::vector<ComponentFactory> components;
 };
 
-const extern std::unordered_map<PrefabID, PrefabDef> prefabTable;
+struct PrefabDefinition
+{
+	std::vector<EntityDefinition> entities;
+};
 
-Entity Prefab_Player(World& world, const SpawnDef& def);
-Entity Prefab_Player_Dummy(World& world, const SpawnDef& def);
-Entity Prefab_BackGround(World& world, const SpawnDef& def);
+struct SpawnOverride
+{
+	const PrefabDefinition* prefab;
+	std::optional<Vec3> pos;
+	Vec3 scale = { 1.0f, 1.0f, 1.0f };
+	float rot = 0.0f;
+};

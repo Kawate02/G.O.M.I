@@ -1,19 +1,32 @@
 #include "World.h"
+#include "UIPrefab_Pause.h"
 
-void World::initialize(StageID stageID)
+void World::initialize(const StageDefinition& prefabs)
 {
-	auto& prefabs = stageTable.at(stageID);
 	for (auto& it : prefabs.systems)
 	{
-		systems.push_back(createSystem(it));
+		systems.push_back(it());
 	}
 	for (auto& it : prefabs.prefabs)
 	{
-		prefabTable.at(it.prefab).func(*this, it);
+		bool first = true;
+		for (auto& entityDef : it.prefab->entities)
+		{
+			Entity e = createEntity();
+			for (auto& addComp : entityDef.components)
+			{
+				addComp(component, e);
+			}
+			if (first && it.pos.has_value())
+			{
+				component.addComponent(e, TransformComponent({ *it.pos, it.scale, it.rot }));
+			}
+			first = false;
+		}
 	}
 	for (auto& it : prefabs.uiPrefabs)
 	{
-		uiPrefabTable.at(it.prefab).func(uiManager, it);
+		spawnUIPrefab(*it.prefab, it.pos, it.layer);
 	}
 	uiManager.initialize();
 	for (auto& it : systems)
@@ -28,7 +41,7 @@ void World::update(float dt)
 	frameCount++;
 	if (inputState.isDownKey(InputKey::KEY_ESCAPE) && !pause)
 	{
-		pauseUI = uiPrefabTable.at("Pause").func(uiManager, { "Pause", {0, 0}, 1 });
+		pauseUI = spawnUIPrefab(UIPrefab_Pause, { 0, 0 }, 1);
 		pause = true;
 	}
 	uiManager.update(inputState, renderQueue);
@@ -56,6 +69,17 @@ void World::release()
 	entities.clear();
 	generations.clear();
 	std::queue<uint32_t>().swap(freeIDs);
+}
+
+UIHandle World::spawnUIPrefab(const UIPrefabDefinition& prefab, Vec2 pos, int layer)
+{
+	UIHandle root = uiManager.add(std::make_unique<UIBase>(Vec2{ 0, 0 }, Vec2{ 0, 0 }, layer, 0, false));
+	for (auto& child : prefab.children)
+	{
+		uiManager.addChild(root, child.factory(), child.type);
+	}
+	uiManager.move(root, pos);
+	return root;
 }
 
 Entity World::createEntity()

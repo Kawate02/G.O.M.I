@@ -11,7 +11,3 @@
 #include "CollisionSystem.h"
 #include "BackGroundSystem.h"
 #include "OffScreenSystem.h"
-
-#include "SystemType.h"
-
-std::unique_ptr<ISystem> createSystem(SystemType type);

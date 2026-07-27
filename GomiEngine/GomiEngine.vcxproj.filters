@@ -69,7 +69,13 @@
     <ClCompile Include="WorldManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Stage.cpp">
+    <ClCompile Include="Stage_Title.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage_Field.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage_Result.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Prefab_Player.cpp">
@@ -78,23 +84,11 @@
     <ClCompile Include="Prefab_BackGround.cpp">
       <Filter>ソース ファイル\Prefab</Filter>
     </ClCompile>
-    <ClCompile Include="Prefab.cpp">
-      <Filter>ソース ファイル\Prefab</Filter>
-    </ClCompile>
-    <ClCompile Include="UIPrefab.cpp">
-      <Filter>ソース ファイル\Prefab</Filter>
-    </ClCompile>
-    <ClCompile Include="UIPrefab_Image.cpp">
-      <Filter>ソース ファイル\Prefab</Filter>
-    </ClCompile>
     <ClCompile Include="DxDrawer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="UIPrefab_Title.cpp">
       <Filter>ソース ファイル\Prefab</Filter>
-    </ClCompile>
-    <ClCompile Include="SystemInclude.cpp">
-      <Filter>ソース ファイル\System</Filter>
     </ClCompile>
     <ClCompile Include="MoveResolveSystem.cpp">
       <Filter>ソース ファイル\System</Filter>
@@ -260,17 +254,17 @@
     <ClInclude Include="Camera.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Stage.h">
+    <ClInclude Include="Stage_Title.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="SpawnDef.h">
+    <ClInclude Include="Stage_Field.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage_Result.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="EntityHash.h">
       <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="UISpawnDef.h">
-      <Filter>ソース ファイル\UI</Filter>
     </ClInclude>
     <ClInclude Include="resource\resource.h">
       <Filter>リソース ファイル</Filter>
@@ -317,9 +311,6 @@
     <ClInclude Include="SystemInclude.h">
       <Filter>ソース ファイル\System</Filter>
     </ClInclude>
-    <ClInclude Include="SystemType.h">
-      <Filter>ソース ファイル\System</Filter>
-    </ClInclude>
     <ClInclude Include="ISystem.h">
       <Filter>ソース ファイル\System</Filter>
     </ClInclude>
@@ -329,7 +320,25 @@
     <ClInclude Include="Prefab.h">
       <Filter>ソース ファイル\Prefab</Filter>
     </ClInclude>
+    <ClInclude Include="Prefab_Player.h">
+      <Filter>ソース ファイル\Prefab</Filter>
+    </ClInclude>
+    <ClInclude Include="Prefab_Player_Dummy.h">
+      <Filter>ソース ファイル\Prefab</Filter>
+    </ClInclude>
+    <ClInclude Include="Prefab_BackGround.h">
+      <Filter>ソース ファイル\Prefab</Filter>
+    </ClInclude>
     <ClInclude Include="UIPrefab.h">
+      <Filter>ソース ファイル\Prefab</Filter>
+    </ClInclude>
+    <ClInclude Include="UIPrefab_Title.h">
+      <Filter>ソース ファイル\Prefab</Filter>
+    </ClInclude>
+    <ClInclude Include="UIPrefab_Reslut.h">
+      <Filter>ソース ファイル\Prefab</Filter>
+    </ClInclude>
+    <ClInclude Include="UIPrefab_Pause.h">
       <Filter>ソース ファイル\Prefab</Filter>
     </ClInclude>
     <ClInclude Include="CollisionComponent.h">

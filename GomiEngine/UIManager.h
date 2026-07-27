@@ -27,6 +27,7 @@ public:
 	UIHandle createUI();
 	UIHandle add(std::unique_ptr<UIBase> ui, UIType type = UIType::NONE);
 	void remove(UIHandle handle);
+	void move(UIHandle handle, Vec2 delta);
 	std::vector<UIHandle> getHandles(UIType type);
 	void addChild(UIHandle parent, std::unique_ptr<UIBase> ui, UIType type = UIType::NONE);
 	bool alive(UIHandle handle);

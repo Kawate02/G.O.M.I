@@ -51,6 +51,16 @@ void UIManager::remove(UIHandle handle)
 	setTop();
 }
 
+void UIManager::move(UIHandle handle, Vec2 delta)
+{
+	if (!alive(handle)) return;
+	uiList[handle.id]->move(delta);
+	for (auto& child : uiList[handle.id]->getChildren())
+	{
+		move(child, delta);
+	}
+}
+
 std::vector<UIHandle> UIManager::getHandles(UIType type)
 {
 	std::vector<UIHandle> result;

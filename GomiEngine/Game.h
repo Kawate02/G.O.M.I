@@ -49,4 +49,6 @@ public:
 
     void run();
     void init();
+    std::string addWorld(const std::string& name, const StageDefinition& stageDef);
+    std::string addWorld(const StageDefinition& stageDef);
 };

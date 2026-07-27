@@ -5,7 +5,9 @@
 class WorldManager
 {
 private:
-	EventRequest<int> worldChangeRequest{Event::World_Change};
+	std::unordered_map<StageID, StageDefinition> stageTable;
+	std::unordered_map<std::string, StageID> worldNames;
+	EventRequest<std::string> worldChangeRequest{Event::World_Change};
 	int crrentStageID = -1;
 	std::unique_ptr<World> crrentWorld;
 
@@ -22,5 +24,7 @@ public:
 	{
 		crrentWorld->release();
 	}
+	std::string addWorld(const std::string& name, const StageDefinition& stageDef);
+	std::string addWorld(const StageDefinition& stageDef);
 	inline World& getWorld() { return *crrentWorld; }
 };
