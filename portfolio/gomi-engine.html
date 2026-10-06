@@ -553,7 +553,7 @@ std::unordered_map&lt;Cell, std::vector&lt;Entity&gt;&gt; grid;</pre>
               DxLib実装（<code class="inline">DxWindow</code> / <code class="inline">DxDrawer</code> 等）を直接参照しません。
               メインループとゲームロジックはDxLibを知らない状態を保っています。
             </p>
-            <div class="tradeoff"><b>正直に：</b>画像/音声の実ファイル読み込みを担う<code class="inline">ResourceManager</code>は
+            <div class="tradeoff"><b>補足：</b>画像/音声の実ファイル読み込みを担う<code class="inline">ResourceManager</code>は
               <code class="inline">DxLib.h</code>（<code class="inline">CreateGraphFromMem</code>等）を直接呼んでおり、
               エンジン全体が完全にDxLib非依存というわけではありません。抽象化できているのは
               「メインループ・入出力・描画命令の発行」までです。</div>
