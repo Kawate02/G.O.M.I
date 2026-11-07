@@ -13,7 +13,7 @@ void registerBuiltinComponents()
 	r.add<TransformComponent>("Transform")
 		.field("position", &TransformComponent::position)
 		.field("scale", &TransformComponent::scale)
-		.field("angle", &TransformComponent::angle);
+		.field("rotation", &TransformComponent::rotation);
 
 	r.add<RendererComponent>("Renderer")
 		.field("path", &RendererComponent::path)

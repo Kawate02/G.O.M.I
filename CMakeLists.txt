@@ -27,7 +27,12 @@ FetchContent_Declare(stb
     GIT_TAG 31c1ad37456438565541f4919958214b6e762fb4
     SOURCE_SUBDIR _header_only)
 
-FetchContent_MakeAvailable(glfw miniaudio stb)
+FetchContent_Declare(glm
+    GIT_REPOSITORY https://github.com/g-truc/glm.git
+    GIT_TAG 1.0.3
+    GIT_SHALLOW TRUE)
+
+FetchContent_MakeAvailable(glfw miniaudio stb glm)
 
 # OpenGL 4.5 core のローダー(glad2 で生成済みのものを同梱)
 add_library(glad STATIC third_party/glad/src/gl.c)
@@ -45,8 +50,8 @@ target_include_directories(GomiCore PUBLIC
     GomiEngine
     ${miniaudio_SOURCE_DIR}
     ${stb_SOURCE_DIR})
-target_link_libraries(GomiCore PUBLIC glfw glad)
-target_compile_definitions(GomiCore PUBLIC NOMINMAX _CRT_SECURE_NO_WARNINGS)
+target_link_libraries(GomiCore PUBLIC glfw glad glm::glm)
+target_compile_definitions(GomiCore PUBLIC NOMINMAX _CRT_SECURE_NO_WARNINGS GLM_ENABLE_EXPERIMENTAL)
 # 開発中は exe の隣に assets が無ければソースの assets を直接読む(編集がすぐ反映される)
 target_compile_definitions(GomiCore PRIVATE GOMI_DEFAULT_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 if (WIN32)

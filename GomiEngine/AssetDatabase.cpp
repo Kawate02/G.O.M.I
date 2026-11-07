@@ -43,7 +43,8 @@ void AssetDatabase::setRoot(const std::filesystem::path& path)
 
 std::filesystem::path AssetDatabase::resolve(const AssetID& id) const
 {
-	return root / std::filesystem::u8path(id);
+	//ID は UTF-8 なので char8_t として渡す(u8path は C++20 で非推奨)
+	return root / std::filesystem::path(std::u8string(id.begin(), id.end()));
 }
 
 bool AssetDatabase::exists(const AssetID& id) const

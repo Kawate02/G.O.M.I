@@ -1,5 +1,6 @@
 #include "ForwardMoveSystem.h"
 #include "World.h"
+#include "MathUtil.h"
 
 #include <cmath>
 
@@ -45,11 +46,11 @@ void ForwardMoveSystem::update(World& world, int frameCount, float deltaTime)
 
 			if (forwardc.turnSpeed <= 0)
 			{
-				tfc.angle = target;
+				tfc.rotation.z = MathUtil::toDegrees(target);
 			}
 			else
 			{
-				tfc.angle = FacingForward(tfc.angle, target, forwardc.turnSpeed * deltaTime);
+				tfc.rotation.z = MathUtil::toDegrees(FacingForward(MathUtil::toRadians(tfc.rotation.z), target, forwardc.turnSpeed * deltaTime));
 			}
 		}
 		});
@@ -61,7 +62,7 @@ void ForwardMoveSystem::update(World& world, int frameCount, float deltaTime)
 		if (!forwardc.enable) return;
 
 		Vec2 vel = { 1, 0 };
-		if (forwardc.additive) world.event().emit<MoveRequestEvent>({ .e = e, .velocity = vel.fromAngle(tfc.angle) * forwardc.speed, .priority = 10, .blend = MoveBlend::ADDITIVE });
-		else world.event().emit<MoveRequestEvent>({ .e = e, .velocity = vel.fromAngle(tfc.angle), .priority = 10, .blend = MoveBlend::DIRECTIONAL});
+		if (forwardc.additive) world.event().emit<MoveRequestEvent>({ .e = e, .velocity = vel.fromAngle(MathUtil::toRadians(tfc.rotation.z)) * forwardc.speed, .priority = 10, .blend = MoveBlend::ADDITIVE });
+		else world.event().emit<MoveRequestEvent>({ .e = e, .velocity = vel.fromAngle(MathUtil::toRadians(tfc.rotation.z)), .priority = 10, .blend = MoveBlend::DIRECTIONAL});
 		});
 }

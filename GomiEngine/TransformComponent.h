@@ -5,5 +5,5 @@ struct TransformComponent
 {
 	Vec3 position;
 	Vec3 scale;
-	float angle;
+	Vec3 rotation; //度。x: ピッチ, y: ヨー, z: ロール(2D の回転は z)
 };

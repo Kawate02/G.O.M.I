@@ -41,7 +41,7 @@ int main()
 		ComponentManager cm;
 		Entity e{ 3, 1 };
 		Json j = Json::parse(R"({
-			"Transform": { "position": [100, 300, 0], "angle": 0.6 },
+			"Transform": { "position": [100, 300, 0], "rotation": [0, 0.6, 0] },
 			"EntityTag": { "tags": ["UNIT", "PLAYER"] },
 			"PlayerControl": { "actions": { "MOVE_RIGHT": "KEY_D", "JUMP": "KEY_SPACE" } },
 			"Collision": { "type": "CIRCLE", "radius": 32 }
@@ -51,7 +51,7 @@ int main()
 		auto& tf = cm.getComponentArray<TransformComponent>().getComponent(e);
 		CHECK(tf.position == Vec3(100, 300, 0));
 		CHECK(tf.scale == Vec3(0, 0, 0)); // 書いていない項目は T{} の値
-		CHECK(reg.find("Transform")->toJson(cm, e)["angle"].dump() == "0.6");
+		CHECK(reg.find("Transform")->toJson(cm, e)["rotation"].dump() == "[0.0,0.6,0.0]");
 
 		auto& tag = cm.getComponentArray<EntityTagComponent>().getComponent(e);
 		CHECK(tag.has(EntityTag::UNIT) && tag.has(EntityTag::PLAYER) && !tag.has(EntityTag::WALL));
