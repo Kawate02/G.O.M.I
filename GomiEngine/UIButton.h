@@ -18,7 +18,7 @@ public:
 	UIButton(std::string idleRes, std::string hoverRes, std::string pressedRes, const Vec2& pos, const Vec2& size, int layer, int order, std::function<void()> onClick, bool blockInput) 
 		: idleRes(idleRes), hoverRes(hoverRes), pressedRes(pressedRes), onClick(onClick), UIBase(pos, size, layer, order, blockInput)
 	{
-		auto assetSize = assetTable.at(hoverRes).size;
+		auto assetSize = getAssetTable().at(hoverRes).size;
 		rectSize = { assetSize.x * size.x, assetSize.y * size.y };
 	}
 	bool hitTest(const InputState& inputState) override;

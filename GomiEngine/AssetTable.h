@@ -22,4 +22,5 @@ struct AssetEntry
 
 using AssetTable = std::unordered_map<AssetID, AssetEntry>;
 
-const extern AssetTable assetTable;
+// 関数の中の static にして、他のグローバル(UIプレハブ等)の初期化より先に使われても大丈夫にする
+const AssetTable& getAssetTable();

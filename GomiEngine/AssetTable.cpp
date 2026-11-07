@@ -1,6 +1,8 @@
 #include "AssetTable.h"
 
-const AssetTable assetTable = {
+const AssetTable& getAssetTable()
+{
+	static const AssetTable assetTable = {
 	{"", {}},
 	{"player", {AssetType::IMAGE_ASSET, IDR_PLAYER_PNG, {64, 64}}},
 	{"background", {AssetType::IMAGE_ASSET, IDR_BG_PNG, {1600, 600}}},
@@ -12,4 +14,6 @@ const AssetTable assetTable = {
 	{"ui_hover", {AssetType::IMAGE_ASSET, IDR_UI_HOVER_PNG, {64, 28}}},
 	{"cursor_move", {AssetType::AUDIO_ASSET, IDR_CURSOR_MOVE_WAV, {}}},
 	{"cursor_click", {AssetType::AUDIO_ASSET, IDR_CURSOR_CLICK_WAV, {}}},
-};
+	};
+	return assetTable;
+}

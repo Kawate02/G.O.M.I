@@ -22,8 +22,8 @@ ImageResource ResourceManager::loadImage(IDrawer& drawer, const AssetID& assetID
     auto cached = images.find(assetID);
     if (cached != images.end()) return cached->second;
 
-    auto it = assetTable.find(assetID);
-    if (it == assetTable.end()) return {};
+    auto it = getAssetTable().find(assetID);
+    if (it == getAssetTable().end()) return {};
     if (it->second.type != AssetType::IMAGE_ASSET) return {};
 
     ResourceBlob blob = loadEmbedded(it->second.file);
@@ -39,8 +39,8 @@ SoundResource ResourceManager::loadSound(IAudioBackend& backend, const AssetID& 
     auto cached = sounds.find(assetID);
     if (cached != sounds.end()) return cached->second;
 
-    auto it = assetTable.find(assetID);
-    if (it == assetTable.end()) return {};
+    auto it = getAssetTable().find(assetID);
+    if (it == getAssetTable().end()) return {};
     if (it->second.type != AssetType::AUDIO_ASSET) return {};
 
     ResourceBlob blob = loadEmbedded(it->second.file);
