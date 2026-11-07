@@ -13,13 +13,11 @@ class UIManager
 private:
 	std::vector<std::unique_ptr<UIBase>> uiList;
 	int topLayer = 1000;
-	std::vector<UIType> uiTypes;
-	std::map<uint32_t, uint8_t> idToIndex;
-	std::map<uint8_t, uint32_t> indexToID;
+	std::vector<UIType> uiTypes; //添字 = UIHandle の id
 
 	std::vector<UIHandle> uiHandles;
-	std::vector<uint8_t> generations;
-	std::queue<uint8_t> freeIDs;
+	std::vector<uint32_t> generations;
+	std::queue<uint32_t> freeIDs;
 
 	std::vector<uint32_t> inputSort;
 public:
@@ -32,7 +30,10 @@ public:
 	void addChild(UIHandle parent, std::unique_ptr<UIBase> ui, UIType type = UIType::NONE);
 	bool alive(UIHandle handle);
 	void setTop();
-	std::unique_ptr<UIBase>& getUI(UIHandle handle);
+	/// <summary>
+	/// 無効なハンドルなら nullptr
+	/// </summary>
+	UIBase* getUI(UIHandle handle);
 	void update(const InputState& inputState, RenderQueue& renderQueue);
 	void clear();
 };

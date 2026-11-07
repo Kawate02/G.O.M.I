@@ -9,10 +9,11 @@ UIHandle UIManager::createUI()
 	uint32_t id;
 	if (freeIDs.empty())
 	{
-		id = generations.size();
+		id = static_cast<uint32_t>(generations.size());
 		generations.push_back(0);
 		uiHandles.resize(generations.size());
 		uiList.resize(generations.size());
+		uiTypes.resize(generations.size(), UIType::NONE);
 	}
 	else
 	{
@@ -28,9 +29,7 @@ UIHandle UIManager::add(std::unique_ptr<UIBase> ui, UIType type)
 	auto handle = createUI();
 	uiHandles[handle.id] = handle;
 	uiList[handle.id] = std::move(ui);
-	uiTypes.push_back(type);
-	idToIndex[handle.id] = static_cast<uint8_t>(uiTypes.size() - 1);
-	indexToID[static_cast<uint8_t>(uiTypes.size() - 1)] = handle.id;
+	uiTypes[handle.id] = type;
 	setTop();
 	return handle;
 }
@@ -45,7 +44,7 @@ void UIManager::remove(UIHandle handle)
 	generations[handle.id]++;
 	uiHandles[handle.id] = { handle.id, generations[handle.id] };
 	freeIDs.push(handle.id);
-	uiTypes[idToIndex[handle.id]] = UIType::NONE;
+	uiTypes[handle.id] = UIType::NONE;
 	inputSort.erase(std::remove(inputSort.begin(), inputSort.end(), handle.id), inputSort.end());
 	uiList[handle.id] = nullptr;
 	setTop();
@@ -64,11 +63,11 @@ void UIManager::move(UIHandle handle, Vec2 delta)
 std::vector<UIHandle> UIManager::getHandles(UIType type)
 {
 	std::vector<UIHandle> result;
-	for (uint32_t i = 0; i < uiTypes.size(); i++)
+	for (uint32_t id = 0; id < uiTypes.size(); id++)
 	{
-		if (uiTypes[i] == type)
+		if (uiTypes[id] == type && uiList[id] != nullptr)
 		{
-			result.push_back(uiHandles[indexToID[i]]);
+			result.push_back(uiHandles[id]);
 		}
 	}
 	return result;
@@ -77,13 +76,12 @@ std::vector<UIHandle> UIManager::getHandles(UIType type)
 void UIManager::addChild(UIHandle parent, std::unique_ptr<UIBase> ui, UIType type)
 {
 	auto handle = add(std::move(ui), type);
-	uiList[parent.id]->addChild(handle);
+	if (alive(parent)) uiList[parent.id]->addChild(handle);
 }
 
 bool UIManager::alive(UIHandle handle)
 {
-	if (handle.generation == generations[handle.id]) return true;
-	return false;
+	return handle.id < generations.size() && handle.generation == generations[handle.id];
 }
 
 void UIManager::setTop()
@@ -99,11 +97,10 @@ void UIManager::setTop()
 	}
 }
 
-std::unique_ptr<UIBase>& UIManager::getUI(UIHandle handle)
+UIBase* UIManager::getUI(UIHandle handle)
 {
-	std::unique_ptr<UIBase> result = nullptr;
-	if (handle.generation != generations[handle.id]) return result;
-	return uiList[handle.id];
+	if (!alive(handle)) return nullptr;
+	return uiList[handle.id].get();
 }
 
 void UIManager::update(const InputState& inputState, RenderQueue& renderQueue)
@@ -134,8 +131,12 @@ void UIManager::clear()
 {
 	for (auto& ui : uiList)
 	{
-		ui->clear();
-		ui.reset();
+		if (ui) ui->clear();
 	}
 	uiList.clear();
+	uiTypes.clear();
+	uiHandles.clear();
+	generations.clear();
+	std::queue<uint32_t>().swap(freeIDs);
+	inputSort.clear();
 }
