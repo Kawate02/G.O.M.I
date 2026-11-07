@@ -3,7 +3,9 @@
     { "type": "Text", "text": "", "fontSize": 42, "anchor": "CENTER", "pos": [400, 300], "layer": 0, "order": 1, "block": true },
     { "type": "Button", "idle": "", "hover": "images/UIHover.png", "pressed": "images/UIHover.png", "pos": [336, 372], "scale": [2, 2], "layer": 0, "order": 1, "onClick": { "event": "WorldChange", "value": "Field" } },
     { "type": "Text", "text": "START", "fontSize": 32, "anchor": "CENTER", "pos": [400, 400], "layer": 0, "order": 2 },
-    { "type": "Button", "idle": "", "hover": "images/UIHover.png", "pressed": "images/UIHover.png", "pos": [336, 442], "scale": [2, 2], "layer": 0, "order": 1, "onClick": { "event": "quit", "value": 0 } },
-    { "type": "Text", "text": "EXIT", "fontSize": 32, "anchor": "CENTER", "pos": [400, 470], "layer": 0, "order": 2 }
+    { "type": "Button", "idle": "", "hover": "images/UIHover.png", "pressed": "images/UIHover.png", "pos": [336, 442], "scale": [2, 2], "layer": 0, "order": 1, "onClick": { "event": "WorldChange", "value": "Demo3D" } },
+    { "type": "Text", "text": "3D DEMO", "fontSize": 32, "anchor": "CENTER", "pos": [400, 470], "layer": 0, "order": 2 },
+    { "type": "Button", "idle": "", "hover": "images/UIHover.png", "pressed": "images/UIHover.png", "pos": [336, 512], "scale": [2, 2], "layer": 0, "order": 1, "onClick": { "event": "quit", "value": 0 } },
+    { "type": "Text", "text": "EXIT", "fontSize": 32, "anchor": "CENTER", "pos": [400, 540], "layer": 0, "order": 2 }
   ]
 }

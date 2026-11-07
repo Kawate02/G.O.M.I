@@ -65,6 +65,8 @@ void PhysicsSystem::update(World& world, int frameCount, float deltaTime)
 					physc.isGround = true;
 				}
 				movec.physVel[axis] = 0;
+				//床や天井で止まったら落下の速さも捨てる(残すと段差から落ちた瞬間に一気に落ちる)
+				if (down[axis] != 0) physc.gravVel[axis] = 0;
 			}
 		}
 		});

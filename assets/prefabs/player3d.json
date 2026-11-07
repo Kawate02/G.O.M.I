@@ -1,0 +1,26 @@
+{
+  "entities": [
+    {
+      "components": {
+        "Transform": { "position": [0, 0.5, 4], "scale": [1, 1, 1] },
+        "MeshRenderer": { "mesh": "builtin:cube", "color": [1, 0.85, 0.2] },
+        "PlayerControl": {
+          "actions": {
+            "MOVE_RIGHT": "KEY_D",
+            "MOVE_LEFT": "KEY_A",
+            "MOVE_UP": "KEY_W",
+            "MOVE_DOWN": "KEY_S",
+            "JUMP": "KEY_SPACE"
+          },
+          "plane": "XZ",
+          "jumpSpeed": 8
+        },
+        "Move": { "speed": 1, "maxSpeed": 6, "stopDamp": 0.7, "turnBrake": 0.6 },
+        "Physics": { "gravity": 25, "maxGravity": 40, "decay": 30, "gravityDirection": [0, -1, 0] },
+        "EntityTag": { "tags": ["UNIT", "PLAYER"] },
+        "Collision": { "type": "BOX", "size": [1, 1, 1], "offset": [-0.5, -0.5, -0.5] },
+        "CameraFollow": { "offset": [0, 5, 8] }
+      }
+    }
+  ]
+}
