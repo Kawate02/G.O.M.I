@@ -14,7 +14,6 @@ void MoveSystem::update(World& world, int frameCount, float deltaTime)
 		if (!world.alive(e)) return;
 		auto& tfc = tf.getComponent(e);
 		auto& movec = move.getComponent(e);
-		tfc.position.x += movec.result.x;
-		tfc.position.y += movec.result.y;
+		tfc.position += movec.result;
 		});
 }

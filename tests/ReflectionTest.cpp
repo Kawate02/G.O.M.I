@@ -44,7 +44,7 @@ int main()
 			"Transform": { "position": [100, 300, 0], "rotation": [0, 0.6, 0] },
 			"EntityTag": { "tags": ["UNIT", "PLAYER"] },
 			"PlayerControl": { "actions": { "MOVE_RIGHT": "KEY_D", "JUMP": "KEY_SPACE" } },
-			"Collision": { "type": "CIRCLE", "radius": 32 }
+			"Collision": { "type": "SPHERE", "radius": 32 }
 		})");
 		for (auto& [name, value] : j.items()) reg.find(name)->addFromJson(cm, e, value);
 
@@ -61,7 +61,7 @@ int main()
 		CHECK(pc.actions.size() == 2 && pc.actions[ActionID::JUMP] == InputKey::KEY_SPACE);
 		CHECK(reg.find("PlayerControl")->toJson(cm, e)["actions"]["MOVE_RIGHT"] == "KEY_D");
 
-		CHECK(cm.getComponentArray<CollisionComponent>().getComponent(e).type == CollisionType::CIRCLE);
+		CHECK(cm.getComponentArray<CollisionComponent>().getComponent(e).type == CollisionType::SPHERE);
 
 		// コンポーネントの既定値(メンバ初期化子)が生きている
 		reg.find("Physics")->addFromJson(cm, e, Json::object());
@@ -73,7 +73,7 @@ int main()
 		ComponentManager cm;
 		Entity e{ 0, 0 };
 		CHECK(throws([&] { reg.find("Transform")->addFromJson(cm, e, Json::parse(R"({"positon": [0,0,0]})")); }));
-		CHECK(throws([&] { reg.find("Transform")->addFromJson(cm, e, Json::parse(R"({"position": [0,0]})")); }));
+		CHECK(throws([&] { reg.find("Transform")->addFromJson(cm, e, Json::parse(R"({"position": [0]})")); }));
 		CHECK(throws([&] { reg.find("Collision")->addFromJson(cm, e, Json::parse(R"({"type": "TRIANGLE"})")); }));
 		try { reg.find("Collision")->addFromJson(cm, e, Json::parse(R"({"type": "TRIANGLE"})")); }
 		catch (const std::exception& ex) { CHECK(std::string(ex.what()).find("Collision.type") != std::string::npos); }

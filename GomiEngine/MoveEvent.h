@@ -1,6 +1,7 @@
 #pragma once
 #include "Entity.h"
-#include "Vec2.h"
+#include "Vec3.h"
+#include <cstdint>
 enum class MoveBlend : uint8_t
 {
 	DIRECTIONAL,
@@ -17,7 +18,7 @@ enum class MoveOwner : uint8_t
 struct MoveRequestEvent
 {
 	Entity e;
-	Vec2 velocity;
+	Vec3 velocity;
 	int priority;
 	MoveBlend blend;
 	MoveOwner owner;

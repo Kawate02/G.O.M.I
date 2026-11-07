@@ -39,7 +39,7 @@ void ForwardMoveSystem::update(World& world, int frameCount, float deltaTime)
 		float threshold = movec.maxSpeed * 0.01f;
 		float thresholdSq = threshold * threshold;
 
-		Vec2 vel = movec.result;
+		Vec3 vel = movec.result;
 		if (vel.lengthSq() > thresholdSq)
 		{
 			float target = atan2(vel.y, vel.x);
@@ -61,8 +61,8 @@ void ForwardMoveSystem::update(World& world, int frameCount, float deltaTime)
 		auto& forwardc = forward.getComponent(e);
 		if (!forwardc.enable) return;
 
-		Vec2 vel = { 1, 0 };
-		if (forwardc.additive) world.event().emit<MoveRequestEvent>({ .e = e, .velocity = vel.fromAngle(MathUtil::toRadians(tfc.rotation.z)) * forwardc.speed, .priority = 10, .blend = MoveBlend::ADDITIVE });
-		else world.event().emit<MoveRequestEvent>({ .e = e, .velocity = vel.fromAngle(MathUtil::toRadians(tfc.rotation.z)), .priority = 10, .blend = MoveBlend::DIRECTIONAL});
+		auto forward = [&]() { Vec2 v = Vec2(1, 0).fromAngle(MathUtil::toRadians(tfc.rotation.z)); return Vec3(v.x, v.y, 0); };
+		if (forwardc.additive) world.event().emit<MoveRequestEvent>({ .e = e, .velocity = forward() * forwardc.speed, .priority = 10, .blend = MoveBlend::ADDITIVE });
+		else world.event().emit<MoveRequestEvent>({ .e = e, .velocity = forward(), .priority = 10, .blend = MoveBlend::DIRECTIONAL});
 		});
 }

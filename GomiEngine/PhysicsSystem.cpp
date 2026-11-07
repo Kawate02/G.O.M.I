@@ -32,15 +32,17 @@ void PhysicsSystem::update(World& world, int frameCount, float deltaTime)
 				}
 			}
 		}
+		//上昇中(重力と逆向き)は弱く、落下中は強く引く
+		const Vec3& down = physc.gravityDirection;
 		float gravity = physc.gravity;
-		if (physc.gravVel.y < 0)
+		if (physc.gravVel.dot(down) < 0)
 		{
 			gravity *= 0.6f;
 		}
 		else gravity *= 1.2f;
 		gravity = gravity > physc.maxGravity ? physc.maxGravity : gravity;
-		physc.gravVel.y += gravity * deltaTime;
-		
+		physc.gravVel += down * (gravity * deltaTime);
+
 		float len = physc.extraVel.length();
 		if (len > 0.0f)
 		{
@@ -50,21 +52,20 @@ void PhysicsSystem::update(World& world, int frameCount, float deltaTime)
 		}
 
 		movec.physVel = physc.gravVel + physc.extraVel;
-		//このフレームで動く距離(速度 x 時間)の先に壁があるかを見る
-		auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), { movec.physVel.x * deltaTime, 0 });
-		if (hitE.entities.size() > 0)
+		//このフレームで動く距離(速度 x 時間)の先に壁があるかを軸ごとに見る。重力の向きで止まったら接地
+		for (int axis = 0; axis < 3; axis++)
 		{
-			movec.physVel.x = 0;
-		}
-
-		hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), { 0, movec.physVel.y * deltaTime });
-		if (hitE.entities.size() > 0)
-		{
-			if (movec.physVel.y >= 0 && physc.gravity > 0)
+			Vec3 step;
+			step[axis] = movec.physVel[axis] * deltaTime;
+			auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), step);
+			if (hitE.entities.size() > 0)
 			{
-				physc.isGround = true;
+				if (down[axis] != 0 && movec.physVel[axis] * down[axis] >= 0 && physc.gravity > 0)
+				{
+					physc.isGround = true;
+				}
+				movec.physVel[axis] = 0;
 			}
-			movec.physVel.y = 0;
 		}
 		});
 }

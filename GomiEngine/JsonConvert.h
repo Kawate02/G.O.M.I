@@ -105,8 +105,9 @@ void fromJson(const Json& j, T& v)
 	}
 	else if constexpr (std::is_same_v<T, Vec3>)
 	{
-		if (!j.is_array() || j.size() != 3) throw std::runtime_error("expected [x, y, z]");
-		v = Vec3(j[0].template get<float>(), j[1].template get<float>(), j[2].template get<float>());
+		//2D 用に [x, y] も受け付ける(z = 0)
+		if (!j.is_array() || (j.size() != 3 && j.size() != 2)) throw std::runtime_error("expected [x, y, z]");
+		v = Vec3(j[0].template get<float>(), j[1].template get<float>(), j.size() == 3 ? j[2].template get<float>() : 0.0f);
 	}
 	else if constexpr (NamedEnum<T>)
 	{

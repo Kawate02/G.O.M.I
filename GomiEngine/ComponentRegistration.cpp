@@ -28,10 +28,14 @@ void registerBuiltinComponents()
 		.field("gravity", &PhysicsComponent::gravity)
 		.field("maxGravity", &PhysicsComponent::maxGravity)
 		.field("decay", &PhysicsComponent::decay)
+		.field("gravityDirection", &PhysicsComponent::gravityDirection)
 		.field("isGround", &PhysicsComponent::isGround);
 
 	r.add<PlayerControlComponent>("PlayerControl")
-		.field("actions", &PlayerControlComponent::actions);
+		.field("actions", &PlayerControlComponent::actions)
+		.field("plane", &PlayerControlComponent::plane)
+		.field("jumpSpeed", &PlayerControlComponent::jumpSpeed)
+		.field("dashSpeed", &PlayerControlComponent::dashSpeed);
 
 	r.add<MoveComponent>("Move")
 		.field("inputVel", &MoveComponent::inputVel)
@@ -53,7 +57,8 @@ void registerBuiltinComponents()
 	r.add<CameraFollowComponent>("CameraFollow")
 		.field("offset", &CameraFollowComponent::offset)
 		.field("x", &CameraFollowComponent::x)
-		.field("y", &CameraFollowComponent::y);
+		.field("y", &CameraFollowComponent::y)
+		.field("z", &CameraFollowComponent::z);
 
 	r.add<CollisionComponent>("Collision")
 		.field("type", &CollisionComponent::type)

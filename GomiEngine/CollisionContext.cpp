@@ -1,70 +1,78 @@
 #include "CollisionContext.h"
 #include "World.h"
 
-Box CollisionContext::makeBox(const TransformComponent& tf, const CollisionComponent& col, const Vec2& postmove)
+namespace
 {
-	Vec2 min = { tf.position.x + postmove.x + col.offset.x, tf.position.y + postmove.y + col.offset.y };
+	/// <summary>
+	/// 1軸の重なり。どちらかの厚さが 0 の軸は境目に触れていれば重なりとみなす(2D を z = 0 で表すため)
+	/// </summary>
+	bool overlapAxis(float aMin, float aMax, float bMin, float bMax)
+	{
+		if (aMin == aMax || bMin == bMax) return aMin <= bMax && aMax >= bMin;
+		return aMin < bMax && aMax > bMin;
+	}
+}
+
+Box CollisionContext::makeBox(const TransformComponent& tf, const CollisionComponent& col, const Vec3& postmove)
+{
+	Vec3 min = tf.position + postmove + col.offset;
 	return { min, min + col.size };
 }
 
-Circle CollisionContext::makeCircle(const TransformComponent& tf, const CollisionComponent& col, const Vec2& postmove)
+Sphere CollisionContext::makeSphere(const TransformComponent& tf, const CollisionComponent& col, const Vec3& postmove)
 {
-	return { { tf.position.x + postmove.x + col.offset.x, tf.position.y + postmove.y + col.offset.y }, col.radius };
+	return { tf.position + postmove + col.offset, col.radius };
+}
+
+Box CollisionContext::bounds(const TransformComponent& tf, const CollisionComponent& col, const Vec3& postmove)
+{
+	if (col.type == CollisionType::BOX) return makeBox(tf, col, postmove);
+	Sphere s = makeSphere(tf, col, postmove);
+	Vec3 r(s.radius, s.radius, s.radius);
+	return { s.center - r, s.center + r };
 }
 
 bool CollisionContext::checkAABB(const Box& box1, const Box& box2)
 {
-	if (box1.min.x < box2.max.x &&
-		box1.max.x > box2.min.x &&
-		box1.min.y < box2.max.y &&
-		box1.max.y > box2.min.y)
-	{
-		return true;
-	}
-	return false;
+	return overlapAxis(box1.min.x, box1.max.x, box2.min.x, box2.max.x)
+		&& overlapAxis(box1.min.y, box1.max.y, box2.min.y, box2.max.y)
+		&& overlapAxis(box1.min.z, box1.max.z, box2.min.z, box2.max.z);
 }
 
-bool CollisionContext::checkCircle(const Circle& circle1, const Circle& circle2)
+bool CollisionContext::checkSphere(const Sphere& sphere1, const Sphere& sphere2)
 {
-	Vec2 dist = circle1.center - circle2.center;
-	float r = circle1.radius + circle2.radius;
+	Vec3 dist = sphere1.center - sphere2.center;
+	float r = sphere1.radius + sphere2.radius;
 	return dist.lengthSq() <= r * r;
 }
 
-bool CollisionContext::checkCircleAABB(const Circle& circle, const Box& box)
+bool CollisionContext::checkSphereAABB(const Sphere& sphere, const Box& box)
 {
-	float closestX = std::clamp(circle.center.x, box.min.x, box.max.x);
-	float closestY = std::clamp(circle.center.y, box.min.y, box.max.y);
-
-	float dx = circle.center.x - closestX;
-	float dy = circle.center.y - closestY;
-
-	return dx * dx + dy * dy <= circle.radius * circle.radius;
+	Vec3 closest(std::clamp(sphere.center.x, box.min.x, box.max.x),
+		std::clamp(sphere.center.y, box.min.y, box.max.y),
+		std::clamp(sphere.center.z, box.min.z, box.max.z));
+	return (sphere.center - closest).lengthSq() <= sphere.radius * sphere.radius;
 }
 
 void CollisionContext::createGrid(World& world)
 {
 	grid.clear();
 	auto& collisions = world.getComponentManager().getComponentArray<CollisionComponent>();
+	auto& transforms = world.getComponentManager().getComponentArray<TransformComponent>();
 
 	for (auto i = 0; i < collisions.getComponentCount(); i++)
 	{
 		Entity e = { collisions.getEntityId(i), collisions.getGeneration(i) };
 		if (!world.alive(e)) continue;
-		auto& colc = collisions.getComponent(e);
-		auto& tf = world.getComponentManager().getComponentArray<TransformComponent>().getComponent(e);
-		std::vector<Cell> cell;
-		if (colc.type == CollisionType::BOX) cell = toCell({ tf.position.x + colc.offset.x, tf.position.y + colc.offset.y }, colc.size, CELL_SIZE);
-		if (colc.type == CollisionType::CIRCLE) cell = toCell({ tf.position.x + colc.offset.x - colc.radius, tf.position.y + colc.offset.y - colc.radius}, { colc.radius * 2, colc.radius * 2 }, CELL_SIZE);
-
-		for (auto& c : cell)
+		Box b = bounds(transforms.getComponent(e), collisions.getComponent(e));
+		for (auto& c : toCell(b.min, b.max - b.min, CELL_SIZE))
 		{
 			grid[c].push_back(e);
 		}
 	}
 }
 
-CollisionHit CollisionContext::queryAt(World& world, const Entity& self, EntityTag selftag, CollisionRule rule, const Vec2& postmove)
+CollisionHit CollisionContext::queryAt(World& world, const Entity& self, EntityTag selftag, CollisionRule rule, const Vec3& postmove)
 {
 	CollisionHit hit;
 	auto& tag = world.getComponentManager().getComponentArray<EntityTagComponent>().getComponent(self);
@@ -75,78 +83,39 @@ CollisionHit CollisionContext::queryAt(World& world, const Entity& self, EntityT
 	}
 	EntityTag othertag = rule.getPair(selftag);//相方のタグはこれしかダメだよ
 	auto& tf = world.getComponentManager().getComponentArray<TransformComponent>();
-	std::vector<Entity> visited;
-	std::vector<Cell> cells;
 	auto& selftf = tf.getComponent(self);
 	auto& selfcol = collision.getComponent(self);
-	//移動後の位置が入るセルを調べる(postmove が 0 なら今の位置)
-	{
-		if (selfcol.type == CollisionType::BOX)
-		{
-			cells = toCell({
-				selftf.position.x + selfcol.offset.x + postmove.x,
-				selftf.position.y + selfcol.offset.y + postmove.y }, {
-				selfcol.size }, CELL_SIZE);
-		}
-		if (selfcol.type == CollisionType::CIRCLE)
-		{
-			cells = toCell({ 
-				selftf.position.x + selfcol.offset.x - selfcol.radius + postmove.x,
-				selftf.position.y + selfcol.offset.y - selfcol.radius + postmove.y }, {
-				selfcol.radius * 2 , selfcol.radius * 2 }, CELL_SIZE);
-		}
-	}
 
-	for (auto& c : cells)
+	//移動後の位置が入るマスと、その周り(上下左右前後の 27 マス)を調べる
+	std::vector<Entity> visited;
+	Box selfBounds = bounds(selftf, selfcol, postmove);
+	for (auto& c : toCell(selfBounds.min, selfBounds.max - selfBounds.min, CELL_SIZE))
 	{
-		for (int i = 0; i < sizeof(neighbors) / sizeof(neighbors[0]); i++)//周囲含めた9マスを調べるよ
+		for (int dz = -1; dz <= 1; dz++)
+		for (int dy = -1; dy <= 1; dy++)
+		for (int dx = -1; dx <= 1; dx++)
 		{
-			Cell cell = { c.x + neighbors[i].x, c.y + neighbors[i].y };
-			auto it = grid.find(cell);
-			if (it != grid.end())//周りにエンティティがいた
+			auto it = grid.find({ c.x + dx, c.y + dy, c.z + dz });
+			if (it == grid.end()) continue;
+			for (auto& otherE : it->second)
 			{
-				for (auto& otherE : it->second)
-				{
-					if (otherE == self) continue;//自分自身は無視
-					if (std::find(visited.begin(), visited.end(), otherE) != visited.end()) continue;//既に見たエンティティは無視
-					if (!world.alive(otherE)) continue;//生きてないエンティティは無視
-					visited.push_back(otherE);
-					auto& otherTag = world.getComponentManager().getComponentArray<EntityTagComponent>().getComponent(otherE);
-					if (otherTag.has(othertag) && collision.hasComponent(otherE))//タグも合ってる
-					{
-						auto& othertf = tf.getComponent(otherE);
-						auto& othercol = collision.getComponent(otherE);
+				if (otherE == self) continue;//自分自身は無視
+				if (std::find(visited.begin(), visited.end(), otherE) != visited.end()) continue;//既に見たエンティティは無視
+				if (!world.alive(otherE)) continue;//生きてないエンティティは無視
+				visited.push_back(otherE);
+				auto& otherTag = world.getComponentManager().getComponentArray<EntityTagComponent>().getComponent(otherE);
+				if (!otherTag.has(othertag) || !collision.hasComponent(otherE)) continue;//タグが合わない
 
-						if (selfcol.type == CollisionType::CIRCLE && othercol.type == CollisionType::CIRCLE)
-						{
-							if (checkCircle(makeCircle(selftf, selfcol, postmove), makeCircle(othertf, othercol)))
-							{
-								hit.entities.push_back(otherE);
-							}
-						}
-						if (selfcol.type == CollisionType::BOX && othercol.type == CollisionType::BOX)
-						{
-							if (checkAABB(makeBox(selftf, selfcol, postmove), makeBox(othertf, othercol)))
-							{
-								hit.entities.push_back(otherE);
-							}
-						}
-						if (selfcol.type == CollisionType::CIRCLE && othercol.type == CollisionType::BOX)
-						{
-							if (checkCircleAABB(makeCircle(selftf, selfcol, postmove), makeBox(othertf, othercol)))
-							{
-								hit.entities.push_back(otherE);
-							}
-						}
-						if (selfcol.type == CollisionType::BOX && othercol.type == CollisionType::CIRCLE)
-						{
-							if (checkCircleAABB(makeCircle(othertf, othercol), makeBox(selftf, selfcol, postmove)))
-							{
-								hit.entities.push_back(otherE);
-							}
-						}
-					}
-				}
+				auto& othertf = tf.getComponent(otherE);
+				auto& othercol = collision.getComponent(otherE);
+				bool selfSphere = selfcol.type == CollisionType::SPHERE;
+				bool otherSphere = othercol.type == CollisionType::SPHERE;
+				bool touching;
+				if (selfSphere && otherSphere) touching = checkSphere(makeSphere(selftf, selfcol, postmove), makeSphere(othertf, othercol));
+				else if (!selfSphere && !otherSphere) touching = checkAABB(makeBox(selftf, selfcol, postmove), makeBox(othertf, othercol));
+				else if (selfSphere) touching = checkSphereAABB(makeSphere(selftf, selfcol, postmove), makeBox(othertf, othercol));
+				else touching = checkSphereAABB(makeSphere(othertf, othercol), makeBox(selftf, selfcol, postmove));
+				if (touching) hit.entities.push_back(otherE);
 			}
 		}
 	}

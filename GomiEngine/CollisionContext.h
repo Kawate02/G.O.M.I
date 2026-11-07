@@ -1,7 +1,7 @@
 #pragma once
 #include "Entity.h"
 #include "CollisionRule.h"
-#include "Vec2.h"
+#include "Vec3.h"
 #include "Cell.h"
 #include "CellHash.h"
 #include <vector>
@@ -17,31 +17,32 @@ struct CollisionHit
 };
 struct Box
 {
-	Vec2 min;
-	Vec2 max;
+	Vec3 min;
+	Vec3 max;
 };
-struct Circle
+struct Sphere
 {
-	Vec2 center;
+	Vec3 center;
 	float radius;
 };
 
-static constexpr Cell neighbors[9] = {
-	{ 1, 0 }, { 1, 1 }, { 0, 1 }, 
-	{ -1, 1 }, { 0, 0 }, { -1, 0 },
-	{ -1, -1 }, { 0, -1 }, { 1, -1 }
-};
-
+/// <summary>
+/// 毎フレーム全コライダーを3Dのグリッドに登録し、周りのマスだけを調べて当たりを返す
+/// </summary>
 class CollisionContext
 {
 private:
 	std::unordered_map<Cell, std::vector<Entity>> grid;
-	Box makeBox(const TransformComponent& tf, const CollisionComponent& col, const Vec2& postmove = { 0, 0 });
-	Circle makeCircle(const TransformComponent& tf, const CollisionComponent& col, const Vec2& postmove = { 0, 0 });
-	bool checkAABB(const Box& box1, const Box& box2);
-	bool checkCircle(const Circle& circle1, const Circle& circle2);
-	bool checkCircleAABB(const Circle& circle, const Box& box);
+	Box makeBox(const TransformComponent& tf, const CollisionComponent& col, const Vec3& postmove = {});
+	Sphere makeSphere(const TransformComponent& tf, const CollisionComponent& col, const Vec3& postmove = {});
+	Box bounds(const TransformComponent& tf, const CollisionComponent& col, const Vec3& postmove = {});
 public:
+	static bool checkAABB(const Box& box1, const Box& box2);
+	static bool checkSphere(const Sphere& sphere1, const Sphere& sphere2);
+	static bool checkSphereAABB(const Sphere& sphere, const Box& box);
 	void createGrid(World& world);
-	CollisionHit queryAt(World& world, const Entity& self, EntityTag selftag, CollisionRule rule, const Vec2& postmove = { 0, 0 });
+	/// <summary>
+	/// self を postmove だけ動かした位置で、rule の相手タグを持つ Entity と重なるものを返す
+	/// </summary>
+	CollisionHit queryAt(World& world, const Entity& self, EntityTag selftag, CollisionRule rule, const Vec3& postmove = {});
 };

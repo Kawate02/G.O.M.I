@@ -24,8 +24,8 @@ void MoveResolveSystem::update(World& world, int frameCount, float deltaTime)
 
 		if (it != moveEvents.end())
 		{
-			Vec2 finVec;
-			Vec2 addVec;
+			Vec3 finVec;
+			Vec3 addVec;
 			int bestPriority = -1;
 
 			for (auto& ev : it->second)
@@ -51,13 +51,12 @@ void MoveResolveSystem::update(World& world, int frameCount, float deltaTime)
 
 			if (movec.inputVel.length() > 0)
 			{
-				Vec2 parallel = finVec * movec.inputVel.dot(finVec);
-				Vec2 perpendicular = movec.inputVel - parallel;
+				Vec3 parallel = finVec * movec.inputVel.dot(finVec);
+				Vec3 perpendicular = movec.inputVel - parallel;
 				movec.inputVel = parallel + perpendicular * movec.turnBrake;
 			}
 			movec.inputVel += finVec * movec.speed;
-			float lenght = movec.inputVel.x * movec.inputVel.x + movec.inputVel.y * movec.inputVel.y;
-			if (lenght > movec.maxSpeed * movec.maxSpeed)
+			if (movec.inputVel.lengthSq() > movec.maxSpeed * movec.maxSpeed)
 			{
 				movec.inputVel = movec.inputVel.normalize() * movec.maxSpeed;
 			}
@@ -66,16 +65,16 @@ void MoveResolveSystem::update(World& world, int frameCount, float deltaTime)
 		}
 
 		movec.result = movec.inputVel * deltaTime + movec.physVel * deltaTime;
-		auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), { movec.result.x, 0 });
-		if (hitE.entities.size() > 0)
+		//軸ごとに壁を調べ、ぶつかる軸だけ止める(壁に沿って滑る)
+		for (int axis = 0; axis < 3; axis++)
 		{
-			movec.result.x = 0;
-		}
-
-		hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), { 0, movec.result.y });
-		if (hitE.entities.size() > 0)
-		{
-			movec.result.y = 0;
+			Vec3 step;
+			step[axis] = movec.result[axis];
+			auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), step);
+			if (hitE.entities.size() > 0)
+			{
+				movec.result[axis] = 0;
+			}
 		}
 		});
 }

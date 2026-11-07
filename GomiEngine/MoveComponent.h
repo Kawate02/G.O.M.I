@@ -1,11 +1,11 @@
 #pragma once
-#include "Vec2.h"
+#include "Vec3.h"
 
 struct MoveComponent
 {
-	Vec2 inputVel = {0, 0};
-	Vec2 physVel = {0, 0};
-	Vec2 result = {0, 0};
+	Vec3 inputVel;
+	Vec3 physVel;
+	Vec3 result; //このフレームで動く量(位置の差)
 	float speed;
 	float maxSpeed;
 	float stopDamp;
