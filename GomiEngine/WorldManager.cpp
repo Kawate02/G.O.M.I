@@ -1,49 +1,50 @@
 #include "WorldManager.h"
+#include "SceneLoader.h"
 
-void WorldManager::initialize(const std::string& startName)
+#include <iostream>
+
+std::unique_ptr<World> WorldManager::createWorld(const std::string& scene)
 {
-	createWorld(startName.empty() ? 0 : worldNames.at(startName));
+	AssetID path = SceneLoader::scenePath(scene);
+	Json data = AssetDatabase::getInstance().readJson(path);
+	auto world = std::make_unique<World>(inputState, renderQueue, audioQueue);
+	world->setPauseUI(project.value("pauseUI", std::string()));
+	world->initialize(data, path);
+	return world;
 }
 
-void WorldManager::createWorld(int next)
+void WorldManager::initialize(const std::string& startScene)
 {
-	crrentStageID = next;
-	crrentWorld = std::make_unique<World>(inputState, renderQueue, audioQueue);
-	auto& prefab = stageTable.at(next);
-	crrentWorld->initialize(prefab);
+	auto& db = AssetDatabase::getInstance();
+	project = db.exists("project.json") ? db.readJson("project.json") : Json::object();
+	std::string first = startScene.empty() ? project.value("startScene", std::string()) : startScene;
+	if (first.empty()) throw std::runtime_error("no start scene: set \"startScene\" in project.json");
+	currentWorld = createWorld(first);
+	currentScene = first;
 }
 
-void WorldManager::changeWorld(int next)
+void WorldManager::changeWorld(const std::string& scene)
 {
-	crrentWorld->release();
-	crrentWorld = std::make_unique<World>(inputState, renderQueue, audioQueue);
-	crrentStageID = next;
-	auto& prefab = stageTable.at(next);
-	crrentWorld->initialize(prefab);
+	std::unique_ptr<World> next;
+	try
+	{
+		next = createWorld(scene);
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << "cannot change world: " << e.what() << std::endl;
+		return;
+	}
+	currentWorld->release();
+	currentWorld = std::move(next);
+	currentScene = scene;
 }
 
 void WorldManager::update(float deltaTime)
 {
 	if (std::string name; worldChangeRequest.trigger(name))
 	{
-		changeWorld(worldNames.at(name));
+		changeWorld(name);
 	}
-	crrentWorld->update(deltaTime);
-}
-
-std::string WorldManager::addWorld(const std::string& name, const StageDefinition& stageDef)
-{
-	StageID id = 0;
-	while (stageTable.find(id) != stageTable.end())
-	{
-		id++;
-	}
-	stageTable[id] = stageDef;
-	worldNames[name] = id;
-	return name;
-}
-
-std::string WorldManager::addWorld(const StageDefinition& stageDef)
-{
-	return addWorld(stageDef.name, stageDef);
+	currentWorld->update(deltaTime);
 }

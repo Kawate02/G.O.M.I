@@ -1,19 +1,13 @@
 #include "Game.h"
+#include "ComponentRegistry.h"
+#include "SystemRegistry.h"
 #include <chrono>
 #include <thread>
 
-std::string Game::addWorld(const std::string& name, const StageDefinition& stageDef)
-{
-	return world.addWorld(name, stageDef);
-}
-
-std::string Game::addWorld(const StageDefinition& stageDef)
-{
-	return world.addWorld(stageDef);
-}
-
 void Game::init()
 {
+	registerBuiltinComponents();
+	registerBuiltinSystems();
 	auto& sm = SettingManager::getInstance();
 	window->init(sm.getValue<int>("windowWidth"), sm.getValue<int>("windowHeight"), "Gomi", sm.getValue<bool>("fullscreen"));
 	drawer->init();

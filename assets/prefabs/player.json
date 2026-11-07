@@ -1,0 +1,26 @@
+{
+  "entities": [
+    {
+      "components": {
+        "Transform": { "position": [0, 0, 0], "scale": [1, 1, 1], "angle": 0 },
+        "Renderer": { "path": "images/player.png", "layer": 0, "order": 0, "enable": true },
+        "PlayerControl": {
+          "actions": {
+            "MOVE_RIGHT": "KEY_D",
+            "MOVE_LEFT": "KEY_A",
+            "MOVE_UP": "KEY_W",
+            "MOVE_DOWN": "KEY_S",
+            "JUMP": "KEY_SPACE",
+            "DASH": "KEY_LSHIFT"
+          }
+        },
+        "Move": { "speed": 50, "maxSpeed": 400, "stopDamp": 0.5, "turnBrake": 0.6 },
+        "CameraFollow": { "offset": [-100, -300], "y": false },
+        "EntityTag": { "tags": ["UNIT", "PLAYER"] },
+        "Collision": { "type": "CIRCLE", "radius": 32, "offset": [32, 32] },
+        "Physics": { "gravity": 0 },
+        "ForwardMove": { "speed": 200, "enable": true, "additive": true }
+      }
+    }
+  ]
+}

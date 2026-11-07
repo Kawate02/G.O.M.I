@@ -19,7 +19,7 @@ bool UIButton::hitTest(const InputState& inputState)
 	{
 		if (!isHover)
 		{
-			EventBus::getInstance().emit<AudioCommand>("audioPlay", { "sounds/cursor_move.wav", 100 });
+			EventBus::getInstance().emit<AudioCommand>("audioPlay", { hoverSound, 100 });
 		}
 		isHover = true;
 		if (inputState.isPressedKey(InputKey::MOUSE_LEFT))
@@ -40,7 +40,7 @@ bool UIButton::hitTest(const InputState& inputState)
 		}
 		if (isClicked && onClick)
 		{
-			EventBus::getInstance().emit<AudioCommand>("audioPlay", { "sounds/cursor_click.wav", 100 });
+			EventBus::getInstance().emit<AudioCommand>("audioPlay", { clickSound, 100 });
 			onClick();
 			return true;
 		}

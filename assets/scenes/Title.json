@@ -1,0 +1,7 @@
+{
+  "systems": ["RendererSystem"],
+  "entities": [],
+  "ui": [
+    { "prefab": "ui/title.json", "pos": [0, 0], "layer": 0 }
+  ]
+}

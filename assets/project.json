@@ -1,0 +1,4 @@
+{
+  "startScene": "Title",
+  "pauseUI": "ui/pause.json"
+}

@@ -1,0 +1,13 @@
+{
+  "entities": [
+    {
+      "components": {
+        "Transform": { "position": [0, 0, 0], "scale": [1, 1, 1], "angle": 0 },
+        "Renderer": { "path": "images/player.png", "layer": 0, "order": 0, "enable": true },
+        "Move": { "maxSpeed": 0.2, "stopDamp": 0.5 },
+        "EntityTag": { "tags": ["WALL", "PLAYER"] },
+        "Collision": { "type": "BOX", "size": [64, 64] }
+      }
+    }
+  ]
+}

@@ -5,24 +5,14 @@
 #include "UIManager.h"
 #include "WorldEventBus.h"
 #include "Camera.h"
-#include "Prefab.h"
-#include "UIPrefab.h"
+#include "JsonConvert.h"
+#include "AssetDatabase.h"
 #include "CollisionContext.h"
 
 #include "InputState.h"
 #include "RenderQueue.h"
 #include "AudioQueue.h"
 #include "EventRequest.h"
-
-using StageID = int;
-
-struct StageDefinition
-{
-	std::string name;
-	std::vector<std::function<std::unique_ptr<ISystem>()>> systems;
-	std::vector<SpawnOverride> prefabs;
-	std::vector<UISpawnOverride> uiPrefabs;
-};
 
 class World
 {
@@ -32,6 +22,9 @@ protected:
 	CollisionContext collision;
 	UIManager uiManager;
 	std::vector<std::unique_ptr<ISystem>> systems;
+	std::vector<std::string> systemNames;
+	Json uiEntries = Json::array(); //シーンの "ui" をそのまま覚えて保存に使う
+	AssetID pauseUIPath;
 	InputState& inputState;
 	RenderQueue& renderQueue;
 	AudioQueue& audioQueue;
@@ -51,7 +44,10 @@ protected:
 	float deltaTime = 0.0f;
 public:
 	World(InputState& input, RenderQueue& rend, AudioQueue& aud) : inputState(input), renderQueue(rend), audioQueue(aud) {}
-	void initialize(const StageDefinition& prefab);
+	/// <summary>
+	/// シーンの JSON から System・Entity・UI を作る。source はエラー表示用のファイル名
+	/// </summary>
+	void initialize(const Json& scene, const std::string& source);
 	void update(float dt);
 	void release();
 	Entity createEntity();
@@ -59,7 +55,15 @@ public:
 	/// すぐに alive が false になる。コンポーネントの削除と ID の再利用はフレームの最後(each の外)で行う
 	/// </summary>
 	void destroyEntity(Entity e);
-	UIHandle spawnUIPrefab(const UIPrefabDefinition& prefab, Vec2 pos, int layer);
+	/// <summary>
+	/// 名前で登録済みの System を末尾に足す(知らない名前なら例外)
+	/// </summary>
+	void addSystem(const std::string& name);
+	UIHandle spawnUI(const AssetID& prefab, Vec2 pos, int layer);
+	inline void setPauseUI(const AssetID& path) { pauseUIPath = path; }
+	inline const std::vector<std::string>& getSystemNames() const { return systemNames; }
+	inline const Json& getUIEntries() const { return uiEntries; }
+	inline void setUIEntries(const Json& entries) { uiEntries = entries; }
 	inline ComponentManager& getComponentManager() { return component; }
 	inline Camera& getCamera() { return camera; }
 	inline bool alive(Entity e) const { return e.id < generations.size() && e.generation == generations[e.id]; }

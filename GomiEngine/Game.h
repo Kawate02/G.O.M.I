@@ -48,6 +48,4 @@ public:
     void run();
     void init();
     inline void setDebugOptions(const DebugOptions& options) { debug = options; }
-    std::string addWorld(const std::string& name, const StageDefinition& stageDef);
-    std::string addWorld(const StageDefinition& stageDef);
 };

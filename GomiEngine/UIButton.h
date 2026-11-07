@@ -12,6 +12,8 @@ protected:
 	bool isPressed = false;
 	bool isClicked = false;
 	std::function<void()> onClick;
+	std::string hoverSound = "sounds/cursor_move.wav";
+	std::string clickSound = "sounds/cursor_click.wav";
 
 	void onUpdate(RenderQueue& renderQueue) override;
 public:
@@ -20,4 +22,5 @@ public:
 	{
 	}
 	bool hitTest(const InputState& inputState) override;
+	inline void setSounds(const std::string& hover, const std::string& click) { hoverSound = hover; clickSound = click; }
 };

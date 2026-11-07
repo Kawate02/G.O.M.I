@@ -1,0 +1,19 @@
+{
+  "systems": [
+    "PlayerControlSystem",
+    "ForwardMoveSystem",
+    "PhysicsSystem",
+    "MoveResolveSystem",
+    "MoveSystem",
+    "CameraSystem",
+    "OffScreenSystem",
+    "RendererSystem",
+    "CollisionSystem",
+    "BackGroundSystem"
+  ],
+  "entities": [
+    { "prefab": "prefabs/player.json", "overrides": { "Transform": { "position": [100, 300, 0] } } },
+    { "prefab": "prefabs/background.json" }
+  ],
+  "ui": []
+}

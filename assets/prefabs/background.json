@@ -1,0 +1,8 @@
+{
+  "entities": [
+    { "components": { "BackGround": { "asset": "images/bg.png", "origin": [0, 0], "parallax": [0, 1], "layer": -100, "order": 0, "enable": true, "margin": 0 } } },
+    { "components": { "BackGround": { "asset": "images/mg.png", "origin": [0, 0], "parallax": [0.5, 1], "layer": -100, "order": 1, "enable": true, "margin": 0 } } },
+    { "components": { "BackGround": { "asset": "images/fg.png", "origin": [0, 0], "parallax": [1, 1], "layer": -100, "order": 2, "enable": true, "margin": 0 } } },
+    { "components": { "BackGround": { "asset": "images/ag.png", "origin": [0, 0], "parallax": [2, 1], "layer": 100, "order": 0, "enable": true, "margin": 0 } } }
+  ]
+}

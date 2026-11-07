@@ -1,0 +1,10 @@
+{
+  "widgets": [
+    { "type": "Image", "image": "images/screen.png", "pos": [0, 0], "scale": [1, 1], "layer": 0, "order": 0, "block": true },
+    { "type": "Text", "tag": "RESULT", "text": "", "fontSize": 32, "anchor": "CENTER", "pos": [400, 200], "layer": 0, "order": 1, "block": true },
+    { "type": "Button", "idle": "", "hover": "images/UIHover.png", "pressed": "images/UIHover.png", "pos": [336, 272], "scale": [2, 2], "layer": 0, "order": 1, "block": true, "onClick": { "event": "WorldChange", "value": "Field" } },
+    { "type": "Text", "text": "RESTART", "fontSize": 32, "anchor": "CENTER", "pos": [400, 300], "layer": 0, "order": 2, "block": true },
+    { "type": "Button", "idle": "", "hover": "images/UIHover.png", "pressed": "images/UIHover.png", "pos": [336, 372], "scale": [2, 2], "layer": 0, "order": 1, "block": true, "onClick": { "event": "WorldChange", "value": "Title" } },
+    { "type": "Text", "text": "EXIT", "fontSize": 32, "anchor": "CENTER", "pos": [400, 400], "layer": 0, "order": 2, "block": true }
+  ]
+}
