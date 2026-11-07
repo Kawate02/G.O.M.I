@@ -1,5 +1,6 @@
 #include "ResourceManager.h"
 #include "MeshFactory.h"
+#include "ModelLoader.h"
 
 ImageResource ResourceManager::loadImage(IDrawer& drawer, const AssetID& assetID)
 {
@@ -53,6 +54,15 @@ int ResourceManager::loadMesh(IDrawer& drawer, const AssetID& assetID)
     if (auto data = MeshFactory::builtin(assetID))
     {
         handle = drawer.createMesh(*data);
+    }
+    else if (ModelLoader::isModelFile(assetID))
+    {
+        auto& db = AssetDatabase::getInstance();
+        std::string error = "asset not found";
+        std::optional<MeshData> model;
+        if (db.exists(assetID)) model = ModelLoader::loadGltf(db.resolve(assetID), error);
+        if (model) handle = drawer.createMesh(*model);
+        else db.warnOnce(assetID, error);
     }
     else if (!assetID.empty())
     {

@@ -6,5 +6,8 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
 
+#define CGLTF_IMPLEMENTATION
+#include <cgltf.h>
+
 #define MINIAUDIO_IMPLEMENTATION
 #include <miniaudio.h>
