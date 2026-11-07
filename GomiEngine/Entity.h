@@ -13,8 +13,4 @@ struct Entity
 	{
 		return id != other.id || generation != other.generation;
 	}
-	inline operator bool() const
-	{
-		return id != 0;
-	}
 };

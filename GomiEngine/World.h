@@ -40,6 +40,8 @@ protected:
 	std::vector<Entity> entities;
 	std::vector<uint32_t> generations;
 	std::queue<uint32_t> freeIDs;
+	std::vector<Entity> pendingDestroy; //フレームの最後にコンポーネントを消す Entity
+	void flushDestroyed();
 
 	EventRequest<int> pauseClose{ Event::Pause_Close };
 	UIHandle pauseUI = { 0, 0 };
@@ -53,11 +55,14 @@ public:
 	void update(float dt);
 	void release();
 	Entity createEntity();
+	/// <summary>
+	/// すぐに alive が false になる。コンポーネントの削除と ID の再利用はフレームの最後(each の外)で行う
+	/// </summary>
 	void destroyEntity(Entity e);
 	UIHandle spawnUIPrefab(const UIPrefabDefinition& prefab, Vec2 pos, int layer);
 	inline ComponentManager& getComponentManager() { return component; }
 	inline Camera& getCamera() { return camera; }
-	inline bool alive(Entity e) { return e.generation == generations[e.id]; }
+	inline bool alive(Entity e) const { return e.id < generations.size() && e.generation == generations[e.id]; }
 	inline WorldEventBus& event() { return eventBus; }
 	inline CollisionContext& col() { return collision; }
 	inline const std::vector<Entity>& getEntities() { return entities; }

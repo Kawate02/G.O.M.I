@@ -56,6 +56,7 @@ void World::update(float dt)
 	{
 		it->update(*this, frameCount, deltaTime);
 	}
+	flushDestroyed();
 	eventBus.clearEvents();
 }
 
@@ -68,6 +69,7 @@ void World::release()
 	}
 	entities.clear();
 	generations.clear();
+	pendingDestroy.clear();
 	std::queue<uint32_t>().swap(freeIDs);
 }
 
@@ -87,7 +89,7 @@ Entity World::createEntity()
 	uint32_t id;
 	if (freeIDs.empty())
 	{
-		id = generations.size();
+		id = static_cast<uint32_t>(generations.size());
 		generations.push_back(0);
 		entities.resize(generations.size());
 	}
@@ -104,6 +106,16 @@ void World::destroyEntity(Entity e)
 {
 	if (!alive(e)) return;
 	generations[e.id]++;
-	entities[e.id] = { e.id, e.generation };
-	freeIDs.push(e.id);
+	entities[e.id] = { e.id, generations[e.id] };
+	pendingDestroy.push_back(e);
+}
+
+void World::flushDestroyed()
+{
+	for (auto& e : pendingDestroy)
+	{
+		component.removeAll(e);
+		freeIDs.push(e.id);
+	}
+	pendingDestroy.clear();
 }

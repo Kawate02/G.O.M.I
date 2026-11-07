@@ -16,6 +16,7 @@ private:
 	{
 		virtual ~IComponentArray() = default;
 		virtual void releaseAll() = 0;
+		virtual void remove(Entity e) = 0;
 	};
 
 	template <typename T>
@@ -23,6 +24,7 @@ private:
 	{
 		ComponentArray<T> array;
 		void releaseAll() override { array.releaseAll(); }
+		void remove(Entity e) override { array.removeComponent(e); }
 	};
 
 	std::unordered_map<std::type_index, std::unique_ptr<IComponentArray>> arrays;
@@ -55,6 +57,17 @@ public:
 		for (auto& [type, array] : arrays)
 		{
 			array->releaseAll();
+		}
+	}
+
+	/// <summary>
+	/// その Entity ID が持つコンポーネントを全種類消す
+	/// </summary>
+	void removeAll(Entity e)
+	{
+		for (auto& [type, array] : arrays)
+		{
+			array->remove(e);
 		}
 	}
 

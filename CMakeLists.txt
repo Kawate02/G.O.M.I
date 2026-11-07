@@ -60,3 +60,12 @@ add_custom_command(TARGET GomiEngine POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/GomiEngine/settings.json
         $<TARGET_FILE_DIR:GomiEngine>/settings.json)
+
+# --- テスト(ctest で実行) ---
+enable_testing()
+add_executable(ComponentArrayTest tests/ComponentArrayTest.cpp)
+target_include_directories(ComponentArrayTest PRIVATE GomiEngine)
+if (MSVC)
+    target_compile_options(ComponentArrayTest PRIVATE /utf-8)
+endif()
+add_test(NAME ComponentArrayTest COMMAND ComponentArrayTest)
