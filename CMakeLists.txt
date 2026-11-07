@@ -34,23 +34,31 @@ add_library(glad STATIC third_party/glad/src/gl.c)
 target_include_directories(glad PUBLIC third_party/glad/include)
 
 # --- エンジン本体 ---
+# main 以外をライブラリにして、実行ファイルとテストで共有する
 file(GLOB GOMI_SOURCES CONFIGURE_DEPENDS
     GomiEngine/*.cpp
     GomiEngine/*.h)
+list(REMOVE_ITEM GOMI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/GomiEngine/Gomi.cpp)
 
-add_executable(GomiEngine ${GOMI_SOURCES} GomiEngine/resource/game.rc)
-target_include_directories(GomiEngine PRIVATE
+add_library(GomiCore STATIC ${GOMI_SOURCES})
+target_include_directories(GomiCore PUBLIC
     GomiEngine
     ${miniaudio_SOURCE_DIR}
     ${stb_SOURCE_DIR})
-target_link_libraries(GomiEngine PRIVATE glfw glad)
-target_compile_definitions(GomiEngine PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
-
+target_link_libraries(GomiCore PUBLIC glfw glad)
+target_compile_definitions(GomiCore PUBLIC NOMINMAX _CRT_SECURE_NO_WARNINGS)
 if (WIN32)
-    target_link_libraries(GomiEngine PRIVATE winmm)
+    target_link_libraries(GomiCore PUBLIC winmm)
 endif()
 if (MSVC)
-    target_compile_options(GomiEngine PRIVATE /utf-8 /W3)
+    target_compile_options(GomiCore PUBLIC /utf-8)
+    target_compile_options(GomiCore PRIVATE /W3)
+endif()
+
+add_executable(GomiEngine GomiEngine/Gomi.cpp GomiEngine/resource/game.rc)
+target_link_libraries(GomiEngine PRIVATE GomiCore)
+
+if (MSVC)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT GomiEngine)
     set_property(TARGET GomiEngine PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:GomiEngine>")
 endif()
@@ -63,9 +71,8 @@ add_custom_command(TARGET GomiEngine POST_BUILD
 
 # --- テスト(ctest で実行) ---
 enable_testing()
-add_executable(ComponentArrayTest tests/ComponentArrayTest.cpp)
-target_include_directories(ComponentArrayTest PRIVATE GomiEngine)
-if (MSVC)
-    target_compile_options(ComponentArrayTest PRIVATE /utf-8)
-endif()
-add_test(NAME ComponentArrayTest COMMAND ComponentArrayTest)
+foreach(test ComponentArrayTest ReflectionTest)
+    add_executable(${test} tests/${test}.cpp)
+    target_link_libraries(${test} PRIVATE GomiCore)
+    add_test(NAME ${test} COMMAND ${test})
+endforeach()
