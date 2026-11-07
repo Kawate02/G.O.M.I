@@ -14,9 +14,9 @@ class AudioPlayer
 {
 private:
 	EventRequest<BGMID> bgmChangeRequest{ "BGMChange" };
-	int bgmHandle = -1;
+	int bgmSound = -1;
+	int bgmVoice = -1;
 	int bgmVolume = 0;
 public:
 	void play(IAudioBackend& backend, AudioQueue& queue);
-	void destroy();
 };

@@ -419,3 +419,6 @@ FodyWeavers.xsd
 
 # DxLib SDK (third-party, download separately from https://dxlib.xsrv.jp/)
 GomiEngine/Dx/
+
+# CMake build output
+/build/

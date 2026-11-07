@@ -1,19 +1,13 @@
 #pragma once
 #include "Utilities.h"
 #include "AssetTable.h"
-#include <DxLib.h>
+#include "IDrawer.h"
+#include "IAudioBackend.h"
 
 struct ResourceBlob
 {
-	void* data;
-	DWORD size;
-};
-
-struct ImageResource
-{
-	int handle = -1;
-	int width = 0;
-	int height = 0;
+	const void* data = nullptr;
+	size_t size = 0;
 };
 
 struct SoundResource
@@ -21,19 +15,23 @@ struct SoundResource
 	int handle = -1;
 };
 
+/// <summary>
+/// exe に埋め込んだリソース(.rc)を読み、描画・音声のハンドルにしてキャッシュする
+/// </summary>
 class ResourceManager
 {
 private:
-	ResourceBlob WinLoadResource(int id);
+	ResourceBlob loadEmbedded(int id);
 	ResourceManager() = default;
-	std::map<AssetID, ImageResource> imagehandles;
+	std::map<AssetID, ImageResource> images;
+	std::map<AssetID, SoundResource> sounds;
 public:
 	static ResourceManager& getInstance()
 	{
 		static ResourceManager instance;
 		return instance;
 	}
-	ImageResource loadImage(const AssetID& assetID);
-	SoundResource loadSound(const AssetID& assetID);
+	ImageResource loadImage(IDrawer& drawer, const AssetID& assetID);
+	SoundResource loadSound(IAudioBackend& backend, const AssetID& assetID);
 	void unloadAll();
 };

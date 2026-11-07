@@ -1,8 +1,8 @@
 #include "WorldManager.h"
 
-void WorldManager::initialize()
+void WorldManager::initialize(const std::string& startName)
 {
-	createWorld(0);
+	createWorld(startName.empty() ? 0 : worldNames.at(startName));
 }
 
 void WorldManager::createWorld(int next)

@@ -1,7 +1,6 @@
 #pragma once
 #include "Utilities.h"
 #include "resource/resource.h"
-#include <windows.h>
 
 using AssetID = std::string;
 using ResourceID = int;

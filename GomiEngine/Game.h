@@ -15,8 +15,9 @@
 #include "AudioQueue.h"
 
 #include "EventRequest.h"
+#include "DebugOptions.h"
 
-class Game 
+class Game
 {
 private:
     EventRequest<int> quitRequest{Event::Game_Quit};
@@ -34,12 +35,9 @@ private:
 	AudioQueue audioQueue;
 
     WorldManager world;
+    DebugOptions debug;
 
-    const int TERGET_FPS = 60;
-    const int TERGET_FRAME_TIME = 1000 / TERGET_FPS;
-
-    int frameCount = 0;
-    int lastTime = 0;
+    const int TARGET_FPS = 60;
 public:
     Game(std::unique_ptr<IWindow> w,
         std::unique_ptr<IInput> i,
@@ -49,6 +47,7 @@ public:
 
     void run();
     void init();
+    inline void setDebugOptions(const DebugOptions& options) { debug = options; }
     std::string addWorld(const std::string& name, const StageDefinition& stageDef);
     std::string addWorld(const StageDefinition& stageDef);
 };

@@ -1,6 +1,7 @@
 #include "ResourceManager.h"
+#include <windows.h>
 
-ResourceBlob ResourceManager::WinLoadResource(int id)
+ResourceBlob ResourceManager::loadEmbedded(int id)
 {
     ResourceBlob blob{};
 
@@ -16,41 +17,43 @@ ResourceBlob ResourceManager::WinLoadResource(int id)
     return blob;
 }
 
-ImageResource ResourceManager::loadImage(const AssetID& assetID)
+ImageResource ResourceManager::loadImage(IDrawer& drawer, const AssetID& assetID)
 {
+    auto cached = images.find(assetID);
+    if (cached != images.end()) return cached->second;
+
     auto it = assetTable.find(assetID);
-	if (it == assetTable.end()) return {};
+    if (it == assetTable.end()) return {};
     if (it->second.type != AssetType::IMAGE_ASSET) return {};
 
-	if (imagehandles.find(assetID) != imagehandles.end()) return imagehandles[assetID];
-
-    auto entry = it->second;
-    ResourceBlob blob = WinLoadResource(entry.file);
+    ResourceBlob blob = loadEmbedded(it->second.file);
     if (blob.data == nullptr) return {};
-    int handle = CreateGraphFromMem(blob.data, blob.size);
-    if (handle == -1) return {};
-    ImageResource res = { .handle = handle };
-    GetGraphSize(handle, &res.width, &res.height);
-    imagehandles[assetID] = res;
+    ImageResource res = drawer.createTexture(static_cast<const unsigned char*>(blob.data), blob.size);
+    if (res.handle == -1) return {};
+    images[assetID] = res;
     return res;
 }
 
-SoundResource ResourceManager::loadSound(const AssetID& assetID)
+SoundResource ResourceManager::loadSound(IAudioBackend& backend, const AssetID& assetID)
 {
+    auto cached = sounds.find(assetID);
+    if (cached != sounds.end()) return cached->second;
+
     auto it = assetTable.find(assetID);
     if (it == assetTable.end()) return {};
-	if (it->second.type != AssetType::AUDIO_ASSET) return {};
+    if (it->second.type != AssetType::AUDIO_ASSET) return {};
 
-    auto entry = it->second;
-    ResourceBlob blob = WinLoadResource(entry.file);
-	if (blob.data == nullptr) return {};
-	int handle = LoadSoundMemByMemImage(blob.data, blob.size);
-	if (handle == -1) return {};
-	SoundResource res = { .handle = handle };
-	return res;
+    ResourceBlob blob = loadEmbedded(it->second.file);
+    if (blob.data == nullptr) return {};
+    int handle = backend.load(assetID, blob.data, blob.size);
+    if (handle == -1) return {};
+    SoundResource res = { .handle = handle };
+    sounds[assetID] = res;
+    return res;
 }
 
 void ResourceManager::unloadAll()
 {
-    imagehandles.clear();
+    images.clear();
+    sounds.clear();
 }

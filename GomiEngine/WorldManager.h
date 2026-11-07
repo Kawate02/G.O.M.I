@@ -16,7 +16,10 @@ private:
 	AudioQueue& audioQueue;
 public:
 	WorldManager(InputState& input, RenderQueue& rend, AudioQueue& audio) : inputState(input), renderQueue(rend), audioQueue(audio) {}
-	void initialize();
+	/// <summary>
+	/// startName の World から始める(空なら最初に登録した World)
+	/// </summary>
+	void initialize(const std::string& startName = "");
 	void createWorld(int next);
 	void changeWorld(int next);
 	void update(float deltaTime);

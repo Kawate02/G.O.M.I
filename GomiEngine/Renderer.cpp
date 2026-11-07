@@ -8,7 +8,7 @@ const RenderKey& getKey(const RenderCommand& command)
 
 void Renderer::init()
 {
-	
+
 }
 
 void Renderer::render(IDrawer& drawer, RenderQueue& queue, const Camera& camera)
@@ -17,8 +17,8 @@ void Renderer::render(IDrawer& drawer, RenderQueue& queue, const Camera& camera)
 	auto items = queue.getCommands();
 	queue.clear();
 
-	std::sort(items.begin(), items.end(), [](const RenderCommand& a, const RenderCommand& b) 
-		{ 
+	std::stable_sort(items.begin(), items.end(), [](const RenderCommand& a, const RenderCommand& b)
+		{
 			const RenderKey& aKey = getKey(a);
 			const RenderKey& bKey = getKey(b);
 			if (aKey.layer != bKey.layer)
@@ -36,9 +36,9 @@ void Renderer::render(IDrawer& drawer, RenderQueue& queue, const Camera& camera)
 			{
 				sprite->position -= camera.position;
 			}
-			auto res = ResourceManager::getInstance().loadImage(sprite->assetID);
+			auto res = ResourceManager::getInstance().loadImage(drawer, sprite->assetID);
 			if (res.handle == -1) continue;
-			drawer.drawImage(res.handle, sprite->position.x, sprite->position.y, res.width, res.height, sprite->scale.x, sprite->scale.y, sprite->angle);
+			drawer.drawImage(res.handle, sprite->position.x, sprite->position.y, res.width * sprite->scale.x, res.height * sprite->scale.y, sprite->angle);
 		}
 		if (TextRenderCommand* text = std::get_if<TextRenderCommand>(&item))
 		{
@@ -46,8 +46,7 @@ void Renderer::render(IDrawer& drawer, RenderQueue& queue, const Camera& camera)
 			{
 				text->position -= camera.position;
 			}
-			drawer.drawText(text->text, text->fontSize,text->anchor, text->position.x, text->position.y);
+			drawer.drawText(text->text, text->fontSize, text->anchor, text->position.x, text->position.y);
 		}
 	}
-	drawer.present();
 }

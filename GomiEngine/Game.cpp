@@ -1,4 +1,6 @@
 #include "Game.h"
+#include <chrono>
+#include <thread>
 
 std::string Game::addWorld(const std::string& name, const StageDefinition& stageDef)
 {
@@ -12,45 +14,65 @@ std::string Game::addWorld(const StageDefinition& stageDef)
 
 void Game::init()
 {
-	window->init(SettingManager::getInstance().getValue<int>("windowWidth"), SettingManager::getInstance().getValue<int>("windowHeight"), "Gomi", SettingManager::getInstance().getValue<bool>("fullscreen"));
+	auto& sm = SettingManager::getInstance();
+	window->init(sm.getValue<int>("windowWidth"), sm.getValue<int>("windowHeight"), "Gomi", sm.getValue<bool>("fullscreen"));
 	drawer->init();
+	audioBackend->init();
     renderer.init();
-    world.initialize();
+    world.initialize(debug.startWorld);
 }
+
 void Game::run()
 {
+	using clock = std::chrono::steady_clock;
+	const auto targetFrameTime = std::chrono::duration_cast<clock::duration>(std::chrono::duration<double>(1.0 / TARGET_FPS));
+
 	init();
-	int lastTime = GetNowCount();
+	auto lastTime = clock::now();
+	auto fpsTimer = lastTime;
+	auto nextFrame = lastTime;
+	int fpsCount = 0;
+	int totalFrames = 0;
     while (window->processMessage())
     {
 		if (quitRequest.trigger()) break;
-		frameCount++;
-		int nowTime = GetNowCount(); //�t���[�����[�g����p
-		float deltaTime = (nowTime - lastTime) / 1000.0f;
+		totalFrames++;
+		fpsCount++;
+		auto nowTime = clock::now();
+		float deltaTime = std::chrono::duration<float>(nowTime - lastTime).count();
 		lastTime = nowTime;
 
         input->inputStateUpdate();
-        inputState = input->getInputState(); //���͏��̒��o
+        inputState = input->getInputState(); //入力情報の抽出
+		debug.apply(totalFrames, inputState);
 
-		world.update(deltaTime); //���C������
+		world.update(deltaTime); //メイン処理
 
 		if (AudioCommand e; audioRequest.trigger(e)) audioQueue.addCommand({ e.audioID, e.volume });
 
-        renderer.render(*drawer, renderQueue, world.getWorld().getCamera()); //�`�揈��
-		audioPlayer.play(*audioBackend, audioQueue); //��������
+        renderer.render(*drawer, renderQueue, world.getWorld().getCamera()); //描画処理
+		for (auto& path : debug.screenshotsAt(totalFrames))
+		{
+			if (!drawer->captureScreen(path)) std::cerr << "screenshot failed: " << path << std::endl;
+		}
+		drawer->present();
+		audioPlayer.play(*audioBackend, audioQueue); //音声処理
 
-		if (nowTime - lastTime >= 1000)
+		if (nowTime - fpsTimer >= std::chrono::seconds(1))
 		{
-			std::cout << "\rFPS:" << frameCount << " " << std::flush;
-			frameCount = 0;
-			lastTime = nowTime;
+			std::cout << "\rFPS:" << fpsCount << " " << std::flush;
+			fpsCount = 0;
+			fpsTimer = nowTime;
 		}
-		//�t���[�����[�g����
-		int frameTime = GetNowCount() - nowTime;
-		if (frameTime < TERGET_FRAME_TIME)
-		{
-			WaitTimer(TERGET_FRAME_TIME - frameTime);
-		}
+		if (debug.shouldQuit(totalFrames)) break;
+
+		//フレームレート調整
+		//予定時刻を積み上げて寝過ごしを次のフレームで取り返す。最後の1msは sleep の粒度が粗いので空回しで待つ
+		nextFrame += targetFrameTime;
+		auto now = clock::now();
+		if (nextFrame < now - targetFrameTime) nextFrame = now; //大きく遅れたら取り返さずに仕切り直す
+		if (nextFrame - now > std::chrono::milliseconds(1)) std::this_thread::sleep_until(nextFrame - std::chrono::milliseconds(1));
+		while (clock::now() < nextFrame) std::this_thread::yield();
     }
 	std::cout << "\nGame End" << std::endl;
 }

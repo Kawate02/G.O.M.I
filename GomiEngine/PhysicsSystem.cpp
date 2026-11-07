@@ -45,7 +45,7 @@ void PhysicsSystem::update(World& world, int frameCount, float deltaTime)
 		if (len > 0.0f)
 		{
 			float reduce = physc.decay * deltaTime;
-			float newLen = max(0, len - reduce);
+			float newLen = std::max(0.0f, len - reduce);
 			physc.extraVel *= (newLen / len);
 		}
 

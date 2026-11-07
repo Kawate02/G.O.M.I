@@ -10,7 +10,7 @@ public:
 	Renderer() {}
 	void init();
 	/// <summary>
-	/// キューをまとめて描画
+	/// キューをまとめて描画(画面の切り替え present は呼び出し側で行う)
 	/// </summary>
 	/// <param name="drawer"></param>
 	/// <param name="queue"></param>
