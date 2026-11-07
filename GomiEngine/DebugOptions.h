@@ -11,6 +11,7 @@
 ///   --frames <n>                   n フレーム目で終了
 ///   --fixed-dt <fps>               deltaTime を 1/fps 秒に固定する(実行のたびに同じ画面になる)
 ///   --screenshot <frame>:<path>    そのフレームの画面を png で保存(複数可)
+///   --save-scene <frame>:<path>    そのフレームの更新前に World をシーンの JSON で保存(--world <path> で読める)
 ///   --key <frame>[-<end>]:<キー名>   そのフレーム(から end まで)キーを押したことにする(InputKey の名前。KEY_ は省略可)
 ///   --click <frame>:<x>,<y>        その位置で左クリックしたことにする
 /// </summary>
@@ -36,6 +37,7 @@ private:
 	std::vector<KeyEvent> keys;
 	std::vector<ClickEvent> clicks;
 	std::vector<Screenshot> screenshots;
+	std::vector<Screenshot> sceneSaves;
 	void pressAt(InputState& state, InputKey key, int frame, int start, int end) const;
 public:
 	std::string startWorld;
@@ -52,5 +54,6 @@ public:
 	/// </summary>
 	void apply(int frame, InputState& state) const;
 	std::vector<std::string> screenshotsAt(int frame) const;
+	std::vector<std::string> sceneSavesAt(int frame) const;
 	inline bool shouldQuit(int frame) const { return maxFrames > 0 && frame >= maxFrames; }
 };

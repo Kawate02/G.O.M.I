@@ -1,6 +1,7 @@
 #include "Game.h"
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
+#include "SceneLoader.h"
 #include <chrono>
 #include <thread>
 
@@ -40,6 +41,10 @@ void Game::run()
         input->inputStateUpdate();
         inputState = input->getInputState(); //入力情報の抽出
 		debug.apply(totalFrames, inputState);
+		for (auto& path : debug.sceneSavesAt(totalFrames))
+		{
+			AssetDatabase::getInstance().writeJson(path, SceneLoader::save(world.getWorld()));
+		}
 
 		world.update(deltaTime); //メイン処理
 

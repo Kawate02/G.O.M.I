@@ -73,7 +73,7 @@ add_custom_command(TARGET GomiEngine POST_BUILD
 
 # --- テスト(ctest で実行) ---
 enable_testing()
-foreach(test ComponentArrayTest ReflectionTest)
+foreach(test ComponentArrayTest ReflectionTest SceneTest)
     add_executable(${test} tests/${test}.cpp)
     target_link_libraries(${test} PRIVATE GomiCore)
     add_test(NAME ${test} COMMAND ${test})

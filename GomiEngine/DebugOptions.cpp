@@ -51,6 +51,11 @@ std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 			if (!splitFrame(value, start, end, rest) || rest.empty()) return "bad --screenshot: " + value;
 			screenshots.push_back({ start, rest });
 		}
+		else if (opt == "--save-scene")
+		{
+			if (!splitFrame(value, start, end, rest) || rest.empty()) return "bad --save-scene: " + value;
+			sceneSaves.push_back({ start, rest });
+		}
 		else if (opt == "--key")
 		{
 			if (!splitFrame(value, start, end, rest)) return "bad --key: " + value;
@@ -105,6 +110,16 @@ std::vector<std::string> DebugOptions::screenshotsAt(int frame) const
 {
 	std::vector<std::string> result;
 	for (auto& s : screenshots)
+	{
+		if (s.frame == frame) result.push_back(s.path);
+	}
+	return result;
+}
+
+std::vector<std::string> DebugOptions::sceneSavesAt(int frame) const
+{
+	std::vector<std::string> result;
+	for (auto& s : sceneSaves)
 	{
 		if (s.frame == frame) result.push_back(s.path);
 	}
