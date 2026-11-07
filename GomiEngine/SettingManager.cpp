@@ -5,10 +5,19 @@ void SettingManager::loadSettings()
 	std::ifstream file(filename);
 	if (file.is_open())
 	{
-		nlohmann::json j;
-		file >> j;
-		settings = j;
-		file.close();
+		try
+		{
+			nlohmann::json j;
+			file >> j;
+			for (auto& [key, value] : j.items())
+			{
+				settings[key] = value.is_string() ? value.get<std::string>() : value.dump();
+			}
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "settings.json is broken, using defaults: " << e.what() << std::endl;
+		}
 	}
 }
 

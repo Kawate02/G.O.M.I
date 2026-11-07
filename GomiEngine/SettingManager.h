@@ -12,6 +12,11 @@ private:
 	SettingManager() = default;
 	std::map<std::string, std::string> settings;
 	const std::string filename = "settings.json";
+	const std::map<std::string, std::string> defaults = {
+		{ "windowWidth", "800" },
+		{ "windowHeight", "600" },
+		{ "fullscreen", "false" },
+	};
 public:
 	static SettingManager& getInstance()
 	{
@@ -21,40 +26,40 @@ public:
 
 	void loadSettings();
 	void saveSettings() const;
+	/// <summary>
+	/// 設定値を読む。settings.json に無ければ既定値、それも無ければ T() を返す
+	/// </summary>
 	template <typename T>
 	T getValue(const std::string& key) const
 	{
 		auto it = settings.find(key);
-		if (it != settings.end())
+		if (it == settings.end())
 		{
-			if constexpr (std::is_same_v<T, int>)
-			{
-				return std::stoi(it->second);
-			}
-			else if constexpr (std::is_same_v<T, float>)
-			{
-				return std::stof(it->second);
-			}
-			else if constexpr (std::is_same_v<T, bool>)
-			{
-				return it->second == "true";
-			}
-			else if constexpr (std::is_same_v<T, std::string>)
-			{
-				return it->second;
-			}
-			else
-			{
-				return T();
-			}
+			it = defaults.find(key);
+			if (it == defaults.end()) return T();
+		}
+		const std::string& v = it->second;
+		try
+		{
+			if constexpr (std::is_same_v<T, int>) return std::stoi(v);
+			else if constexpr (std::is_same_v<T, float>) return std::stof(v);
+			else if constexpr (std::is_same_v<T, bool>) return v == "true" || v == "1";
+			else if constexpr (std::is_same_v<T, std::string>) return v;
+			else return T();
+		}
+		catch (...)
+		{
+			return T();
 		}
 	}
 
 	template <typename T>
 	void setValue(const std::string& key, T value, const std::string& eventName = "")
 	{
-		settings[key] = std::to_string(value);
+		if constexpr (std::is_same_v<T, bool>) settings[key] = value ? "true" : "false";
+		else if constexpr (std::is_same_v<T, std::string>) settings[key] = value;
+		else settings[key] = std::to_string(value);
 		saveSettings();
-		EventBus::getInstance().emit<T>(eventName, value);
+		if (!eventName.empty()) EventBus::getInstance().emit<T>(eventName, value);
 	}
 };
