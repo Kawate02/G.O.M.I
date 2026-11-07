@@ -32,8 +32,8 @@ void CameraSystem::update(World& world, int frameCount, float deltaTime)
 		if (fEntityc.x) camera.position.x = tfc.position.x + fEntityc.offset.x;
 		if (fEntityc.y) camera.position.y = tfc.position.y + fEntityc.offset.y;
 
-		//3D: カメラを対象 + offset に置いて対象を見る
-		if (hasCamera3D && camera3D != e)
+		//3D: カメラを対象 + offset に置いて対象を見る(エディタで止めている時はシーンのカメラを動かさない)
+		if (hasCamera3D && camera3D != e && world.isSimulating())
 		{
 			auto& cam = tf.getComponent(camera3D);
 			if (fEntityc.x) cam.position.x = tfc.position.x + fEntityc.offset.x;

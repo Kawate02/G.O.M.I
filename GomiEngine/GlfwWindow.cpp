@@ -32,7 +32,7 @@ void GlfwWindow::init(int width, int height, const char* title, bool fullscreen)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
 
 	this->width = width;
 	this->height = height;
@@ -62,4 +62,19 @@ int GlfwWindow::consumeScroll()
 	int notches = static_cast<int>(std::trunc(scrollAccum));
 	scrollAccum -= notches;
 	return notches;
+}
+
+void GlfwWindow::cancelClose()
+{
+	glfwSetWindowShouldClose(window, GLFW_FALSE);
+}
+
+bool GlfwWindow::closeRequested() const
+{
+	return glfwWindowShouldClose(window);
+}
+
+void GlfwWindow::setTitle(const std::string& title)
+{
+	glfwSetWindowTitle(window, title.c_str());
 }

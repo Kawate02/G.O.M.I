@@ -14,6 +14,8 @@
 ///   --save-scene <frame>:<path>    そのフレームの更新前に World をシーンの JSON で保存(--world <path> で読める)
 ///   --key <frame>[-<end>]:<キー名>   そのフレーム(から end まで)キーを押したことにする(InputKey の名前。KEY_ は省略可)
 ///   --click <frame>:<x>,<y>        その位置で左クリックしたことにする
+///   --type <frame>:<文字>          文字を入力したことにする(エディタの入力欄用)
+///   --select <番号>                エディタで最初に選んでおく Entity の並び順の番号
 /// </summary>
 class DebugOptions
 {
@@ -38,10 +40,12 @@ private:
 	std::vector<ClickEvent> clicks;
 	std::vector<Screenshot> screenshots;
 	std::vector<Screenshot> sceneSaves;
+	std::vector<Screenshot> typed;
 	void pressAt(InputState& state, InputKey key, int frame, int start, int end) const;
 public:
 	std::string startWorld;
 	std::string assetDir;
+	int select = -1;
 	int maxFrames = 0;
 	float fixedDeltaTime = 0.0f; //0 なら実時間
 
@@ -55,5 +59,17 @@ public:
 	void apply(int frame, InputState& state) const;
 	std::vector<std::string> screenshotsAt(int frame) const;
 	std::vector<std::string> sceneSavesAt(int frame) const;
+	std::vector<std::string> typedAt(int frame) const;
+	/// <summary>
+	/// このフレームのクリック(位置を合わせるフレーム・押すフレーム・離すフレーム)。エディタが ImGui に渡す
+	/// </summary>
+	struct ClickState
+	{
+		bool move = false;
+		bool press = false;
+		bool release = false;
+		Vec2 pos;
+	};
+	ClickState clickAt(int frame) const;
 	inline bool shouldQuit(int frame) const { return maxFrames > 0 && frame >= maxFrames; }
 };

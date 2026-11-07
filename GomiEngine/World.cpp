@@ -21,6 +21,7 @@ void World::addSystem(const std::string& name)
 void World::update(float dt, bool simulate)
 {
 	deltaTime = dt;
+	simulating = simulate;
 	if (!simulate)
 	{
 		uiManager.update(inputState, renderQueue, false);

@@ -139,6 +139,19 @@ std::string SceneEditor::displayName(Entity e)
 		std::string file = link->prefab.substr(link->prefab.find_last_of('/') + 1);
 		return file + " [" + std::to_string(link->index) + "]";
 	}
+	//名前が無ければ、役目の分かるコンポーネントから付ける
+	if (cm.has<Camera3DComponent>(e)) return "Camera3D";
+	if (cm.has<LightComponent>(e)) return "Light";
+	if (cm.has<MeshRendererComponent>(e))
+	{
+		auto& mesh = cm.getComponentArray<MeshRendererComponent>().getComponent(e).mesh;
+		return mesh.substr(mesh.find_last_of("/:") + 1);
+	}
+	if (cm.has<RendererComponent>(e))
+	{
+		auto& image = cm.getComponentArray<RendererComponent>().getComponent(e).path;
+		return image.substr(image.find_last_of('/') + 1);
+	}
 	return "Entity " + std::to_string(e.id);
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "IWindow.h"
+#include <string>
 
 struct GLFWwindow;
 
@@ -10,6 +11,7 @@ private:
 	int width = 0;
 	int height = 0;
 	double scrollAccum = 0.0;
+	bool resizable = false;
 	static void onScroll(GLFWwindow* w, double xoffset, double yoffset);
 public:
 	~GlfwWindow() override;
@@ -26,4 +28,14 @@ public:
 	/// 前回呼んでから回ったホイールの量(ノッチ数)
 	/// </summary>
 	int consumeScroll();
+	/// <summary>
+	/// init の前に呼ぶと、マウスで大きさを変えられる窓になる(エディタ用)
+	/// </summary>
+	inline void setResizable(bool value) { resizable = value; }
+	/// <summary>
+	/// 閉じるボタンが押されたのを取り消す(保存の確認を出す時)
+	/// </summary>
+	void cancelClose();
+	bool closeRequested() const;
+	void setTitle(const std::string& title);
 };

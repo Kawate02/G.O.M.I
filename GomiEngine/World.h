@@ -53,6 +53,7 @@ protected:
 	bool pause = false;
 
 	int frameCount = 0;
+	bool simulating = true;
 	float deltaTime = 0.0f;
 public:
 	World(InputState& input, RenderQueue& rend, AudioQueue& aud) : inputState(input), renderQueue(rend), audioQueue(aud) {}
@@ -92,6 +93,10 @@ public:
 	}
 	inline ComponentManager& getComponentManager() { return component; }
 	inline Camera& getCamera() { return camera; }
+	/// <summary>
+	/// ゲームとして進めているか(エディタで止めている時は false)。System がデータを書き換えるかの判断に使う
+	/// </summary>
+	inline bool isSimulating() const { return simulating; }
 	inline bool alive(Entity e) const { return e.id < generations.size() && e.generation == generations[e.id]; }
 	inline WorldEventBus& event() { return eventBus; }
 	inline CollisionContext& col() { return collision; }

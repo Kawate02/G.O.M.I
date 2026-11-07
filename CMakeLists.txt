@@ -38,7 +38,13 @@ FetchContent_Declare(cgltf
     GIT_SHALLOW TRUE
     SOURCE_SUBDIR _header_only)
 
-FetchContent_MakeAvailable(glfw miniaudio stb glm cgltf)
+FetchContent_Declare(imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG v1.92.9b-docking
+    GIT_SHALLOW TRUE
+    SOURCE_SUBDIR _no_cmake)
+
+FetchContent_MakeAvailable(glfw miniaudio stb glm cgltf imgui)
 
 # OpenGL 4.5 core のローダー(glad2 で生成済みのものを同梱)
 add_library(glad STATIC third_party/glad/src/gl.c)
@@ -75,6 +81,26 @@ target_link_libraries(GomiEngine PRIVATE GomiCore)
 if (MSVC)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT GomiEngine)
     set_property(TARGET GomiEngine PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:GomiEngine>")
+endif()
+
+# --- エディタ(Dear ImGui) ---
+add_library(imgui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp)
+target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${imgui_SOURCE_DIR}/misc/cpp)
+target_link_libraries(imgui PUBLIC glfw)
+
+file(GLOB EDITOR_SOURCES CONFIGURE_DEPENDS Editor/*.cpp Editor/*.h)
+add_executable(GomiEditor ${EDITOR_SOURCES})
+target_link_libraries(GomiEditor PRIVATE GomiCore imgui)
+if (MSVC)
+    set_property(TARGET GomiEditor PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:GomiEditor>")
 endif()
 
 # 設定ファイルを実行ファイルの隣に置く

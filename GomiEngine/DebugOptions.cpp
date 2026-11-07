@@ -56,6 +56,16 @@ std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 			if (!splitFrame(value, start, end, rest) || rest.empty()) return "bad --save-scene: " + value;
 			sceneSaves.push_back({ start, rest });
 		}
+		else if (opt == "--type")
+		{
+			if (!splitFrame(value, start, end, rest)) return "bad --type: " + value;
+			typed.push_back({ start, rest });
+		}
+		else if (opt == "--select")
+		{
+			try { select = std::stoi(value); }
+			catch (...) { return "bad --select: " + value; }
+		}
 		else if (opt == "--key")
 		{
 			if (!splitFrame(value, start, end, rest)) return "bad --key: " + value;
@@ -124,4 +134,31 @@ std::vector<std::string> DebugOptions::sceneSavesAt(int frame) const
 		if (s.frame == frame) result.push_back(s.path);
 	}
 	return result;
+}
+
+std::vector<std::string> DebugOptions::typedAt(int frame) const
+{
+	std::vector<std::string> result;
+	for (auto& s : typed)
+	{
+		if (s.frame == frame) result.push_back(s.path);
+	}
+	return result;
+}
+
+DebugOptions::ClickState DebugOptions::clickAt(int frame) const
+{
+	ClickState state;
+	for (auto& c : clicks)
+	{
+		//1つ前のフレームでカーソルを置き、押して、次のフレームで離す
+		if (frame >= c.frame - 1 && frame <= c.frame + 1)
+		{
+			state.move = true;
+			state.pos = c.pos;
+		}
+		if (frame == c.frame) state.press = true;
+		if (frame == c.frame + 1) state.release = true;
+	}
+	return state;
 }
