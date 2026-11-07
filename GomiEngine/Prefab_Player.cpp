@@ -21,7 +21,7 @@ const PrefabDefinition Prefab_Player = {
 				Component<EntityTagComponent>({ EntityTag::UNIT | EntityTag::PLAYER }),
 				Component<CollisionComponent>({ .type = CollisionType::CIRCLE, .radius = 32, .offset = { 32, 32 } }),
 				Component<PhysicsComponent>({ .gravity = 0 }),
-				Component<FowardMoveComponent>({ .speed = 200, .enable = true, .additive = true }),
+				Component<ForwardMoveComponent>({ .speed = 200, .enable = true, .additive = true }),
 			}
 		}
 	}

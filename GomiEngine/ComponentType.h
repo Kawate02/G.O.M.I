@@ -5,7 +5,7 @@
 #include "PhysicsComponent.h"
 #include "ControllerComponent.h"
 #include "MoveComponent.h"
-#include "FowardMoveCompenent.h"
+#include "ForwardMoveComponent.h"
 #include "CameraFollowComponent.h"
 #include "CollisionComponent.h"
 #include "EntityTagComponent.h"

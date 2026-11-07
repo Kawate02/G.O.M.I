@@ -6,7 +6,7 @@
 #include "MoveSystem.h"
 #include "PhysicsSystem.h"
 #include "MoveResolveSystem.h"
-#include "FowardMoveSystem.h"
+#include "ForwardMoveSystem.h"
 #include "CameraSystem.h"
 #include "CollisionSystem.h"
 #include "BackGroundSystem.h"

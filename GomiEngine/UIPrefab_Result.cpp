@@ -1,4 +1,4 @@
-#include "UIPrefab_Reslut.h"
+#include "UIPrefab_Result.h"
 #include "UIButton.h"
 #include "UIImage.h"
 #include "UIText.h"

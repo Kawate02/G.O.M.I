@@ -7,7 +7,7 @@ const StageDefinition Stage_Field = {
 	"Field",
 	{
 		System<PlayerControlSystem>(),
-		System<FowardMoveSystem>(),
+		System<ForwardMoveSystem>(),
 		System<PhysicsSystem>(),
 		System<MoveResolveSystem>(),
 		System<MoveSystem>(),
