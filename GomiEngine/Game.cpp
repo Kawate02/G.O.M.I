@@ -41,6 +41,7 @@ void Game::run()
 		auto nowTime = clock::now();
 		float deltaTime = std::chrono::duration<float>(nowTime - lastTime).count();
 		lastTime = nowTime;
+		if (debug.fixedDeltaTime > 0) deltaTime = debug.fixedDeltaTime;
 
         input->inputStateUpdate();
         inputState = input->getInputState(); //入力情報の抽出

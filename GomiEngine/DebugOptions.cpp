@@ -55,6 +55,12 @@ std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 			try { maxFrames = std::stoi(value); }
 			catch (...) { return "bad --frames: " + value; }
 		}
+		else if (opt == "--fixed-dt")
+		{
+			try { fixedDeltaTime = 1.0f / std::stof(value); }
+			catch (...) { return "bad --fixed-dt: " + value; }
+			if (!(fixedDeltaTime > 0)) return "bad --fixed-dt: " + value;
+		}
 		else if (opt == "--screenshot")
 		{
 			if (!splitFrame(value, start, end, rest) || rest.empty()) return "bad --screenshot: " + value;
