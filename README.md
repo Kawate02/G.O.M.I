@@ -6,7 +6,7 @@ C++20 の ECS ゲームエンジン。2D と 3D の両方を描ける。描画�
 ## ビルド
 
 必要なもの: Visual Studio 2022(C++ によるデスクトップ開発)、OpenGL 4.5 が動く GPU。
-GLFW・miniaudio・stb は CMake が初回の構成時に自動で取ってくる。
+GLFW・miniaudio・stb・glm・cgltf は CMake が初回の構成時に自動で取ってくる。
 
 ```
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
