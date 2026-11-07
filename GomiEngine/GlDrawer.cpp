@@ -143,6 +143,12 @@ GlDrawer::~GlDrawer()
 		glDeleteVertexArrays(1, &m.vao);
 	}
 	glDeleteTextures(1, &whiteTexture);
+	for (auto& t : targets)
+	{
+		glDeleteFramebuffers(1, &t.fbo);
+		glDeleteTextures(1, &t.color);
+		glDeleteRenderbuffers(1, &t.depth);
+	}
 	glDeleteProgram(program3D);
 	if (!textures.empty()) glDeleteTextures(static_cast<GLsizei>(textures.size()), textures.data());
 	glDeleteBuffers(1, &vbo);
@@ -198,7 +204,12 @@ void GlDrawer::init()
 void GlDrawer::clearScreen(float r, float g, float b)
 {
 	int fbw, fbh;
-	glfwGetFramebufferSize(window.handle(), &fbw, &fbh);
+	if (currentTarget >= 0)
+	{
+		fbw = targets[currentTarget].width;
+		fbh = targets[currentTarget].height;
+	}
+	else glfwGetFramebufferSize(window.handle(), &fbw, &fbh);
 	glViewport(0, 0, fbw, fbh);
 	glClearColor(r, g, b, 1);
 	glClearDepth(1.0);
@@ -212,7 +223,7 @@ void GlDrawer::begin2D()
 	glDisable(GL_CULL_FACE);
 	glUseProgram(program);
 	glBindVertexArray(vao);
-	glUniform2f(locScreen, static_cast<float>(window.getWidth()), static_cast<float>(window.getHeight()));
+	glUniform2f(locScreen, static_cast<float>(screenWidth()), static_cast<float>(screenHeight()));
 	glActiveTexture(GL_TEXTURE0);
 }
 
@@ -371,7 +382,7 @@ int GlDrawer::createMesh(const MeshData& mesh)
 
 void GlDrawer::beginScene3D(const Scene3DParams& params)
 {
-	float aspect = static_cast<float>(window.getWidth()) / static_cast<float>(window.getHeight());
+	float aspect = static_cast<float>(screenWidth()) / static_cast<float>(screenHeight());
 	glm::mat4 proj = glm::perspective(glm::radians(params.fov), aspect, params.nearClip, params.farClip);
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
@@ -404,12 +415,72 @@ void GlDrawer::endScene3D()
 	begin2D();
 }
 
+int GlDrawer::screenWidth() const
+{
+	return currentTarget >= 0 ? targets[currentTarget].width : window.getWidth();
+}
+
+int GlDrawer::screenHeight() const
+{
+	return currentTarget >= 0 ? targets[currentTarget].height : window.getHeight();
+}
+
+int GlDrawer::createRenderTarget(int w, int h)
+{
+	RenderTarget t;
+	t.width = w;
+	t.height = h;
+	glGenFramebuffers(1, &t.fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, t.fbo);
+	glGenTextures(1, &t.color);
+	glBindTexture(GL_TEXTURE_2D, t.color);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t.color, 0);
+	glGenRenderbuffers(1, &t.depth);
+	glBindRenderbuffer(GL_RENDERBUFFER, t.depth);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, t.depth);
+	bool ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+	glBindFramebuffer(GL_FRAMEBUFFER, currentTarget >= 0 ? targets[currentTarget].fbo : 0);
+	if (!ok)
+	{
+		glDeleteFramebuffers(1, &t.fbo);
+		glDeleteTextures(1, &t.color);
+		glDeleteRenderbuffers(1, &t.depth);
+		return -1;
+	}
+	targets.push_back(t);
+	return static_cast<int>(targets.size() - 1);
+}
+
+void GlDrawer::setRenderTarget(int target)
+{
+	if (target >= static_cast<int>(targets.size())) target = -1;
+	currentTarget = target;
+	glBindFramebuffer(GL_FRAMEBUFFER, target >= 0 ? targets[target].fbo : 0);
+}
+
+uintptr_t GlDrawer::renderTargetTexture(int target)
+{
+	if (target < 0 || target >= static_cast<int>(targets.size())) return 0;
+	return targets[target].color;
+}
+
 bool GlDrawer::captureScreen(const std::string& path)
 {
 	int fbw, fbh;
-	glfwGetFramebufferSize(window.handle(), &fbw, &fbh);
+	if (currentTarget >= 0)
+	{
+		fbw = targets[currentTarget].width;
+		fbh = targets[currentTarget].height;
+	}
+	else glfwGetFramebufferSize(window.handle(), &fbw, &fbh);
 	std::vector<unsigned char> pixels(static_cast<size_t>(fbw) * fbh * 4);
-	glReadBuffer(GL_BACK);
+	glReadBuffer(currentTarget >= 0 ? GL_COLOR_ATTACHMENT0 : GL_BACK);
 	glReadPixels(0, 0, fbw, fbh, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 	stbi_flip_vertically_on_write(1);
 	return stbi_write_png(path.c_str(), fbw, fbh, 4, pixels.data(), fbw * 4) != 0;

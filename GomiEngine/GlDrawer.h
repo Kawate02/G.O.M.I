@@ -49,6 +49,22 @@ private:
 	unsigned int whiteTexture = 0;
 	std::vector<GpuMesh> meshes; // ハンドル = この配列の添字
 
+	struct RenderTarget
+	{
+		unsigned int fbo = 0;
+		unsigned int color = 0;
+		unsigned int depth = 0;
+		int width = 0;
+		int height = 0;
+	};
+	std::vector<RenderTarget> targets;
+	int currentTarget = -1;
+	/// <summary>
+	/// 2D の座標と 3D の縦横比に使う大きさ(描き先 or ウィンドウの論理サイズ)
+	/// </summary>
+	int screenWidth() const;
+	int screenHeight() const;
+
 	/// <summary>
 	/// 2D(スプライト・文字)を描く状態に戻す
 	/// </summary>
@@ -67,6 +83,9 @@ public:
 	void beginScene3D(const Scene3DParams& params) override;
 	void drawMesh(int mesh, int texture, const glm::mat4& model, const glm::vec3& color) override;
 	void endScene3D() override;
+	int createRenderTarget(int w, int h) override;
+	void setRenderTarget(int target) override;
+	uintptr_t renderTargetTexture(int target) override;
 	bool captureScreen(const std::string& path) override;
 	void present() override;
 };

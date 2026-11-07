@@ -73,7 +73,20 @@ public:
 	virtual void endScene3D() = 0;
 
 	/// <summary>
-	/// 今描いた画面を画像ファイルに保存する(present の前に呼ぶ)。未対応なら false
+	/// 画面の外の描き先(w x h)を作る。エディタでゲームの画面をパネルに出す時に使う。未対応・失敗なら -1
+	/// </summary>
+	virtual int createRenderTarget(int w, int h) { return -1; }
+	/// <summary>
+	/// 以降の描画先を切り替える。-1 でウィンドウに戻す。2D の座標と 3D の縦横比は描き先の大きさになる
+	/// </summary>
+	virtual void setRenderTarget(int target) {}
+	/// <summary>
+	/// 描き先のテクスチャの番号(OpenGL ならテクスチャ名)。ImGui::Image などに渡す。上下は逆さま
+	/// </summary>
+	virtual uintptr_t renderTargetTexture(int target) { return 0; }
+
+	/// <summary>
+	/// 今描いた画面を画像ファイルに保存する(present の前に呼ぶ)。描き先を切り替えていればその中身。未対応なら false
 	/// </summary>
 	virtual bool captureScreen(const std::string& path) { return false; }
     virtual void present() = 0;
