@@ -10,7 +10,7 @@ public:
 	Renderer() {}
 	void init();
 	/// <summary>
-	/// ƒLƒ…[‚ğ‚Ü‚Æ‚ß‚Ä•`‰æ
+	/// ã‚­ãƒ¥ãƒ¼ã‚’ã¾ã¨ã‚ã¦æç”»
 	/// </summary>
 	/// <param name="drawer"></param>
 	/// <param name="queue"></param>

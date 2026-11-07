@@ -71,9 +71,9 @@ CollisionHit CollisionContext::queryAt(World& world, const Entity& self, EntityT
 	auto& collision = world.getComponentManager().getComponentArray<CollisionComponent>();
 	if (!tag.has(selftag) || !collision.hasComponent(self))
 	{
-		return hit; //©•ª‚ªƒ^ƒO‚Á‚Ä‚È‚¢‚Ì‚Í˜_ŠO‚¾‚æ
+		return hit; //è‡ªåˆ†ãŒã‚¿ã‚°æŒã£ã¦ãªã„ã®ã¯è«–å¤–ã ã‚ˆ
 	}
-	EntityTag othertag = rule.getPair(selftag);//‘Š•û‚Ìƒ^ƒO‚Í‚±‚ê‚µ‚©ƒ_ƒ‚¾‚æ
+	EntityTag othertag = rule.getPair(selftag);//ç›¸æ–¹ã®ã‚¿ã‚°ã¯ã“ã‚Œã—ã‹ãƒ€ãƒ¡ã ã‚ˆ
 	auto& tf = world.getComponentManager().getComponentArray<TransformComponent>();
 	std::vector<Entity> visited;
 	std::vector<Cell> cells;
@@ -99,20 +99,20 @@ CollisionHit CollisionContext::queryAt(World& world, const Entity& self, EntityT
 
 	for (auto& c : cells)
 	{
-		for (int i = 0; i < sizeof(neighbors) / sizeof(neighbors[0]); i++)//üˆÍŠÜ‚ß‚½9ƒ}ƒX‚ğ’²‚×‚é‚æ
+		for (int i = 0; i < sizeof(neighbors) / sizeof(neighbors[0]); i++)//å‘¨å›²å«ã‚ãŸ9ãƒã‚¹ã‚’èª¿ã¹ã‚‹ã‚ˆ
 		{
 			Cell cell = { c.x + neighbors[i].x, c.y + neighbors[i].y };
 			auto it = grid.find(cell);
-			if (it != grid.end())//ü‚è‚ÉƒGƒ“ƒeƒBƒeƒB‚ª‚¢‚½
+			if (it != grid.end())//å‘¨ã‚Šã«ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ãŒã„ãŸ
 			{
 				for (auto& otherE : it->second)
 				{
-					if (otherE == self) continue;//©•ª©g‚Í–³‹
-					if (std::find(visited.begin(), visited.end(), otherE) != visited.end()) continue;//Šù‚ÉŒ©‚½ƒGƒ“ƒeƒBƒeƒB‚Í–³‹
-					if (!world.alive(otherE)) continue;//¶‚«‚Ä‚È‚¢ƒGƒ“ƒeƒBƒeƒB‚Í–³‹
+					if (otherE == self) continue;//è‡ªåˆ†è‡ªèº«ã¯ç„¡è¦–
+					if (std::find(visited.begin(), visited.end(), otherE) != visited.end()) continue;//æ—¢ã«è¦‹ãŸã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã¯ç„¡è¦–
+					if (!world.alive(otherE)) continue;//ç”Ÿãã¦ãªã„ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã¯ç„¡è¦–
 					visited.push_back(otherE);
 					auto& otherTag = world.getComponentManager().getComponentArray<EntityTagComponent>().getComponent(otherE);
-					if (otherTag.has(othertag) && collision.hasComponent(otherE))//ƒ^ƒO‚à‡‚Á‚Ä‚é
+					if (otherTag.has(othertag) && collision.hasComponent(otherE))//ã‚¿ã‚°ã‚‚åˆã£ã¦ã‚‹
 					{
 						auto& othertf = tf.getComponent(otherE);
 						auto& othercol = collision.getComponent(otherE);

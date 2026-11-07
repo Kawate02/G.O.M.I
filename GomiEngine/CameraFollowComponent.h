@@ -3,7 +3,7 @@
 
 struct CameraFollowComponent
 {
-	Vec2 offset; //ƒJƒƒ‰‚ª‚Ç‚ê‚¾‚¯ƒYƒŒ‚é‚©
-	bool x = true; //x‚ğ’Ç]
-	bool y = true; //y‚ğ’Ç]
+	Vec2 offset; //ã‚«ãƒ¡ãƒ©ãŒã©ã‚Œã ã‘ã‚ºãƒ¬ã‚‹ã‹
+	bool x = true; //xã‚’è¿½å¾“
+	bool y = true; //yã‚’è¿½å¾“
 };

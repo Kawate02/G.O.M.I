@@ -2,7 +2,7 @@
 #include <string>
 #include "TextAnchor.h"
 /// <summary>
-/// 描画システムの抽象レイヤー
+/// 謠冗判繧ｷ繧ｹ繝�繝縺ｮ謚ｽ雎｡繝ｬ繧､繝､繝ｼ
 /// </summary>
 class IDrawer
 {

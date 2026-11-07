@@ -2,7 +2,7 @@
 #include "InputState.h"
 
 /// <summary>
-/// 入力システムの抽象レイヤー
+/// 蜈･蜉帙す繧ｹ繝�繝縺ｮ謚ｽ雎｡繝ｬ繧､繝､繝ｼ
 /// </summary>
 class IInput 
 {
