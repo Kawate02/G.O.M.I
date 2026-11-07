@@ -1,6 +1,6 @@
 #pragma once
 #include "Utilities.h"
-#include "AssetTable.h"
+#include "AssetDatabase.h"
 #include "TextAnchor.h"
 #include <variant>
 

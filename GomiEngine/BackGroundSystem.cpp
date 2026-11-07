@@ -22,7 +22,7 @@ void BackGroundSystem::update(World& world, int frameCount, float deltaTime)
 		auto& bgc = bg.getComponent(e);
 		if (!bgc.enable) return;
 
-		Vec2 rectSize = getAssetTable().at(bgc.asset).size;
+		Vec2 rectSize = AssetDatabase::getInstance().imageSize(bgc.asset);
 		const float width = rectSize.x;
 		const float height = rectSize.y;
 		if (width <= 0 || height <= 0) return;

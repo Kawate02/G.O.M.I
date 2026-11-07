@@ -34,6 +34,7 @@ std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 		std::string rest;
 
 		if (opt == "--world") startWorld = value;
+		else if (opt == "--assets") assetDir = value;
 		else if (opt == "--frames")
 		{
 			try { maxFrames = std::stoi(value); }

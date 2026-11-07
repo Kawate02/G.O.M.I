@@ -47,6 +47,8 @@ target_include_directories(GomiCore PUBLIC
     ${stb_SOURCE_DIR})
 target_link_libraries(GomiCore PUBLIC glfw glad)
 target_compile_definitions(GomiCore PUBLIC NOMINMAX _CRT_SECURE_NO_WARNINGS)
+# 開発中は exe の隣に assets が無ければソースの assets を直接読む(編集がすぐ反映される)
+target_compile_definitions(GomiCore PRIVATE GOMI_DEFAULT_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 if (WIN32)
     target_link_libraries(GomiCore PUBLIC winmm)
 endif()
@@ -55,7 +57,7 @@ if (MSVC)
     target_compile_options(GomiCore PRIVATE /W3)
 endif()
 
-add_executable(GomiEngine GomiEngine/Gomi.cpp GomiEngine/resource/game.rc)
+add_executable(GomiEngine GomiEngine/Gomi.cpp)
 target_link_libraries(GomiEngine PRIVATE GomiCore)
 
 if (MSVC)

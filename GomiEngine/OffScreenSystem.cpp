@@ -6,7 +6,7 @@ void OffScreenSystem::despawn(World& world, Entity e)
 {
 	auto& tf = world.getComponentManager().getComponentArray<TransformComponent>().getComponent(e);
 	auto& rend = world.getComponentManager().getComponentArray<RendererComponent>().getComponent(e);
-	Vec2 size = getAssetTable().at(rend.path).size;
+	Vec2 size = AssetDatabase::getInstance().imageSize(rend.path);
 	if (tf.position.x + size.x < cameraRect.left) world.destroyEntity(e);
 	if (tf.position.x > cameraRect.right) world.destroyEntity(e);
 	if (tf.position.y + size.y < cameraRect.top) world.destroyEntity(e);
@@ -19,7 +19,7 @@ void OffScreenSystem::clamp(World& world, Entity e)
 	auto& rend = world.getComponentManager().getComponentArray<RendererComponent>().getComponent(e);
 	auto& move = world.getComponentManager().getComponentArray<MoveComponent>().getComponent(e);
 
-	Vec2 size = getAssetTable().at(rend.path).size;
+	Vec2 size = AssetDatabase::getInstance().imageSize(rend.path);
 	if (tf.position.x + size.x > cameraRect.right)
 	{
 		tf.position.x = cameraRect.right - size.x;

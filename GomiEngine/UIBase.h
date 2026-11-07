@@ -3,7 +3,7 @@
 #include "InputState.h"
 #include "Utilities.h"
 #include "RenderQueue.h"
-#include "AssetTable.h"
+#include "AssetDatabase.h"
 #include "EventBus.h"
 #include "AudioCommand.h"
 #include "UIHandle.h"

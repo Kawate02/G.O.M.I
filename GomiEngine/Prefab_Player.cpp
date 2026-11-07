@@ -6,7 +6,7 @@ const PrefabDefinition Prefab_Player = {
 		{
 			{
 				Component(TransformComponent({ { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }, 0 })),
-				Component(RendererComponent({ "player", 0, 0, true })),
+				Component(RendererComponent({ "images/player.png", 0, 0, true })),
 				Component<PlayerControlComponent>({
 					{
 						{ ActionID::MOVE_RIGHT, InputKey::KEY_D },

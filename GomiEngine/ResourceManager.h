@@ -1,14 +1,8 @@
 #pragma once
 #include "Utilities.h"
-#include "AssetTable.h"
+#include "AssetDatabase.h"
 #include "IDrawer.h"
 #include "IAudioBackend.h"
-
-struct ResourceBlob
-{
-	const void* data = nullptr;
-	size_t size = 0;
-};
 
 struct SoundResource
 {
@@ -16,15 +10,15 @@ struct SoundResource
 };
 
 /// <summary>
-/// exe に埋め込んだリソース(.rc)を読み、描画・音声のハンドルにしてキャッシュする
+/// assets のファイルを描画・音声のハンドルにしてキャッシュする。読めなかった ID も覚えて毎フレーム読み直さない
 /// </summary>
 class ResourceManager
 {
 private:
-	ResourceBlob loadEmbedded(int id);
 	ResourceManager() = default;
 	std::map<AssetID, ImageResource> images;
 	std::map<AssetID, SoundResource> sounds;
+	std::map<AssetID, std::vector<unsigned char>> soundData; //音声バックエンドが参照し続けるので持っておく
 public:
 	static ResourceManager& getInstance()
 	{

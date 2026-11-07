@@ -9,6 +9,9 @@ void UIButton::onUpdate(RenderQueue& renderQueue)
 
 bool UIButton::hitTest(const InputState& inputState)
 {
+	//当たり範囲はホバー画像の大きさ x 拡大率(画像は生成後に読めるようになることもあるので毎回求める)
+	auto assetSize = AssetDatabase::getInstance().imageSize(hoverRes);
+	rectSize = { assetSize.x * size.x, assetSize.y * size.y };
 	if (inputState.mouse.position.x > pos.x &&
 		inputState.mouse.position.x < pos.x + rectSize.x &&
 		inputState.mouse.position.y > pos.y &&
@@ -16,7 +19,7 @@ bool UIButton::hitTest(const InputState& inputState)
 	{
 		if (!isHover)
 		{
-			EventBus::getInstance().emit<AudioCommand>("audioPlay", { "cursor_move", 100 });
+			EventBus::getInstance().emit<AudioCommand>("audioPlay", { "sounds/cursor_move.wav", 100 });
 		}
 		isHover = true;
 		if (inputState.isPressedKey(InputKey::MOUSE_LEFT))
@@ -37,7 +40,7 @@ bool UIButton::hitTest(const InputState& inputState)
 		}
 		if (isClicked && onClick)
 		{
-			EventBus::getInstance().emit<AudioCommand>("audioPlay", { "cursor_click", 100 });
+			EventBus::getInstance().emit<AudioCommand>("audioPlay", { "sounds/cursor_click.wav", 100 });
 			onClick();
 			return true;
 		}

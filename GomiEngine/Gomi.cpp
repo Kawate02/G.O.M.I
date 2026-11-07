@@ -1,5 +1,6 @@
 ﻿#include <iostream>
 #include "Game.h"
+#include "AssetDatabase.h"
 #include "GlfwWindow.h"
 #include "GlfwInput.h"
 #include "GlDrawer.h"
@@ -19,6 +20,7 @@ int main(int argc, char** argv)
 
     try
     {
+        AssetDatabase::getInstance().setRoot(AssetDatabase::findRoot(options.assetDir));
         auto window = std::make_unique<GlfwWindow>();
         GlfwWindow& w = *window;
         Game game(std::move(window), std::make_unique<GlfwInput>(w), std::make_unique<GlDrawer>(w), std::make_unique<MiniaudioBackend>());
