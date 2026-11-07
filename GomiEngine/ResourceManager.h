@@ -18,6 +18,7 @@ private:
 	ResourceManager() = default;
 	std::map<AssetID, ImageResource> images;
 	std::map<AssetID, SoundResource> sounds;
+	std::map<AssetID, int> meshes;
 	std::map<AssetID, std::vector<unsigned char>> soundData; //音声バックエンドが参照し続けるので持っておく
 public:
 	static ResourceManager& getInstance()
@@ -27,5 +28,9 @@ public:
 	}
 	ImageResource loadImage(IDrawer& drawer, const AssetID& assetID);
 	SoundResource loadSound(IAudioBackend& backend, const AssetID& assetID);
+	/// <summary>
+	/// "builtin:cube" などの基本形か、.gltf / .glb のモデル。読めなければ -1
+	/// </summary>
+	int loadMesh(IDrawer& drawer, const AssetID& assetID);
 	void unloadAll();
 };

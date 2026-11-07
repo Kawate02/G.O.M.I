@@ -37,4 +37,5 @@ void registerBuiltinSystems()
 	r.add<RendererSystem>("RendererSystem");
 	r.add<CollisionSystem>("CollisionSystem");
 	r.add<BackGroundSystem>("BackGroundSystem");
+	r.add<MeshRendererSystem>("MeshRendererSystem");
 }

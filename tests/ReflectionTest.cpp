@@ -19,7 +19,7 @@ int main()
 	registerBuiltinComponents();
 	registerBuiltinComponents(); // 2回呼んでも二重登録しない
 	auto& reg = ComponentRegistry::getInstance();
-	CHECK(reg.all().size() == 10);
+	CHECK(reg.all().size() == 13);
 
 	// 全コンポーネント: 既定値 → JSON → 付け直し → JSON が一致する
 	for (auto& info : reg.all())

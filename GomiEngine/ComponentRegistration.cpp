@@ -77,4 +77,23 @@ void registerBuiltinComponents()
 		.field("order", &BackGroundComponent::order)
 		.field("enable", &BackGroundComponent::enable)
 		.field("margin", &BackGroundComponent::margin);
+
+	r.add<MeshRendererComponent>("MeshRenderer")
+		.field("mesh", &MeshRendererComponent::mesh)
+		.field("texture", &MeshRendererComponent::texture)
+		.field("color", &MeshRendererComponent::color)
+		.field("enable", &MeshRendererComponent::enable);
+
+	r.add<Camera3DComponent>("Camera3D")
+		.field("fov", &Camera3DComponent::fov)
+		.field("nearClip", &Camera3DComponent::nearClip)
+		.field("farClip", &Camera3DComponent::farClip)
+		.field("clearColor", &Camera3DComponent::clearColor)
+		.field("active", &Camera3DComponent::active);
+
+	r.add<LightComponent>("Light")
+		.field("direction", &LightComponent::direction)
+		.field("color", &LightComponent::color)
+		.field("intensity", &LightComponent::intensity)
+		.field("ambient", &LightComponent::ambient);
 }

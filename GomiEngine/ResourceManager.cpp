@@ -1,4 +1,5 @@
 #include "ResourceManager.h"
+#include "MeshFactory.h"
 
 ImageResource ResourceManager::loadImage(IDrawer& drawer, const AssetID& assetID)
 {
@@ -43,8 +44,27 @@ SoundResource ResourceManager::loadSound(IAudioBackend& backend, const AssetID& 
     return res;
 }
 
+int ResourceManager::loadMesh(IDrawer& drawer, const AssetID& assetID)
+{
+    auto cached = meshes.find(assetID);
+    if (cached != meshes.end()) return cached->second;
+
+    int handle = -1;
+    if (auto data = MeshFactory::builtin(assetID))
+    {
+        handle = drawer.createMesh(*data);
+    }
+    else if (!assetID.empty())
+    {
+        AssetDatabase::getInstance().warnOnce(assetID, "unknown mesh");
+    }
+    meshes[assetID] = handle;
+    return handle;
+}
+
 void ResourceManager::unloadAll()
 {
     images.clear();
     sounds.clear();
+    meshes.clear();
 }

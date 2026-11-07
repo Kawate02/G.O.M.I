@@ -7,6 +7,7 @@
 #include <stb_image.h>
 #include <stb_image_write.h>
 #include <stb_truetype.h>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <fstream>
 #include <iostream>
@@ -53,6 +54,57 @@ void main()
 }
 )";
 
+	const char* vertex3DSrc = R"(#version 450 core
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec2 aUV;
+uniform mat4 uModel;
+uniform mat4 uViewProj;
+uniform mat3 uNormalMat;
+out vec3 vNormal;
+out vec2 vUV;
+void main()
+{
+	gl_Position = uViewProj * uModel * vec4(aPos, 1.0);
+	vNormal = uNormalMat * aNormal;
+	vUV = aUV;
+}
+)";
+
+	// 拡散光(ランバート)+ 環境光
+	const char* fragment3DSrc = R"(#version 450 core
+in vec3 vNormal;
+in vec2 vUV;
+out vec4 FragColor;
+uniform sampler2D uTex;
+uniform vec3 uColor;
+uniform vec3 uLightDir;
+uniform vec3 uLightColor;
+uniform float uAmbient;
+void main()
+{
+	vec4 base = texture(uTex, vUV) * vec4(uColor, 1.0);
+	if (base.a < 0.5) discard; //抜き(透明部分)は描かない。半透明はまだ扱わない
+	vec3 n = normalize(vNormal);
+	float diffuse = max(dot(n, -normalize(uLightDir)), 0.0);
+	FragColor = vec4(base.rgb * (uAmbient + diffuse * uLightColor), base.a);
+}
+)";
+
+	unsigned int link(unsigned int vs, unsigned int fs)
+	{
+		unsigned int p = glCreateProgram();
+		glAttachShader(p, vs);
+		glAttachShader(p, fs);
+		glLinkProgram(p);
+		glDeleteShader(vs);
+		glDeleteShader(fs);
+		int ok = 0;
+		glGetProgramiv(p, GL_LINK_STATUS, &ok);
+		if (!ok) throw std::runtime_error("shader link failed");
+		return p;
+	}
+
 	unsigned int compile(GLenum type, const char* src)
 	{
 		unsigned int shader = glCreateShader(type);
@@ -84,6 +136,14 @@ GlDrawer::~GlDrawer()
 {
 	if (!program) return; // init 前
 	for (auto& [size, font] : fonts) glDeleteTextures(1, &font->texture);
+	for (auto& m : meshes)
+	{
+		glDeleteBuffers(1, &m.vbo);
+		glDeleteBuffers(1, &m.ebo);
+		glDeleteVertexArrays(1, &m.vao);
+	}
+	glDeleteTextures(1, &whiteTexture);
+	glDeleteProgram(program3D);
 	if (!textures.empty()) glDeleteTextures(static_cast<GLsizei>(textures.size()), textures.data());
 	glDeleteBuffers(1, &vbo);
 	glDeleteVertexArrays(1, &vao);
@@ -94,17 +154,23 @@ void GlDrawer::init()
 {
 	if (!gladLoadGL(glfwGetProcAddress)) throw std::runtime_error("gladLoadGL failed");
 
-	unsigned int vs = compile(GL_VERTEX_SHADER, vertexSrc);
-	unsigned int fs = compile(GL_FRAGMENT_SHADER, fragmentSrc);
-	program = glCreateProgram();
-	glAttachShader(program, vs);
-	glAttachShader(program, fs);
-	glLinkProgram(program);
-	glDeleteShader(vs);
-	glDeleteShader(fs);
-	int ok = 0;
-	glGetProgramiv(program, GL_LINK_STATUS, &ok);
-	if (!ok) throw std::runtime_error("shader link failed");
+	program = link(compile(GL_VERTEX_SHADER, vertexSrc), compile(GL_FRAGMENT_SHADER, fragmentSrc));
+	program3D = link(compile(GL_VERTEX_SHADER, vertex3DSrc), compile(GL_FRAGMENT_SHADER, fragment3DSrc));
+	loc3Model = glGetUniformLocation(program3D, "uModel");
+	loc3ViewProj = glGetUniformLocation(program3D, "uViewProj");
+	loc3NormalMat = glGetUniformLocation(program3D, "uNormalMat");
+	loc3Color = glGetUniformLocation(program3D, "uColor");
+	loc3LightDir = glGetUniformLocation(program3D, "uLightDir");
+	loc3LightColor = glGetUniformLocation(program3D, "uLightColor");
+	loc3Ambient = glGetUniformLocation(program3D, "uAmbient");
+
+	//テクスチャの無いメッシュ用の白 1x1
+	const unsigned char white[4] = { 255, 255, 255, 255 };
+	glGenTextures(1, &whiteTexture);
+	glBindTexture(GL_TEXTURE_2D, whiteTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	locRect = glGetUniformLocation(program, "uRect");
 	locAngle = glGetUniformLocation(program, "uAngle");
@@ -129,14 +195,21 @@ void GlDrawer::init()
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
 }
 
-void GlDrawer::clearScreen()
+void GlDrawer::clearScreen(float r, float g, float b)
 {
 	int fbw, fbh;
 	glfwGetFramebufferSize(window.handle(), &fbw, &fbh);
 	glViewport(0, 0, fbw, fbh);
-	glClearColor(0, 0, 0, 1);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClearColor(r, g, b, 1);
+	glClearDepth(1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	begin2D();
+}
 
+void GlDrawer::begin2D()
+{
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
 	glUseProgram(program);
 	glBindVertexArray(vao);
 	glUniform2f(locScreen, static_cast<float>(window.getWidth()), static_cast<float>(window.getHeight()));
@@ -269,6 +342,66 @@ void GlDrawer::drawText(const std::string& text, int fontSize, Anchor anchor, fl
 		const float uv[4] = { q.s0, q.t0, q.s1, q.t1 };
 		drawQuad(font->texture, q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0, 0, uv, 1);
 	}
+}
+
+int GlDrawer::createMesh(const MeshData& mesh)
+{
+	if (mesh.vertices.empty() || mesh.indices.empty()) return -1;
+	GpuMesh m;
+	glGenVertexArrays(1, &m.vao);
+	glGenBuffers(1, &m.vbo);
+	glGenBuffers(1, &m.ebo);
+	glBindVertexArray(m.vao);
+	glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
+	glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(float), mesh.vertices.data(), GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(uint32_t), mesh.indices.data(), GL_STATIC_DRAW);
+	const GLsizei stride = MeshData::STRIDE * sizeof(float);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(0));
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(3 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(6 * sizeof(float)));
+	m.indexCount = static_cast<int>(mesh.indices.size());
+	meshes.push_back(m);
+	glBindVertexArray(vao); //2D 用に戻す
+	return static_cast<int>(meshes.size() - 1);
+}
+
+void GlDrawer::beginScene3D(const Scene3DParams& params)
+{
+	float aspect = static_cast<float>(window.getWidth()) / static_cast<float>(window.getHeight());
+	glm::mat4 proj = glm::perspective(glm::radians(params.fov), aspect, params.nearClip, params.farClip);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+	glFrontFace(GL_CCW);
+	glUseProgram(program3D);
+	glUniformMatrix4fv(loc3ViewProj, 1, GL_FALSE, &(proj * params.view)[0][0]);
+	glUniform3fv(loc3LightDir, 1, &params.lightDirection[0]);
+	glUniform3fv(loc3LightColor, 1, &params.lightColor[0]);
+	glUniform1f(loc3Ambient, params.ambient);
+	glActiveTexture(GL_TEXTURE0);
+}
+
+void GlDrawer::drawMesh(int mesh, int texture, const glm::mat4& model, const glm::vec3& color)
+{
+	if (mesh < 0 || mesh >= static_cast<int>(meshes.size())) return;
+	glm::mat3 normalMat = glm::transpose(glm::inverse(glm::mat3(model)));
+	glUniformMatrix4fv(loc3Model, 1, GL_FALSE, &model[0][0]);
+	glUniformMatrix3fv(loc3NormalMat, 1, GL_FALSE, &normalMat[0][0]);
+	glUniform3fv(loc3Color, 1, &color[0]);
+	bool hasTexture = texture >= 0 && texture < static_cast<int>(textures.size());
+	glBindTexture(GL_TEXTURE_2D, hasTexture ? textures[texture] : whiteTexture);
+	glBindVertexArray(meshes[mesh].vao);
+	glDrawElements(GL_TRIANGLES, meshes[mesh].indexCount, GL_UNSIGNED_INT, nullptr);
+}
+
+void GlDrawer::endScene3D()
+{
+	begin2D();
 }
 
 bool GlDrawer::captureScreen(const std::string& path)

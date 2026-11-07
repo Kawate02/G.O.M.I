@@ -10,3 +10,6 @@
 #include "CollisionComponent.h"
 #include "EntityTagComponent.h"
 #include "BackGroundComponent.h"
+#include "MeshRendererComponent.h"
+#include "Camera3DComponent.h"
+#include "LightComponent.h"

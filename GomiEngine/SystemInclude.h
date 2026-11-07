@@ -11,3 +11,4 @@
 #include "CollisionSystem.h"
 #include "BackGroundSystem.h"
 #include "OffScreenSystem.h"
+#include "MeshRendererSystem.h"

@@ -1,6 +1,9 @@
 #pragma once
 #include <string>
 #include <cstddef>
+#include <cstdint>
+#include <vector>
+#include <glm/glm.hpp>
 #include "TextAnchor.h"
 
 struct ImageResource
@@ -11,13 +14,40 @@ struct ImageResource
 };
 
 /// <summary>
+/// メッシュの頂点(1頂点 = 位置 xyz・法線 xyz・UV の8要素)と三角形の頂点番号
+/// </summary>
+struct MeshData
+{
+	static constexpr int STRIDE = 8;
+	std::vector<float> vertices;
+	std::vector<uint32_t> indices;
+};
+
+/// <summary>
+/// 3D を描く時の共通の設定
+/// </summary>
+struct Scene3DParams
+{
+	glm::mat4 view{ 1.0f };
+	float fov = 60;       //縦の視野角(度)
+	float nearClip = 0.1f;
+	float farClip = 1000;
+	glm::vec3 lightDirection{ 0, -1, 0 }; //光が進む向き
+	glm::vec3 lightColor{ 1, 1, 1 };
+	float ambient = 0.25f;
+};
+
+/// <summary>
 /// 描画システムの抽象レイヤー
 /// </summary>
 class IDrawer
 {
 public:
     virtual void init() = 0;
-	virtual void clearScreen() = 0;
+	/// <summary>
+	/// 画面を色で塗りつぶし、奥行きもリセットする
+	/// </summary>
+	virtual void clearScreen(float r, float g, float b) = 0;
 	/// <summary>
 	/// 画像ファイル(png等)のバイト列からテクスチャを作る。失敗したら handle = -1
 	/// </summary>
@@ -27,6 +57,21 @@ public:
 	/// </summary>
     virtual void drawImage(int handle, float x, float y, float w, float h, float angle) = 0;
     virtual void drawText(const std::string& text, int fontSize, Anchor anchor, float x, float y) = 0;
+
+	/// <summary>
+	/// メッシュを GPU に載せてハンドルを返す。失敗したら -1
+	/// </summary>
+	virtual int createMesh(const MeshData& mesh) = 0;
+	/// <summary>
+	/// ここから endScene3D までの drawMesh を、奥行き付き・光の当たった 3D として描く
+	/// </summary>
+	virtual void beginScene3D(const Scene3DParams& params) = 0;
+	/// <summary>
+	/// texture が -1 なら色だけで塗る
+	/// </summary>
+	virtual void drawMesh(int mesh, int texture, const glm::mat4& model, const glm::vec3& color) = 0;
+	virtual void endScene3D() = 0;
+
 	/// <summary>
 	/// 今描いた画面を画像ファイルに保存する(present の前に呼ぶ)。未対応なら false
 	/// </summary>
