@@ -1,6 +1,6 @@
 **決してゴミのようなエンジンという訳ではない。**
 
-C++20 の ECS ゲームエンジン。描画は OpenGL 4.5(GLFW)、音声は miniaudio。
+C++20 の ECS ゲームエンジン。2D と 3D の両方を描ける。描画は OpenGL 4.5(GLFW)、音声は miniaudio、3D モデルは glTF。
 ゲームの中身(シーン・プレハブ・UI・画像・音)は `assets/` のファイルに書き、エンジンを作り直さなくても変えられる。
 
 ## ビルド
@@ -28,6 +28,7 @@ Visual Studio で開く時は、フォルダを開く(CMake として読み込�
 | `prefabs/*.json` | Entity の雛形(コンポーネントとその値) |
 | `ui/*.json` | UI の部品(Text / Image / Button)。ボタンは押した時に出すイベントを書く |
 | `images/` `sounds/` | 画像(png 等)と音(wav 等) |
+| `models/` | 3D モデル(glTF 2.0 の `.gltf` / `.glb`) |
 
 シーンの例:
 
@@ -46,6 +47,21 @@ Visual Studio で開く時は、フォルダを開く(CMake として読み込�
 - `overrides` はプレハブの最初の Entity に、項目単位で値を重ねる
 - 書かなかった項目はコンポーネントの既定値になる
 - 知らないコンポーネント名・項目名・enum の名前は、ファイル名と場所を付けたエラーで起動が止まる
+
+## 3D
+
+座標は右手系・Y が上(glTF と同じ)。回転は度で、`[x: ピッチ, y: ヨー, z: ロール]`。2D のスプライトと UI は 3D の上に画面座標で重なる。
+
+| コンポーネント | 役目 |
+|---|---|
+| `MeshRenderer` | `mesh` を描く。`builtin:cube` / `builtin:plane` / `builtin:sphere` か `models/*.gltf`。`texture` と `color` を掛ける |
+| `Camera3D` | このカメラから見る(回転 0 で -Z を向く)。`fov`・`clearColor`(背景色) |
+| `Light` | 平行光源。`direction`(光が進む向き)・`color`・`ambient` |
+| `Collision` | `BOX`(position + offset を角に size の箱)か `SPHERE`(中心 position + offset)。回転・拡大には追従しない |
+| `PlayerControl` | `plane: "XZ"` で上下キーが奥・手前になる。`jumpSpeed` |
+| `Physics` | `gravityDirection: [0, -1, 0]` で 3D の下向き |
+
+3D のシーンでは `MeshRendererSystem` を、カメラを追従させるなら `CameraSystem` も並べる。例は `assets/scenes/Demo3D.json`(タイトルの「3D DEMO」から開く)。
 
 ## コンポーネント・System を足す
 
