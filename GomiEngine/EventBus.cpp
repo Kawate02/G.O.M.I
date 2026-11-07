@@ -2,16 +2,18 @@
 
 ListenerHandle EventBus::subscribe(std::string eventName, Callback callback)
 {
-	listeners[eventName].push_back({ callback, true });
-	return ListenerHandle{ eventName, listeners[eventName].size() - 1 };
+	size_t id = nextId++;
+	listeners[eventName].push_back({ id, callback, true });
+	return ListenerHandle{ eventName, id };
 }
 
 void EventBus::unsubscribe(ListenerHandle handle)
 {
 	auto it = listeners.find(handle.eventName);
-	if (it != listeners.end() && handle.index < it->second.size()) 
+	if (it == listeners.end()) return;
+	for (auto& entry : it->second)
 	{
-		it->second[handle.index].active = false;
+		if (entry.id == handle.id) entry.active = false;
 	}
 }
 

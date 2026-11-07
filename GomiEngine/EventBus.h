@@ -20,6 +20,7 @@ using Callback = std::function<void(std::any)>;
 
 struct ListenerEntry
 {
+	size_t id;
 	Callback callback;
 	bool active = true;
 };
@@ -27,7 +28,7 @@ struct ListenerEntry
 struct ListenerHandle 
 {
 	std::string eventName;
-	size_t index;
+	size_t id = 0;
 };
 
 class EventBus
@@ -35,6 +36,7 @@ class EventBus
 private:
 	EventBus() = default;
 	std::unordered_map<std::string, std::vector<ListenerEntry>> listeners;
+	size_t nextId = 1;
 public:
 	static EventBus& getInstance()
 	{
@@ -50,11 +52,17 @@ public:
 		auto it = listeners.find(eventName);
 		if (it != listeners.end())
 		{
-			for (auto& entry : it->second)
+			//呼び出し中に購読が増えても壊れないよう、添字で回して増えた分は次回から
+			auto& vec = it->second;
+			const size_t n = vec.size();
+			for (size_t i = 0; i < n; i++)
 			{
-				if (entry.active) entry.callback(data);
+				if (vec[i].active) vec[i].callback(data);
 			}
 		}
 	}
+	/// <summary>
+	/// 購読解除されたものを取り除く。emit の外(フレームの区切り)で呼ぶ
+	/// </summary>
 	void cleanup();
 };

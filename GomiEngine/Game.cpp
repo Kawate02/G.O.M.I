@@ -64,6 +64,7 @@ void Game::run()
 			fpsCount = 0;
 			fpsTimer = nowTime;
 		}
+		EventBus::getInstance().cleanup();
 		if (debug.shouldQuit(totalFrames)) break;
 
 		//フレームレート調整

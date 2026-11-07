@@ -18,6 +18,9 @@ public:
 	{
 		EventBus::getInstance().unsubscribe(handle);
 	}
+	//購読のラムダが this を握っているのでコピー・ムーブさせない
+	EventRequest(const EventRequest&) = delete;
+	EventRequest& operator=(const EventRequest&) = delete;
 	inline void setEvent(const T& v)
 	{
 		hasEvent = true;
