@@ -50,13 +50,14 @@ void PhysicsSystem::update(World& world, int frameCount, float deltaTime)
 		}
 
 		movec.physVel = physc.gravVel + physc.extraVel;
-		auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), { movec.physVel.x, 0 });
+		//このフレームで動く距離(速度 x 時間)の先に壁があるかを見る
+		auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), { movec.physVel.x * deltaTime, 0 });
 		if (hitE.entities.size() > 0)
 		{
 			movec.physVel.x = 0;
 		}
 
-		hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), { 0, movec.physVel.y });
+		hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), { 0, movec.physVel.y * deltaTime });
 		if (hitE.entities.size() > 0)
 		{
 			if (movec.physVel.y >= 0 && physc.gravity > 0)

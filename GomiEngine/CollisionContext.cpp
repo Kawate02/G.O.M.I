@@ -45,12 +45,12 @@ bool CollisionContext::checkCircleAABB(const Circle& circle, const Box& box)
 void CollisionContext::createGrid(World& world)
 {
 	grid.clear();
-	auto& entities = world.getEntities();
 	auto& collisions = world.getComponentManager().getComponentArray<CollisionComponent>();
 
 	for (auto i = 0; i < collisions.getComponentCount(); i++)
 	{
-		auto& e = entities[collisions.getEntityId(i)];
+		Entity e = { collisions.getEntityId(i), collisions.getGeneration(i) };
+		if (!world.alive(e)) continue;
 		auto& colc = collisions.getComponent(e);
 		auto& tf = world.getComponentManager().getComponentArray<TransformComponent>().getComponent(e);
 		std::vector<Cell> cell;
@@ -79,7 +79,7 @@ CollisionHit CollisionContext::queryAt(World& world, const Entity& self, EntityT
 	std::vector<Cell> cells;
 	auto& selftf = tf.getComponent(self);
 	auto& selfcol = collision.getComponent(self);
-	if (postmove.x != 0 || postmove.y != 0)
+	//移動後の位置が入るセルを調べる(postmove が 0 なら今の位置)
 	{
 		if (selfcol.type == CollisionType::BOX)
 		{
