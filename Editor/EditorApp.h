@@ -42,6 +42,13 @@ private:
 	ImVec2 viewMin{ 0, 0 };
 	ImVec2 viewSize{ 0, 0 };
 	bool viewHovered = false;
+	//3D の見た目(前のフレームの値。ギズモとクリック選択に使う)
+	bool view3D = false;
+	float viewFov = 60;
+	float viewNear = 0.1f;
+	float viewFar = 1000;
+	int gizmoOperation = 0; //0: 移動, 1: 回転, 2: 拡大
+	bool gizmoWasUsing = false;
 
 	std::vector<std::string> logLines;
 	std::vector<std::string> assetFiles;
@@ -77,6 +84,9 @@ private:
 	void buildDefaultLayout(ImGuiID dockspace);
 	void handleShortcuts();
 	void updateCamera();
+	void drawGizmo();
+	void pickAt(const ImVec2& mouse);
+	glm::mat4 viewProjection() const;
 	void applyScriptedInput(int frame);
 public:
 	explicit EditorApp(const DebugOptions& options);

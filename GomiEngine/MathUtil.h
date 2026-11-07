@@ -40,6 +40,21 @@ namespace MathUtil
 	}
 
 	/// <summary>
+	/// modelMatrix の逆。行列を位置・回転(度、Y→X→Z)・拡大に戻す(せん断の無い行列に限る)
+	/// </summary>
+	inline void decompose(const glm::mat4& m, Vec3& position, Vec3& rotationDegrees, Vec3& scale)
+	{
+		glm::vec3 s(glm::length(glm::vec3(m[0])), glm::length(glm::vec3(m[1])), glm::length(glm::vec3(m[2])));
+		glm::mat4 rot(1.0f);
+		for (int i = 0; i < 3; i++) rot[i] = glm::vec4(glm::vec3(m[i]) / (s[i] > 0 ? s[i] : 1.0f), 0);
+		float yaw, pitch, roll;
+		glm::extractEulerAngleYXZ(rot, yaw, pitch, roll);
+		position = fromGlm(glm::vec3(m[3]));
+		rotationDegrees = Vec3(toDegrees(pitch), toDegrees(yaw), toDegrees(roll));
+		scale = fromGlm(s);
+	}
+
+	/// <summary>
 	/// from から to を向く回転(度、ロールは 0)
 	/// </summary>
 	inline Vec3 lookRotation(const Vec3& from, const Vec3& to)

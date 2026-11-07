@@ -2,11 +2,13 @@
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
 #include "SettingManager.h"
+#include "ResourceManager.h"
 
 #include <imgui_internal.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_stdlib.h>
+#include <ImGuizmo.h>
 #include <glad/gl.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -544,7 +546,15 @@ void EditorApp::drawSceneView()
 	ImGui::Begin(WIN_SCENE);
 	ImGui::PopStyleVar();
 	ImGui::SetCursorPos(ImVec2(8, ImGui::GetCursorPosY() + 4));
-	ImGui::Checkbox("エディタカメラ(3D: 右ドラッグで回す / 中ドラッグで動かす / ホイール / F で選んだ物へ)", &useEditorCamera);
+	ImGui::RadioButton("移動 (W)", &gizmoOperation, 0);
+	ImGui::SameLine();
+	ImGui::RadioButton("回転 (E)", &gizmoOperation, 1);
+	ImGui::SameLine();
+	ImGui::RadioButton("拡大 (R)", &gizmoOperation, 2);
+	ImGui::SameLine(0, 20);
+	ImGui::Checkbox("エディタカメラ", &useEditorCamera);
+	ImGui::SameLine();
+	ImGui::TextDisabled("(3D: 右ドラッグで回す / 中ドラッグで動かす / ホイール / F で選んだ物へ。左クリックで選ぶ)");
 
 	//ゲームの画面を縦横比を保って真ん中に出す
 	ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -557,7 +567,132 @@ void EditorApp::drawSceneView()
 	ImTextureID tex = static_cast<ImTextureID>(drawer.renderTargetTexture(gameTarget));
 	ImGui::Image(ImTextureRef(tex), viewSize, ImVec2(0, 1), ImVec2(1, 0)); //描き先は上下逆さま
 	viewHovered = ImGui::IsItemHovered();
+	drawGizmo();
+	//ギズモを触っていない時の左クリックで、そこにある物を選ぶ
+	if (viewHovered && !editor->isPlaying() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
+	{
+		pickAt(ImGui::GetIO().MousePos);
+	}
 	ImGui::End();
+}
+
+glm::mat4 EditorApp::viewProjection() const
+{
+	return glm::perspective(glm::radians(viewFov), static_cast<float>(gameWidth) / gameHeight, viewNear, viewFar) * camera.view();
+}
+
+void EditorApp::drawGizmo()
+{
+	bool using3D = view3D && !editor->isPlaying();
+	Entity e = selectedEntity();
+	if (!using3D || selected < 0 || !editor->world().getComponentManager().has<TransformComponent>(e))
+	{
+		gizmoWasUsing = false;
+		return;
+	}
+	auto& t = editor->world().getComponentManager().getComponentArray<TransformComponent>().getComponent(e);
+	glm::mat4 view = camera.view();
+	glm::mat4 proj = glm::perspective(glm::radians(viewFov), static_cast<float>(gameWidth) / gameHeight, viewNear, viewFar);
+	glm::mat4 model = MathUtil::modelMatrix(t.position, t.rotation, t.scale);
+
+	ImGuizmo::SetOrthographic(false);
+	ImGuizmo::SetDrawlist();
+	ImGuizmo::SetRect(viewMin.x, viewMin.y, viewSize.x, viewSize.y);
+	ImGuizmo::OPERATION op = gizmoOperation == 0 ? ImGuizmo::TRANSLATE : gizmoOperation == 1 ? ImGuizmo::ROTATE : ImGuizmo::SCALE;
+	ImGuizmo::MODE mode = gizmoOperation == 2 ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+	bool changed = ImGuizmo::Manipulate(&view[0][0], &proj[0][0], op, mode, &model[0][0]);
+	bool usingNow = ImGuizmo::IsUsing();
+	if (usingNow && !gizmoWasUsing) editor->recordUndo();
+	gizmoWasUsing = usingNow;
+	if (!changed) return;
+
+	//行列を 位置・回転(度、Y→X→Z)・拡大 に戻す
+	Vec3 position, rotation, scale;
+	MathUtil::decompose(model, position, rotation, scale);
+	auto entity = selectedEntity();
+	editor->setField(entity, "Transform", "position", toJson(position));
+	if (gizmoOperation == 1) editor->setField(entity, "Transform", "rotation", toJson(rotation));
+	if (gizmoOperation == 2) editor->setField(entity, "Transform", "scale", toJson(scale));
+}
+
+void EditorApp::pickAt(const ImVec2& mouse)
+{
+	if (viewSize.x <= 0) return;
+	float u = (mouse.x - viewMin.x) / viewSize.x;
+	float v = (mouse.y - viewMin.y) / viewSize.y;
+	auto list = editor->entities();
+	auto& cm = editor->world().getComponentManager();
+	int best = -1;
+
+	if (view3D)
+	{
+		//カーソルの下を通る光線と、各メッシュの範囲の箱(モデルの座標)が交わる一番近いもの
+		glm::mat4 inv = glm::inverse(viewProjection());
+		glm::vec4 nearP = inv * glm::vec4(u * 2 - 1, 1 - v * 2, -1, 1);
+		glm::vec4 farP = inv * glm::vec4(u * 2 - 1, 1 - v * 2, 1, 1);
+		glm::vec3 origin = glm::vec3(nearP) / nearP.w;
+		glm::vec3 dir = glm::vec3(farP) / farP.w - origin;
+		float bestT = 1e30f;
+		for (int i = 0; i < static_cast<int>(list.size()); i++)
+		{
+			Entity e = list[i];
+			if (!cm.has<MeshRendererComponent>(e) || !cm.has<TransformComponent>(e)) continue;
+			glm::vec3 lo, hi;
+			if (!ResourceManager::getInstance().getMeshBounds(cm.getComponentArray<MeshRendererComponent>().getComponent(e).mesh, lo, hi)) continue;
+			auto& t = cm.getComponentArray<TransformComponent>().getComponent(e);
+			glm::mat4 toLocal = glm::inverse(MathUtil::modelMatrix(t.position, t.rotation, t.scale));
+			glm::vec3 o = glm::vec3(toLocal * glm::vec4(origin, 1));
+			glm::vec3 d = glm::vec3(toLocal * glm::vec4(dir, 0));
+			//平らな面(plane)でも当たるよう、厚さ 0 の軸を少しふくらませる
+			for (int k = 0; k < 3; k++) if (hi[k] - lo[k] < 1e-4f) { lo[k] -= 0.01f; hi[k] += 0.01f; }
+			float t0 = 0, t1 = 1e30f;
+			bool hit = true;
+			for (int k = 0; k < 3 && hit; k++)
+			{
+				if (std::abs(d[k]) < 1e-9f)
+				{
+					hit = o[k] >= lo[k] && o[k] <= hi[k];
+					continue;
+				}
+				float a = (lo[k] - o[k]) / d[k], b = (hi[k] - o[k]) / d[k];
+				if (a > b) std::swap(a, b);
+				t0 = std::max(t0, a);
+				t1 = std::min(t1, b);
+				hit = t0 <= t1;
+			}
+			if (hit && t0 < bestT)
+			{
+				bestT = t0;
+				best = i;
+			}
+		}
+	}
+	else
+	{
+		//2D: スプライトの四角の中で、一番手前(layer → order が大きい)もの
+		Vec2 p(u * gameWidth, v * gameHeight);
+		Vec2 cameraPos = editor->world().getCamera().position;
+		std::pair<int, int> top{ -1000000, -1000000 };
+		for (int i = 0; i < static_cast<int>(list.size()); i++)
+		{
+			Entity e = list[i];
+			if (!cm.has<RendererComponent>(e) || !cm.has<TransformComponent>(e)) continue;
+			auto& r = cm.getComponentArray<RendererComponent>().getComponent(e);
+			auto& t = cm.getComponentArray<TransformComponent>().getComponent(e);
+			Vec2 size = AssetDatabase::getInstance().imageSize(r.path);
+			Vec2 min(t.position.x, t.position.y);
+			if (r.useCamera) min -= cameraPos;
+			Vec2 max = min + Vec2(size.x * t.scale.x, size.y * t.scale.y);
+			if (p.x < min.x || p.y < min.y || p.x > max.x || p.y > max.y) continue;
+			std::pair<int, int> key{ r.layer, r.order };
+			if (key >= top)
+			{
+				top = key;
+				best = i;
+			}
+		}
+	}
+	selected = best;
 }
 
 void EditorApp::drawAssets()
@@ -751,6 +886,12 @@ void EditorApp::handleShortcuts()
 		editor->destroy(selectedEntity());
 		selected = -1;
 	}
+	if (viewHovered && !io.KeyCtrl)
+	{
+		if (ImGui::IsKeyPressed(ImGuiKey_W, false)) gizmoOperation = 0;
+		if (ImGui::IsKeyPressed(ImGuiKey_E, false)) gizmoOperation = 1;
+		if (ImGui::IsKeyPressed(ImGuiKey_R, false)) gizmoOperation = 2;
+	}
 	//選んだ物にエディタカメラを向ける
 	if (selected >= 0 && viewHovered && ImGui::IsKeyPressed(ImGuiKey_F, false))
 	{
@@ -820,6 +961,7 @@ int EditorApp::run()
 		ImGui_ImplGlfw_NewFrame();
 		applyScriptedInput(frame);
 		ImGui::NewFrame();
+		ImGuizmo::BeginFrame();
 
 		// ---- ゲームの入力: 再生中で、文字入力中でない時だけ。マウスはシーンの画面の中の座標に直す
 		input.inputStateUpdate();
@@ -861,11 +1003,16 @@ int EditorApp::run()
 		updateCamera();
 
 		// ---- シーンの画面を描き先に描く(止めている時の 3D はエディタカメラから)
+		view3D = false;
 		if (!editor->isPlaying() && useEditorCamera && (renderQueue.getCamera3D() || !renderQueue.getMeshes().empty()))
 		{
 			Camera3DView view = renderQueue.getCamera3D().value_or(Camera3DView{ glm::mat4(1.0f), 60, 0.1f, 1000, Vec3(0.45f, 0.6f, 0.8f) });
 			view.view = camera.view();
 			renderQueue.setCamera3D(view);
+			view3D = true;
+			viewFov = view.fov;
+			viewNear = view.nearClip;
+			viewFar = view.farClip;
 		}
 		drawer.setRenderTarget(gameTarget);
 		renderer.render(drawer, renderQueue, editor->world().getCamera());

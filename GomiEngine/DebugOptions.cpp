@@ -1,4 +1,6 @@
 #include "DebugOptions.h"
+#include <algorithm>
+#include <cstdio>
 
 namespace
 {
@@ -60,6 +62,12 @@ std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 		{
 			if (!splitFrame(value, start, end, rest)) return "bad --type: " + value;
 			typed.push_back({ start, rest });
+		}
+		else if (opt == "--drag")
+		{
+			float v[4];
+			if (!splitFrame(value, start, end, rest) || std::sscanf(rest.c_str(), "%f,%f,%f,%f", &v[0], &v[1], &v[2], &v[3]) != 4) return "bad --drag: " + value;
+			drags.push_back({ start, end, Vec2(v[0], v[1]), Vec2(v[2], v[3]) });
 		}
 		else if (opt == "--select")
 		{
@@ -159,6 +167,16 @@ DebugOptions::ClickState DebugOptions::clickAt(int frame) const
 		}
 		if (frame == c.frame) state.press = true;
 		if (frame == c.frame + 1) state.release = true;
+	}
+	for (auto& d : drags)
+	{
+		//start の1つ前に置いて押し、end まで線の上を動かし、end の次で離す
+		if (frame < d.start - 1 || frame > d.end + 1) continue;
+		float k = d.end > d.start ? std::clamp(static_cast<float>(frame - d.start) / (d.end - d.start), 0.0f, 1.0f) : 1.0f;
+		state.move = true;
+		state.pos = d.from + (d.to - d.from) * k;
+		if (frame == d.start) state.press = true;
+		if (frame == d.end + 1) state.release = true;
 	}
 	return state;
 }

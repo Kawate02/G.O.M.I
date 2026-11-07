@@ -2,6 +2,7 @@
 #include "ModelLoader.h"
 #include "MeshFactory.h"
 #include "AssetDatabase.h"
+#include "MathUtil.h"
 #include <iostream>
 
 static int failures = 0;
@@ -75,6 +76,27 @@ int main()
 		}
 		CHECK(!ModelLoader::loadGltf(db.resolve("models/missing.gltf"), error).has_value());
 		CHECK(ModelLoader::isModelFile("models/a.glb") && !ModelLoader::isModelFile("images/a.png"));
+	}
+
+	// 行列 → 位置・回転(度)・拡大 に戻すと元の値になる(ギズモで使う)
+	{
+		const Vec3 cases[][3] = {
+			{ Vec3(1, 2, 3), Vec3(0, 0, 0), Vec3(1, 1, 1) },
+			{ Vec3(-4, 0.5f, 9), Vec3(30, 45, 0), Vec3(2, 2, 2) },
+			{ Vec3(0, 0, 0), Vec3(-25, 170, 10), Vec3(1, 3, 0.5f) },
+			{ Vec3(5, -1, 0), Vec3(80, -60, -45), Vec3(0.2f, 1, 4) },
+		};
+		for (auto& c : cases)
+		{
+			Vec3 p, r, s;
+			MathUtil::decompose(MathUtil::modelMatrix(c[0], c[1], c[2]), p, r, s);
+			for (int k = 0; k < 3; k++)
+			{
+				CHECK(std::abs(p[k] - c[0][k]) < 1e-4f);
+				CHECK(std::abs(r[k] - c[1][k]) < 1e-3f);
+				CHECK(std::abs(s[k] - c[2][k]) < 1e-4f);
+			}
+		}
 	}
 
 	if (failures == 0) std::cout << "ModelTest: all passed" << std::endl;

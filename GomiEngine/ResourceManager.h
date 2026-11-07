@@ -19,6 +19,7 @@ private:
 	std::map<AssetID, ImageResource> images;
 	std::map<AssetID, SoundResource> sounds;
 	std::map<AssetID, int> meshes;
+	std::map<AssetID, std::pair<glm::vec3, glm::vec3>> meshBounds;
 	std::map<AssetID, std::vector<unsigned char>> soundData; //音声バックエンドが参照し続けるので持っておく
 public:
 	static ResourceManager& getInstance()
@@ -32,5 +33,9 @@ public:
 	/// "builtin:cube" などの基本形か、.gltf / .glb のモデル。読めなければ -1
 	/// </summary>
 	int loadMesh(IDrawer& drawer, const AssetID& assetID);
+	/// <summary>
+	/// 読み込み済みメッシュの範囲(モデルの座標で min, max)。まだ読んでいなければ false
+	/// </summary>
+	bool getMeshBounds(const AssetID& assetID, glm::vec3& min, glm::vec3& max) const;
 	void unloadAll();
 };

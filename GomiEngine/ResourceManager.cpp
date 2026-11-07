@@ -51,7 +51,8 @@ int ResourceManager::loadMesh(IDrawer& drawer, const AssetID& assetID)
     if (cached != meshes.end()) return cached->second;
 
     int handle = -1;
-    if (auto data = MeshFactory::builtin(assetID))
+    std::optional<MeshData> data = MeshFactory::builtin(assetID);
+    if (data)
     {
         handle = drawer.createMesh(*data);
     }
@@ -59,9 +60,8 @@ int ResourceManager::loadMesh(IDrawer& drawer, const AssetID& assetID)
     {
         auto& db = AssetDatabase::getInstance();
         std::string error = "asset not found";
-        std::optional<MeshData> model;
-        if (db.exists(assetID)) model = ModelLoader::loadGltf(db.resolve(assetID), error);
-        if (model) handle = drawer.createMesh(*model);
+        if (db.exists(assetID)) data = ModelLoader::loadGltf(db.resolve(assetID), error);
+        if (data) handle = drawer.createMesh(*data);
         else db.warnOnce(assetID, error);
     }
     else if (!assetID.empty())
@@ -69,7 +69,27 @@ int ResourceManager::loadMesh(IDrawer& drawer, const AssetID& assetID)
         AssetDatabase::getInstance().warnOnce(assetID, "unknown mesh");
     }
     meshes[assetID] = handle;
+    if (data && handle != -1)
+    {
+        glm::vec3 lo(1e30f), hi(-1e30f);
+        for (size_t i = 0; i + 2 < data->vertices.size(); i += MeshData::STRIDE)
+        {
+            glm::vec3 p(data->vertices[i], data->vertices[i + 1], data->vertices[i + 2]);
+            lo = glm::min(lo, p);
+            hi = glm::max(hi, p);
+        }
+        meshBounds[assetID] = { lo, hi };
+    }
     return handle;
+}
+
+bool ResourceManager::getMeshBounds(const AssetID& assetID, glm::vec3& min, glm::vec3& max) const
+{
+    auto it = meshBounds.find(assetID);
+    if (it == meshBounds.end()) return false;
+    min = it->second.first;
+    max = it->second.second;
+    return true;
 }
 
 void ResourceManager::unloadAll()

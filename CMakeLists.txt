@@ -44,7 +44,12 @@ FetchContent_Declare(imgui
     GIT_SHALLOW TRUE
     SOURCE_SUBDIR _no_cmake)
 
-FetchContent_MakeAvailable(glfw miniaudio stb glm cgltf imgui)
+FetchContent_Declare(imguizmo
+    GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
+    GIT_TAG 18cef5e031d8c6973d80284c67f60549fafd78c1
+    SOURCE_SUBDIR _no_cmake)
+
+FetchContent_MakeAvailable(glfw miniaudio stb glm cgltf imgui imguizmo)
 
 # OpenGL 4.5 core のローダー(glad2 で生成済みのものを同梱)
 add_library(glad STATIC third_party/glad/src/gl.c)
@@ -92,8 +97,9 @@ add_library(imgui STATIC
     ${imgui_SOURCE_DIR}/imgui_demo.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
-    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp)
-target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${imgui_SOURCE_DIR}/misc/cpp)
+    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
+    ${imguizmo_SOURCE_DIR}/src/ImGuizmo.cpp)
+target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${imgui_SOURCE_DIR}/misc/cpp ${imguizmo_SOURCE_DIR}/src)
 target_link_libraries(imgui PUBLIC glfw)
 
 file(GLOB EDITOR_SOURCES CONFIGURE_DEPENDS Editor/*.cpp Editor/*.h)

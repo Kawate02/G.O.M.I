@@ -14,6 +14,7 @@
 ///   --save-scene <frame>:<path>    そのフレームの更新前に World をシーンの JSON で保存(--world <path> で読める)
 ///   --key <frame>[-<end>]:<キー名>   そのフレーム(から end まで)キーを押したことにする(InputKey の名前。KEY_ は省略可)
 ///   --click <frame>:<x>,<y>        その位置で左クリックしたことにする
+///   --drag <start>-<end>:<x1>,<y1>,<x2>,<y2>  左ボタンを押したまま動かす(エディタ用)
 ///   --type <frame>:<文字>          文字を入力したことにする(エディタの入力欄用)
 ///   --select <番号>                エディタで最初に選んでおく Entity の並び順の番号
 /// </summary>
@@ -38,6 +39,14 @@ private:
 	};
 	std::vector<KeyEvent> keys;
 	std::vector<ClickEvent> clicks;
+	struct DragEvent
+	{
+		int start;
+		int end;
+		Vec2 from;
+		Vec2 to;
+	};
+	std::vector<DragEvent> drags;
 	std::vector<Screenshot> screenshots;
 	std::vector<Screenshot> sceneSaves;
 	std::vector<Screenshot> typed;
