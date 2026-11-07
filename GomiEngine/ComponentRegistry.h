@@ -64,6 +64,7 @@ struct ComponentInfo
 	/// <summary>既定値に JSON の項目を上書きして付ける。知らない項目名があれば例外</summary>
 	std::function<void(ComponentManager&, Entity, const Json&)> addFromJson;
 	std::function<Json(ComponentManager&, Entity)> toJson;
+	std::function<void(ComponentManager&, Entity)> remove;
 
 	const FieldInfo* findField(std::string_view fieldName) const;
 };
@@ -142,6 +143,7 @@ public:
 			for (auto& f : self.fields) j[f.name] = f.save(&value);
 			return j;
 		};
+		info.remove = [](ComponentManager& cm, Entity e) { if (cm.has<C>(e)) cm.getComponentArray<C>().removeComponent(e); };
 		components.push_back(std::move(info));
 		return Builder<C>(*this, index);
 	}

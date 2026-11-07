@@ -39,6 +39,9 @@ public:
 	/// 無効なハンドルなら nullptr
 	/// </summary>
 	UIBase* getUI(UIHandle handle);
-	void update(const InputState& inputState, RenderQueue& renderQueue);
+	/// <summary>
+	/// interactive が false なら描くだけで、マウスに反応しない(エディタで止めている時)
+	/// </summary>
+	void update(const InputState& inputState, RenderQueue& renderQueue, bool interactive = true);
 	void clear();
 };

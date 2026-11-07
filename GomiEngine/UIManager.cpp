@@ -103,10 +103,11 @@ UIBase* UIManager::getUI(UIHandle handle)
 	return uiList[handle.id].get();
 }
 
-void UIManager::update(const InputState& inputState, RenderQueue& renderQueue)
+void UIManager::update(const InputState& inputState, RenderQueue& renderQueue, bool interactive)
 {
 	for (auto& it : uiList)
 	{
+		if (!interactive) break;
 		if (it == nullptr) continue;
 		if (topLayer < 1000)
 		{

@@ -10,6 +10,9 @@ void registerBuiltinComponents()
 
 	auto& r = ComponentRegistry::getInstance();
 
+	r.add<NameComponent>("Name")
+		.field("name", &NameComponent::name);
+
 	r.add<TransformComponent>("Transform")
 		.field("position", &TransformComponent::position)
 		.field("scale", &TransformComponent::scale)

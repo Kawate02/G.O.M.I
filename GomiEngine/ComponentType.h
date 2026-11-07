@@ -13,3 +13,4 @@
 #include "MeshRendererComponent.h"
 #include "Camera3DComponent.h"
 #include "LightComponent.h"
+#include "NameComponent.h"

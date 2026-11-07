@@ -18,9 +18,20 @@ void World::addSystem(const std::string& name)
 	systemNames.push_back(name);
 }
 
-void World::update(float dt)
+void World::update(float dt, bool simulate)
 {
 	deltaTime = dt;
+	if (!simulate)
+	{
+		uiManager.update(inputState, renderQueue, false);
+		for (auto& it : systems)
+		{
+			if (it->runsInEditMode()) it->update(*this, frameCount, 0.0f);
+		}
+		flushDestroyed();
+		eventBus.clearEvents();
+		return;
+	}
 	frameCount++;
 	if (inputState.isDownKey(InputKey::KEY_ESCAPE) && !pause)
 	{

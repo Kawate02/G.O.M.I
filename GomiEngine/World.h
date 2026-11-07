@@ -48,7 +48,10 @@ public:
 	/// シーンの JSON から System・Entity・UI を作る。source はエラー表示用のファイル名
 	/// </summary>
 	void initialize(const Json& scene, const std::string& source);
-	void update(float dt);
+	/// <summary>
+	/// simulate が false なら、エディタ用に描画の System(runsInEditMode)だけ動かし、入力・ポーズ・UI の反応は止める
+	/// </summary>
+	void update(float dt, bool simulate = true);
 	void release();
 	Entity createEntity();
 	/// <summary>

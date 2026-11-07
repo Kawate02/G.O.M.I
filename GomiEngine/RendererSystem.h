@@ -10,4 +10,5 @@ class RendererSystem : public ISystem
 public:
 	void initialize(World& world) override;
 	void update(World& world, int frameCount, float deltaTime) override;
+	bool runsInEditMode() const override { return true; }
 };
