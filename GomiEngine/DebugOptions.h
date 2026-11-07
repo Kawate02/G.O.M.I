@@ -10,7 +10,7 @@
 ///   --frames <n>                   n フレーム目で終了
 ///   --fixed-dt <fps>               deltaTime を 1/fps 秒に固定する(実行のたびに同じ画面になる)
 ///   --screenshot <frame>:<path>    そのフレームの画面を png で保存(複数可)
-///   --key <frame>[-<end>]:<キー名>   そのフレーム(から end まで)キーを押したことにする(ESCAPE, SPACE, W, A, S, D など)
+///   --key <frame>[-<end>]:<キー名>   そのフレーム(から end まで)キーを押したことにする(InputKey の名前。KEY_ は省略可)
 ///   --click <frame>:<x>,<y>        その位置で左クリックしたことにする
 /// </summary>
 class DebugOptions

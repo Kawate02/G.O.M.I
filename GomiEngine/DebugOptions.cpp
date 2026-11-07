@@ -1,23 +1,7 @@
 #include "DebugOptions.h"
-#include <unordered_map>
 
 namespace
 {
-	const std::unordered_map<std::string, InputKey> keyNames = {
-		{ "ESCAPE", InputKey::KEY_ESCAPE },
-		{ "SPACE", InputKey::KEY_SPACE },
-		{ "RETURN", InputKey::KEY_RETURN },
-		{ "LSHIFT", InputKey::KEY_LSHIFT },
-		{ "LEFT", InputKey::KEY_LEFT },
-		{ "RIGHT", InputKey::KEY_RIGHT },
-		{ "UP", InputKey::KEY_UP },
-		{ "DOWN", InputKey::KEY_DOWN },
-		{ "W", InputKey::KEY_W },
-		{ "A", InputKey::KEY_A },
-		{ "S", InputKey::KEY_S },
-		{ "D", InputKey::KEY_D },
-	};
-
 	// "<frame>:<rest>" または "<start>-<end>:<rest>" を分ける
 	bool splitFrame(const std::string& arg, int& start, int& end, std::string& rest)
 	{
@@ -69,9 +53,11 @@ std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 		else if (opt == "--key")
 		{
 			if (!splitFrame(value, start, end, rest)) return "bad --key: " + value;
-			auto it = keyNames.find(rest);
-			if (it == keyNames.end()) return "unknown key: " + rest;
-			keys.push_back({ start, end, it->second });
+			//"KEY_ESCAPE" でも "ESCAPE" でもよい
+			auto key = enumFromName<InputKey>(rest);
+			if (!key) key = enumFromName<InputKey>("KEY_" + rest);
+			if (!key) return "unknown key: " + rest;
+			keys.push_back({ start, end, *key });
 		}
 		else if (opt == "--click")
 		{

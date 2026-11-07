@@ -1,4 +1,5 @@
 #pragma once
+#include "EnumNames.h"
 #include "UIBase.h"
 #include "RenderQueue.h"
 #include "Utilities.h"
@@ -8,6 +9,10 @@ enum class UIType : uint8_t
 	NONE = 0,
 	RESULT
 };
+GOMI_ENUM_NAMES(UIType,
+	GOMI_ENUM_ENTRY(UIType, NONE),
+	GOMI_ENUM_ENTRY(UIType, RESULT))
+
 class UIManager
 {
 private:

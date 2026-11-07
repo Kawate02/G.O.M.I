@@ -1,4 +1,5 @@
 #pragma once
+#include "EnumNames.h"
 #include "EntityTagComponent.h"
 #include <unordered_map>
 #include <string>
@@ -10,6 +11,11 @@ enum class CollisionKind : uint8_t
 	DAMAGE,
 	TRIGGER
 };
+GOMI_ENUM_NAMES(CollisionKind,
+	GOMI_ENUM_ENTRY(CollisionKind, BLOCK),
+	GOMI_ENUM_ENTRY(CollisionKind, DAMAGE),
+	GOMI_ENUM_ENTRY(CollisionKind, TRIGGER))
+
 struct CollisionRule
 {
 	EntityTag a;

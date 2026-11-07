@@ -1,4 +1,5 @@
 #pragma once
+#include "EnumNames.h"
 #include <cstdint>
 enum class Anchor : uint8_t
 {
@@ -12,3 +13,13 @@ enum class Anchor : uint8_t
 	BOTTOM_CENTER,
 	BOTTOM_RIGHT
 };
+GOMI_ENUM_NAMES(Anchor,
+	GOMI_ENUM_ENTRY(Anchor, TOP_LEFT),
+	GOMI_ENUM_ENTRY(Anchor, TOP_CENTER),
+	GOMI_ENUM_ENTRY(Anchor, TOP_RIGHT),
+	GOMI_ENUM_ENTRY(Anchor, CENTER_LEFT),
+	GOMI_ENUM_ENTRY(Anchor, CENTER),
+	GOMI_ENUM_ENTRY(Anchor, CENTER_RIGHT),
+	GOMI_ENUM_ENTRY(Anchor, BOTTOM_LEFT),
+	GOMI_ENUM_ENTRY(Anchor, BOTTOM_CENTER),
+	GOMI_ENUM_ENTRY(Anchor, BOTTOM_RIGHT))
