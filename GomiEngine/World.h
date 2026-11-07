@@ -14,6 +14,16 @@
 #include "AudioQueue.h"
 #include "EventRequest.h"
 
+/// <summary>
+/// その Entity がどのプレハブの何番目から作られたか。instance が同じものは同じ配置から作られた仲間
+/// </summary>
+struct PrefabLink
+{
+	AssetID prefab;
+	int index = 0;
+	int instance = 0;
+};
+
 class World
 {
 protected:
@@ -35,6 +45,8 @@ protected:
 	std::queue<uint32_t> freeIDs;
 	std::vector<Entity> pendingDestroy; //フレームの最後にコンポーネントを消す Entity
 	void flushDestroyed();
+	std::unordered_map<uint32_t, std::pair<Entity, PrefabLink>> prefabLinks;
+	int nextPrefabInstance = 1;
 
 	EventRequest<int> pauseClose{ Event::Pause_Close };
 	UIHandle pauseUI = { 0, 0 };
@@ -67,6 +79,17 @@ public:
 	inline const std::vector<std::string>& getSystemNames() const { return systemNames; }
 	inline const Json& getUIEntries() const { return uiEntries; }
 	inline void setUIEntries(const Json& entries) { uiEntries = entries; }
+	inline int newPrefabInstance() { return nextPrefabInstance++; }
+	inline void setPrefabLink(Entity e, const PrefabLink& link) { prefabLinks[e.id] = { e, link }; }
+	inline void clearPrefabLink(Entity e) { prefabLinks.erase(e.id); }
+	/// <summary>
+	/// プレハブから作られていなければ nullptr
+	/// </summary>
+	inline const PrefabLink* getPrefabLink(Entity e) const
+	{
+		auto it = prefabLinks.find(e.id);
+		return it != prefabLinks.end() && it->second.first == e ? &it->second.second : nullptr;
+	}
 	inline ComponentManager& getComponentManager() { return component; }
 	inline Camera& getCamera() { return camera; }
 	inline bool alive(Entity e) const { return e.id < generations.size() && e.generation == generations[e.id]; }

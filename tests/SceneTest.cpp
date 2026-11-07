@@ -48,13 +48,52 @@ int main()
 	// Field の中身: プレイヤー1体 + 背景4枚、overrides が効いている
 	{
 		Json saved = loadAndSave(db.readJson("scenes/Field.json"), "Field");
-		CHECK(countEntities(saved) == 5);
 		CHECK(saved["systems"].size() == 10);
-		const Json& player = saved["entities"][0]["components"];
+		CHECK(countEntities(saved) == 2); // プレハブ2つ(プレイヤー + 背景4枚)
+		Env env;
+		World world(env.input, env.render, env.audio);
+		world.initialize(db.readJson("scenes/Field.json"), "Field");
+		CHECK(world.getEntities().size() == 5);
+		const Json player = SceneLoader::componentsOf(world, world.getEntities()[0]);
 		CHECK(player["Transform"]["position"] == Json::parse("[100, 300, 0]"));
 		CHECK(player["Transform"]["scale"] == Json::parse("[1, 1, 1]")); // プレハブ側の値が残る
 		CHECK(player["Move"]["turnBrake"].dump() == "0.6");
-		CHECK(saved["entities"][4]["components"]["BackGround"]["asset"] == "images/ag.png");
+		CHECK(SceneLoader::componentsOf(world, world.getEntities()[4])["BackGround"]["asset"] == "images/ag.png");
+	}
+
+	// プレハブのつながりは保存で残り、変えた項目だけが overrides になる
+	{
+		Json saved = loadAndSave(db.readJson("scenes/Field.json"), "Field");
+		CHECK(saved["entities"].size() == 2);
+		CHECK(saved["entities"][0] == Json::parse(R"({"prefab": "prefabs/player.json", "overrides": {"Transform": {"position": [100, 300, 0]}}})"));
+		CHECK(saved["entities"][1] == Json::parse(R"({"prefab": "prefabs/background.json"})"));
+
+		Env env;
+		World world(env.input, env.render, env.audio);
+		world.initialize(db.readJson("scenes/Field.json"), "Field");
+		auto& cm = world.getComponentManager();
+		Entity player = world.getEntities()[0];
+		cm.getComponentArray<MoveComponent>().getComponent(player).maxSpeed = 123;
+		cm.addComponent(player, NameComponent{ "hero" });
+		Json s1 = SceneLoader::save(world);
+		CHECK(s1["entities"][0]["overrides"]["Move"] == Json::parse(R"({"maxSpeed": 123})"));
+		CHECK(s1["entities"][0]["overrides"]["Name"]["name"] == "hero");
+
+		// 背景の2枚目を変えると、背景のつながりは切れて4枚とも展開される
+		cm.getComponentArray<BackGroundComponent>().getComponent(world.getEntities()[2]).order = 9;
+		Json s2 = SceneLoader::save(world);
+		CHECK(s2["entities"].size() == 5);
+		CHECK(s2["entities"][2]["components"]["BackGround"]["order"] == 9);
+		CHECK(s2["entities"][0].contains("prefab"));
+
+		// 保存したものを読み直しても同じ
+		CHECK(loadAndSave(s2, "s2") == s2);
+
+		// プレハブを後から置く
+		auto made = SceneLoader::instantiate(world, "prefabs/background.json");
+		CHECK(made.size() == 4);
+		CHECK(world.getPrefabLink(made[3])->index == 3);
+		CHECK(SceneLoader::save(world)["entities"].size() == 6);
 	}
 
 	// 破棄した Entity は保存されない
@@ -63,7 +102,11 @@ int main()
 		World world(env.input, env.render, env.audio);
 		world.initialize(db.readJson("scenes/Field.json"), "Field");
 		world.destroyEntity(world.getEntities()[1]);
-		CHECK(countEntities(SceneLoader::save(world)) == 4);
+		world.update(0.0f, false); // 破棄はフレームの最後に反映される
+		Json s = SceneLoader::save(world);
+		CHECK(countEntities(s) == 4); // プレイヤー + 背景の残り3枚(仲間が欠けたので展開)
+		CHECK(s["entities"][0].contains("prefab"));
+		CHECK(s["entities"][1].contains("components"));
 	}
 
 	// merge: オブジェクトは中まで重ね、それ以外は置き換え

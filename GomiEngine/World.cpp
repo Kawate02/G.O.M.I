@@ -67,6 +67,7 @@ void World::release()
 	entities.clear();
 	generations.clear();
 	pendingDestroy.clear();
+	prefabLinks.clear();
 	std::queue<uint32_t>().swap(freeIDs);
 }
 
@@ -105,6 +106,7 @@ void World::flushDestroyed()
 	for (auto& e : pendingDestroy)
 	{
 		component.removeAll(e);
+		prefabLinks.erase(e.id);
 		freeIDs.push(e.id);
 	}
 	pendingDestroy.clear();

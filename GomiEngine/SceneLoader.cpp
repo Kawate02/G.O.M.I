@@ -76,6 +76,7 @@ namespace
 			checkKeys(prefab, { "entities" }, prefabId);
 			const Json& defs = prefab.value("entities", Json::array());
 			bool first = true;
+			int instance = world.newPrefabInstance();
 			for (size_t i = 0; i < defs.size(); i++)
 			{
 				//overrides の間違いもあるので、シーン側の場所も付ける
@@ -84,7 +85,9 @@ namespace
 				Json components = defs[i].value("components", Json::object());
 				if (first && item.contains("overrides")) components = SceneLoader::merge(components, item["overrides"]);
 				first = false;
-				addComponents(world, world.createEntity(), components, at);
+				Entity e = world.createEntity();
+				addComponents(world, e, components, at);
+				world.setPrefabLink(e, { prefabId, static_cast<int>(i), instance });
 			}
 		}
 		else
@@ -194,23 +197,145 @@ void SceneLoader::load(World& world, const Json& scene, const std::string& sourc
 	world.setUIEntries(ui);
 }
 
+Json SceneLoader::componentsOf(World& world, Entity e)
+{
+	auto& cm = world.getComponentManager();
+	Json components = Json::object();
+	for (auto& info : ComponentRegistry::getInstance().all())
+	{
+		if (info.has(cm, e)) components[info.name] = info.toJson(cm, e);
+	}
+	return components;
+}
+
+Json SceneLoader::normalize(const Json& components)
+{
+	ComponentManager cm;
+	Entity e{ 0, 0 };
+	Json out = Json::object();
+	for (auto& [name, fields] : components.items())
+	{
+		const ComponentInfo* info = ComponentRegistry::getInstance().find(name);
+		if (!info) continue;
+		info->addFromJson(cm, e, fields);
+		out[name] = info->toJson(cm, e);
+	}
+	return out;
+}
+
+Json SceneLoader::diff(const Json& base, const Json& current)
+{
+	if (!base.is_object() || !current.is_object()) return base == current ? Json() : current;
+	Json out = Json::object();
+	for (auto& [key, v] : current.items())
+	{
+		if (!base.contains(key))
+		{
+			out[key] = v;
+			continue;
+		}
+		Json d = diff(base[key], v);
+		if (!d.is_null() && !(d.is_object() && d.empty() && v.is_object())) out[key] = d;
+	}
+	return out;
+}
+
+std::vector<Entity> SceneLoader::instantiate(World& world, const AssetID& prefabId, const Json& overrides)
+{
+	Json item = { { "prefab", prefabId } };
+	if (!overrides.is_null() && !overrides.empty()) item["overrides"] = overrides;
+	std::vector<Entity> created;
+	spawnEntity(world, item, prefabId);
+	//新しく作った Entity(空き番号の再利用もあるので、つながりで探す)
+	for (auto& e : world.getEntities())
+	{
+		const PrefabLink* link = world.alive(e) ? world.getPrefabLink(e) : nullptr;
+		if (link && link->prefab == prefabId) created.push_back(e);
+	}
+	int newest = 0;
+	for (auto& e : created) newest = std::max(newest, world.getPrefabLink(e)->instance);
+	std::vector<Entity> result;
+	for (auto& e : created)
+	{
+		if (world.getPrefabLink(e)->instance == newest) result.push_back(e);
+	}
+	std::sort(result.begin(), result.end(), [&](Entity a, Entity b) { return world.getPrefabLink(a)->index < world.getPrefabLink(b)->index; });
+	return result;
+}
+
 Json SceneLoader::save(World& world)
 {
 	Json scene = Json::object();
 	scene["systems"] = world.getSystemNames();
 
-	auto& registry = ComponentRegistry::getInstance();
-	auto& cm = world.getComponentManager();
-	Json entities = Json::array();
+	//プレハブの各 Entity のコンポーネントを、既定値を埋めた形にして覚えておく
+	std::unordered_map<AssetID, std::vector<Json>> prefabCache;
+	auto prefabEntities = [&](const AssetID& id) -> const std::vector<Json>& {
+		auto it = prefabCache.find(id);
+		if (it != prefabCache.end()) return it->second;
+		std::vector<Json> list;
+		try
+		{
+			Json prefab = AssetDatabase::getInstance().readJson(id);
+			for (auto& def : prefab.value("entities", Json::array())) list.push_back(normalize(def.value("components", Json::object())));
+		}
+		catch (const std::exception&)
+		{
+			//プレハブが消えていたら、つながりを切って展開して書く
+		}
+		return prefabCache[id] = list;
+	};
+
+	//同じ配置(instance)の仲間を集める
+	std::unordered_map<int, std::vector<Entity>> instances;
 	for (auto& e : world.getEntities())
 	{
 		if (!world.alive(e)) continue;
-		Json components = Json::object();
-		for (auto& info : registry.all())
+		if (const PrefabLink* link = world.getPrefabLink(e)) instances[link->instance].push_back(e);
+	}
+
+	Json entities = Json::array();
+	std::unordered_map<int, bool> written;
+	for (auto& e : world.getEntities())
+	{
+		if (!world.alive(e)) continue;
+		const PrefabLink* link = world.getPrefabLink(e);
+		if (!link)
 		{
-			if (info.has(cm, e)) components[info.name] = info.toJson(cm, e);
+			entities.push_back({ { "components", componentsOf(world, e) } });
+			continue;
 		}
-		entities.push_back({ { "components", components } });
+		if (written.count(link->instance)) continue;
+		written[link->instance] = true;
+
+		//プレハブ + 差分で書けるか: 全員そろっていて、2番目以降は変わっておらず、1番目はコンポーネントが減っていない
+		auto members = instances[link->instance];
+		std::sort(members.begin(), members.end(), [&](Entity a, Entity b) { return world.getPrefabLink(a)->index < world.getPrefabLink(b)->index; });
+		const auto& defs = prefabEntities(link->prefab);
+		bool keep = !defs.empty() && members.size() == defs.size();
+		Json overrides;
+		for (size_t i = 0; keep && i < members.size(); i++)
+		{
+			const PrefabLink* m = world.getPrefabLink(members[i]);
+			Json current = componentsOf(world, members[i]);
+			if (m->index != static_cast<int>(i) || m->prefab != link->prefab) keep = false;
+			else if (i == 0)
+			{
+				for (auto& [name, v] : defs[0].items()) keep = keep && current.contains(name);
+				overrides = diff(defs[0], current);
+			}
+			else if (current != defs[i]) keep = false;
+		}
+		if (keep)
+		{
+			Json item = { { "prefab", link->prefab } };
+			if (overrides.is_object() && !overrides.empty()) item["overrides"] = overrides;
+			entities.push_back(item);
+		}
+		else
+		{
+			for (auto& m : members) entities.push_back({ { "components", componentsOf(world, m) } });
+		}
 	}
 	scene["entities"] = entities;
 	scene["ui"] = world.getUIEntries();
