@@ -30,6 +30,9 @@ std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 	for (int i = 1; i < argc; i++)
 	{
 		std::string opt = argv[i];
+		//値を取らないもの
+		if (opt == "--replay-update") { replayUpdate = true; continue; }
+		if (opt == "--no-wait") { noWait = true; continue; }
 		if (i + 1 >= argc) return "missing value for " + opt;
 		std::string value = argv[++i];
 		int start = 0, end = 0;
@@ -37,6 +40,9 @@ std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 
 		if (opt == "--world") startWorld = value;
 		else if (opt == "--assets") assetDir = value;
+		else if (opt == "--record") recordPath = value;
+		else if (opt == "--replay") replayPath = value;
+		else if (opt == "--replay-out") replayOut = value;
 		else if (opt == "--frames")
 		{
 			try { maxFrames = std::stoi(value); }
@@ -92,6 +98,8 @@ std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 		}
 		else return "unknown option: " + opt;
 	}
+	if (!recordPath.empty() && !replayPath.empty()) return "--record and --replay cannot be used together";
+	if (replayUpdate && replayPath.empty()) return "--replay-update needs --replay";
 	return std::nullopt;
 }
 

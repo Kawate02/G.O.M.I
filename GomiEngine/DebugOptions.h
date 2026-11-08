@@ -17,6 +17,12 @@
 ///   --drag <start>-<end>:<x1>,<y1>,<x2>,<y2>  左ボタンを押したまま動かす(エディタ用)
 ///   --type <frame>:<文字>          文字を入力したことにする(エディタの入力欄用)
 ///   --select <番号>                エディタで最初に選んでおく Entity の並び順の番号
+///   --record <path>                操作を記録し、終わる時に記録の JSON を書く(Δt は 1/60 に固定。--fixed-dt があればそれ)
+///   --replay <path>                記録を流し、確認点で画面と状態を基準(記録と同じ名前のフォルダ)と比べる。違えば終了コード 1
+///                                  シーン・Δt・乱数の種・終わるフレームは記録のものを使う
+///   --replay-update                --replay で比べずに、基準を今回の画面と状態で書き直す
+///   --replay-out <フォルダ>        比べた結果(今回の画面・状態・差分の画像)の置き場。省略時は一時フォルダの gomi-replay/<記録名>
+///   --no-wait                      フレームの間を待たずに流す(テストを速く回す)
 /// </summary>
 class DebugOptions
 {
@@ -57,6 +63,11 @@ public:
 	int select = -1;
 	int maxFrames = 0;
 	float fixedDeltaTime = 0.0f; //0 なら実時間
+	std::string recordPath;
+	std::string replayPath;
+	std::string replayOut;
+	bool replayUpdate = false;
+	bool noWait = false;
 
 	/// <summary>
 	/// 解釈できない引数があれば説明を返す

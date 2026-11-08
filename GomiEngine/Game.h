@@ -16,6 +16,9 @@
 
 #include "EventRequest.h"
 #include "DebugOptions.h"
+#include "Replay.h"
+
+#include <optional>
 
 class Game
 {
@@ -36,6 +39,14 @@ private:
 
     WorldManager world;
     DebugOptions debug;
+    std::optional<ReplayPlayer> replayPlayer;
+    std::optional<ReplayCheck> replayCheck;
+    std::optional<ReplayRecorder> recorder;
+    std::string replayName;
+    std::string firstScene; //記録に書く、始めたシーン
+
+    void startReplay();
+    int finishReplay(int lastFrame);
 
     const int TARGET_FPS = 60;
 public:
@@ -45,7 +56,10 @@ public:
         std::unique_ptr<IAudioBackend> a)
         : settings(), window(std::move(w)), input(std::move(i)), drawer(std::move(d)), audioBackend(std::move(a)), world(inputState, renderQueue, audioQueue) {}
 
-    void run();
+    /// <summary>
+    /// 終了コードを返す(記録の再生で基準と違えば 1)
+    /// </summary>
+    int run();
     void init();
     inline void setDebugOptions(const DebugOptions& options) { debug = options; }
 };

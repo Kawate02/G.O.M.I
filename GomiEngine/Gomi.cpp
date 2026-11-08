@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include "Game.h"
 #include "AssetDatabase.h"
 #include "GlfwWindow.h"
@@ -22,7 +22,7 @@ int main(int argc, char** argv)
         GlfwWindow& w = *window;
         Game game(std::move(window), std::make_unique<GlfwInput>(w), std::make_unique<GlDrawer>(w), std::make_unique<MiniaudioBackend>());
         game.setDebugOptions(options);
-        game.run();
+        return game.run();
     }
     catch (const std::exception& e)
     {
