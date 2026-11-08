@@ -10,13 +10,48 @@
 #include "EditorCamera.h"
 
 #include <imgui.h>
+#include <functional>
 #include <memory>
+#include <streambuf>
 #include <string>
 #include <vector>
 
 /// <summary>
 /// G.O.M.I のエディタ。中身の編集は SceneEditor に任せ、ここは ImGui の画面だけを持つ
 /// </summary>
+/// <summary>
+/// std::cerr に書かれた行を受け取って関数に渡す(エンジンの警告をエディタのログに集める)。元の出力先にも流す
+/// </summary>
+class LineCapture : public std::streambuf
+{
+private:
+	std::streambuf* original;
+	std::string line;
+	std::function<void(const std::string&)> onLine;
+protected:
+	int overflow(int c) override
+	{
+		if (c == EOF) return 0;
+		if (original) original->sputc(static_cast<char>(c));
+		if (c == '\n')
+		{
+			if (!line.empty() && onLine) onLine(line);
+			line.clear();
+		}
+		else line.push_back(static_cast<char>(c));
+		return c;
+	}
+public:
+	LineCapture(std::streambuf* original, std::function<void(const std::string&)> onLine) : original(original), onLine(std::move(onLine)) {}
+};
+
+enum class LogLevel
+{
+	Info,
+	Warning,
+	Error,
+};
+
 class EditorApp
 {
 private:
@@ -50,7 +85,19 @@ private:
 	int gizmoOperation = 0; //0: 移動, 1: 回転, 2: 拡大
 	bool gizmoWasUsing = false;
 
-	std::vector<std::string> logLines;
+	struct LogLine
+	{
+		LogLevel level;
+		std::string text;
+	};
+	std::vector<LogLine> logLines;
+	std::string lastProblem;     //状態バーに出す最後の警告・エラー
+	LogLevel lastProblemLevel = LogLevel::Info;
+	bool problemSeen = true;     //ログを開いたら色を戻す
+	std::unique_ptr<LineCapture> cerrCapture;
+	std::streambuf* originalCerr = nullptr;
+	bool fixedStep = true;       //再生を 1/60 秒固定で進める(毎回同じ結果にする)
+	bool focusLog = false;
 	std::vector<std::string> assetFiles;
 	double assetsListedAt = -100;
 
@@ -63,7 +110,7 @@ private:
 	bool quit = false;
 	bool layoutBuilt = false;
 
-	void log(const std::string& message);
+	void log(const std::string& message, LogLevel level = LogLevel::Info);
 	void refreshAssets(bool force = false);
 	std::vector<std::string> assetsIn(const std::string& folder, std::initializer_list<const char*> exts);
 	Entity selectedEntity();
@@ -73,6 +120,9 @@ private:
 	void saveScene();
 
 	void drawMenuBar();
+	void drawToolbar();
+	void drawStatusBar();
+	void togglePlay();
 	void drawHierarchy();
 	void drawInspector();
 	bool drawField(Entity e, const struct ComponentInfo& info, const struct FieldInfo& f);

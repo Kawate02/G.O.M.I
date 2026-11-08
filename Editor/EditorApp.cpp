@@ -36,6 +36,14 @@ namespace
 	}
 }
 
+namespace
+{
+	const ImVec4 PLAY_TINT(0.55f, 0.32f, 0.08f, 1.0f); //再生中の帯の色
+	const ImVec4 PLAY_TEXT(1.0f, 0.72f, 0.35f, 1.0f);
+	const ImVec4 COLOR_WARNING(1.0f, 0.8f, 0.3f, 1.0f);
+	const ImVec4 COLOR_ERROR(1.0f, 0.42f, 0.38f, 1.0f);
+}
+
 EditorApp::EditorApp(const DebugOptions& options) : debug(options)
 {
 	registerBuiltinComponents();
@@ -69,11 +77,20 @@ EditorApp::EditorApp(const DebugOptions& options) : debug(options)
 	ImGui_ImplGlfw_InitForOpenGL(window.handle(), true);
 	ImGui_ImplOpenGL3_Init("#version 450");
 
+	originalCerr = std::cerr.rdbuf();
+	cerrCapture = std::make_unique<LineCapture>(originalCerr, [this](const std::string& line) {
+		logLines.push_back({ LogLevel::Warning, line });
+		lastProblem = line;
+		lastProblemLevel = LogLevel::Warning;
+		problemSeen = false;
+	});
+	std::cerr.rdbuf(cerrCapture.get());
+
 	editor = std::make_unique<SceneEditor>(inputState, renderQueue, audioQueue);
 	if (!debug.startWorld.empty())
 	{
 		std::string error;
-		if (!editor->open(debug.startWorld, error)) log("開けませんでした: " + error);
+		if (!editor->open(debug.startWorld, error)) log("開けませんでした: " + error, LogLevel::Error);
 	}
 	selected = debug.select;
 	refreshAssets(true);
@@ -82,15 +99,22 @@ EditorApp::EditorApp(const DebugOptions& options) : debug(options)
 EditorApp::~EditorApp()
 {
 	editor.reset();
+	if (originalCerr) std::cerr.rdbuf(originalCerr);
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 }
 
-void EditorApp::log(const std::string& message)
+void EditorApp::log(const std::string& message, LogLevel level)
 {
-	logLines.push_back(message);
-	if (logLines.size() > 200) logLines.erase(logLines.begin());
+	logLines.push_back({ level, message });
+	if (logLines.size() > 500) logLines.erase(logLines.begin());
+	if (level != LogLevel::Info)
+	{
+		lastProblem = message;
+		lastProblemLevel = level;
+		problemSeen = false;
+	}
 	std::cout << message << std::endl;
 }
 
@@ -160,7 +184,7 @@ void EditorApp::doPending()
 			selected = -1;
 			log("開きました: " + editor->getPath());
 		}
-		else log("開けませんでした: " + error);
+		else log("開けませんでした: " + error, LogLevel::Error);
 		break;
 	case Pending::Quit:
 		quit = true;
@@ -181,7 +205,7 @@ void EditorApp::saveScene()
 	}
 	std::string error;
 	if (editor->save(error)) log("保存しました: " + editor->getPath());
-	else log("保存できませんでした: " + error);
+	else log("保存できませんでした: " + error, LogLevel::Error);
 }
 
 // ---- 画面
@@ -230,24 +254,126 @@ void EditorApp::drawMenuBar()
 		ImGui::EndMenu();
 	}
 
-	//再生・停止とファイル名
-	ImGui::SameLine(0, 30);
-	if (!playing)
+	if (ImGui::BeginMenu("再生"))
 	{
-		if (ImGui::Button("▶ 再生")) editor->play();
+		if (ImGui::MenuItem(playing ? "停止" : "再生", "F5")) togglePlay();
+		if (ImGui::MenuItem(editor->isPaused() ? "再開" : "一時停止", "F6", false, playing)) editor->setPaused(!editor->isPaused());
+		if (ImGui::MenuItem("1コマ進める", "F7", false, playing)) editor->stepFrame();
+		ImGui::Separator();
+		ImGui::MenuItem("Δt を 1/60 秒に固定", nullptr, &fixedStep);
+		ImGui::EndMenu();
 	}
-	else
-	{
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.2f, 0.2f, 1));
-		if (ImGui::Button("■ 停止")) editor->stop();
-		ImGui::PopStyleColor();
-		ImGui::SameLine();
-		ImGui::TextColored(ImVec4(1, 0.6f, 0.3f, 1), "再生中(止めると元に戻ります)");
-	}
-	ImGui::SameLine(0, 30);
-	std::string name = editor->getPath().empty() ? "(新しいシーン)" : editor->getPath();
-	ImGui::TextDisabled("%s%s", name.c_str(), editor->isDirty() ? " *" : "");
 	ImGui::EndMainMenuBar();
+}
+
+void EditorApp::togglePlay()
+{
+	if (editor->isPlaying()) editor->stop();
+	else editor->play();
+}
+
+void EditorApp::drawToolbar()
+{
+	bool playing = editor->isPlaying();
+	float height = ImGui::GetFrameHeight() + ImGui::GetStyle().WindowPadding.y * 2;
+	if (playing) ImGui::PushStyleColor(ImGuiCol_WindowBg, PLAY_TINT);
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
+	bool open = ImGui::BeginViewportSideBar("##toolbar", ImGui::GetMainViewport(), ImGuiDir_Up, height, flags);
+	if (playing) ImGui::PopStyleColor();
+	if (!open)
+	{
+		ImGui::End();
+		return;
+	}
+	auto tip = [](const char* text) { if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("%s", text); };
+
+	if (ImGui::Button(playing ? "■ 停止" : "▶ 再生")) togglePlay();
+	tip(playing ? "止めると、再生中の変更は消えて再生前に戻る (F5)" : "ゲームとして動かす (F5)");
+	ImGui::SameLine();
+	ImGui::BeginDisabled(!playing);
+	if (ImGui::Button(editor->isPaused() ? "▶ 再開" : "|| 一時停止")) editor->setPaused(!editor->isPaused());
+	tip("F6");
+	ImGui::SameLine();
+	if (ImGui::Button(">| 1コマ")) editor->stepFrame();
+	tip("一時停止して1フレームだけ進める (F7)");
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	ImGui::Checkbox("Δt 1/60 固定", &fixedStep);
+	tip("再生を毎フレーム 1/60 秒ずつ進める。同じ操作から毎回同じ結果になる");
+
+	ImGui::SameLine(0, 24);
+	ImGui::TextDisabled("|");
+	ImGui::SameLine(0, 24);
+	ImGui::RadioButton("移動", &gizmoOperation, 0);
+	tip("W");
+	ImGui::SameLine();
+	ImGui::RadioButton("回転", &gizmoOperation, 1);
+	tip("E");
+	ImGui::SameLine();
+	ImGui::RadioButton("拡大", &gizmoOperation, 2);
+	tip("R");
+	ImGui::SameLine(0, 24);
+	ImGui::Checkbox("エディタカメラ", &useEditorCamera);
+	tip("止めている時の 3D をエディタ用のカメラで見る\n右ドラッグ: 回す / 中ドラッグ: 動かす / ホイール: 寄る / F: 選んだ物へ\n左クリック: 物を選ぶ");
+
+	if (playing)
+	{
+		ImGui::SameLine(0, 24);
+		ImGui::TextColored(PLAY_TEXT, editor->isPaused() ? "一時停止中" : "再生中");
+		ImGui::SameLine();
+		ImGui::TextUnformatted("止めると変更は消えます");
+	}
+
+	//右端にシーンのファイル名
+	std::string name = (editor->getPath().empty() ? std::string("(新しいシーン)") : editor->getPath()) + (editor->isDirty() ? " *" : "");
+	float w = ImGui::CalcTextSize(name.c_str()).x;
+	ImGui::SameLine(std::max(ImGui::GetCursorPosX() + 20, ImGui::GetWindowWidth() - w - 16));
+	if (playing) ImGui::TextUnformatted(name.c_str()); //色の付いた帯の上では薄い文字が読めない
+	else ImGui::TextDisabled("%s", name.c_str());
+	ImGui::End();
+}
+
+void EditorApp::drawStatusBar()
+{
+	bool playing = editor->isPlaying();
+	float height = ImGui::GetFrameHeight();
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 3));
+	if (playing) ImGui::PushStyleColor(ImGuiCol_WindowBg, PLAY_TINT);
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
+	bool open = ImGui::BeginViewportSideBar("##status", ImGui::GetMainViewport(), ImGuiDir_Down, height, flags);
+	if (playing) ImGui::PopStyleColor();
+	ImGui::PopStyleVar();
+	if (!open)
+	{
+		ImGui::End();
+		return;
+	}
+	const char* state = !playing ? "停止中" : editor->isPaused() ? "一時停止中" : "再生中";
+	if (playing) ImGui::TextColored(PLAY_TEXT, "%s", state);
+	else ImGui::TextUnformatted(state);
+	ImGui::SameLine(0, 20);
+	ImGui::Text("フレーム %d", editor->getPlayFrame());
+	ImGui::SameLine(0, 20);
+	ImGui::Text("%.0f FPS", ImGui::GetIO().Framerate);
+	ImGui::SameLine(0, 20);
+	ImGui::Text("選択: %s", selected >= 0 ? editor->displayName(selectedEntity()).c_str() : "なし");
+	ImGui::SameLine(0, 20);
+	if (editor->isDirty()) ImGui::TextColored(COLOR_WARNING, "未保存");
+	else ImGui::TextDisabled("保存済み");
+
+	//最後の警告・エラー(押すとログを開く)
+	if (!lastProblem.empty())
+	{
+		std::string text = (lastProblemLevel == LogLevel::Error ? "エラー: " : "警告: ") + lastProblem;
+		float w = ImGui::CalcTextSize(text.c_str()).x;
+		ImGui::SameLine(std::max(ImGui::GetCursorPosX() + 20, ImGui::GetWindowWidth() - w - 16));
+		ImVec4 color = problemSeen ? ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled) : (lastProblemLevel == LogLevel::Error ? COLOR_ERROR : COLOR_WARNING);
+		ImGui::PushStyleColor(ImGuiCol_Text, color);
+		if (ImGui::Selectable(text.c_str(), false, 0, ImVec2(w, 0))) focusLog = true;
+		ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("押すとログを開く");
+	}
+	ImGui::End();
 }
 
 void EditorApp::drawHierarchy()
@@ -269,7 +395,7 @@ void EditorApp::drawHierarchy()
 			if (ImGui::Selectable(p.c_str()))
 			{
 				auto made = editor->createFromPrefab(p);
-				if (made.empty()) log("プレハブを置けませんでした: " + p);
+				if (made.empty()) log("プレハブを置けませんでした: " + p, LogLevel::Error);
 				else selected = static_cast<int>(editor->entities().size()) - static_cast<int>(made.size());
 			}
 		}
@@ -470,7 +596,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 			}
 			catch (const std::exception& ex)
 			{
-				log(info.name + "." + f.name + ": JSON の書き方が違います: " + ex.what());
+				log(info.name + "." + f.name + ": JSON の書き方が違います: " + ex.what(), LogLevel::Error);
 			}
 		}
 		break;
@@ -480,7 +606,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 	if (changed)
 	{
 		std::string error;
-		if (!editor->setField(e, info.name, f.name, next, &error)) log(info.name + "." + f.name + ": " + error);
+		if (!editor->setField(e, info.name, f.name, next, &error)) log(info.name + "." + f.name + ": " + error, LogLevel::Error);
 	}
 	return changed;
 }
@@ -545,16 +671,6 @@ void EditorApp::drawSceneView()
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::Begin(WIN_SCENE);
 	ImGui::PopStyleVar();
-	ImGui::SetCursorPos(ImVec2(8, ImGui::GetCursorPosY() + 4));
-	ImGui::RadioButton("移動 (W)", &gizmoOperation, 0);
-	ImGui::SameLine();
-	ImGui::RadioButton("回転 (E)", &gizmoOperation, 1);
-	ImGui::SameLine();
-	ImGui::RadioButton("拡大 (R)", &gizmoOperation, 2);
-	ImGui::SameLine(0, 20);
-	ImGui::Checkbox("エディタカメラ", &useEditorCamera);
-	ImGui::SameLine();
-	ImGui::TextDisabled("(3D: 右ドラッグで回す / 中ドラッグで動かす / ホイール / F で選んだ物へ。左クリックで選ぶ)");
 
 	//ゲームの画面を縦横比を保って真ん中に出す
 	ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -567,6 +683,12 @@ void EditorApp::drawSceneView()
 	ImTextureID tex = static_cast<ImTextureID>(drawer.renderTargetTexture(gameTarget));
 	ImGui::Image(ImTextureRef(tex), viewSize, ImVec2(0, 1), ImVec2(1, 0)); //描き先は上下逆さま
 	viewHovered = ImGui::IsItemHovered();
+	if (editor->isPlaying())
+	{
+		//再生中は画面のまわりを色で囲む
+		ImVec2 max(viewMin.x + viewSize.x, viewMin.y + viewSize.y);
+		ImGui::GetWindowDrawList()->AddRect(ImVec2(viewMin.x - 2, viewMin.y - 2), ImVec2(max.x + 2, max.y + 2), ImGui::GetColorU32(PLAY_TEXT), 0, 0, 3.0f);
+	}
 	drawGizmo();
 	//ギズモを触っていない時の左クリックで、そこにある物を選ぶ
 	if (viewHovered && !editor->isPlaying() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
@@ -787,7 +909,18 @@ void EditorApp::drawSystems()
 void EditorApp::drawLog()
 {
 	ImGui::Begin(WIN_LOG);
-	for (auto& l : logLines) ImGui::TextUnformatted(l.c_str());
+	if (ImGui::IsWindowAppearing() || ImGui::IsWindowFocused()) problemSeen = true;
+	if (ImGui::SmallButton("消す"))
+	{
+		logLines.clear();
+		lastProblem.clear();
+	}
+	ImGui::Separator();
+	for (auto& l : logLines)
+	{
+		if (l.level == LogLevel::Info) ImGui::TextUnformatted(l.text.c_str());
+		else ImGui::TextColored(l.level == LogLevel::Error ? COLOR_ERROR : COLOR_WARNING, "%s", l.text.c_str());
+	}
 	if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) ImGui::SetScrollHereY(1.0f);
 	ImGui::End();
 }
@@ -839,7 +972,7 @@ void EditorApp::drawPopups()
 				refreshAssets(true);
 				if (pending != Pending::None) doPending();
 			}
-			else log("保存できませんでした: " + error);
+			else log("保存できませんでした: " + error, LogLevel::Error);
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
@@ -870,7 +1003,17 @@ void EditorApp::buildDefaultLayout(ImGuiID dockspace)
 void EditorApp::handleShortcuts()
 {
 	ImGuiIO& io = ImGui::GetIO();
-	if (io.WantTextInput || editor->isPlaying()) return;
+	if (io.WantTextInput) return;
+	if (ImGui::IsKeyPressed(ImGuiKey_F5, false)) togglePlay();
+	if (ImGui::IsKeyPressed(ImGuiKey_F6, false) && editor->isPlaying()) editor->setPaused(!editor->isPaused());
+	if (ImGui::IsKeyPressed(ImGuiKey_F7, false) && editor->isPlaying()) editor->stepFrame();
+	if (!io.KeyCtrl)
+	{
+		if (ImGui::IsKeyPressed(ImGuiKey_W, false)) gizmoOperation = 0;
+		if (ImGui::IsKeyPressed(ImGuiKey_E, false)) gizmoOperation = 1;
+		if (ImGui::IsKeyPressed(ImGuiKey_R, false)) gizmoOperation = 2;
+	}
+	if (editor->isPlaying()) return;
 	bool ctrl = io.KeyCtrl;
 	if (ctrl && ImGui::IsKeyPressed(ImGuiKey_Z, false)) editor->undo();
 	if (ctrl && ImGui::IsKeyPressed(ImGuiKey_Y, false)) editor->redo();
@@ -885,12 +1028,6 @@ void EditorApp::handleShortcuts()
 	{
 		editor->destroy(selectedEntity());
 		selected = -1;
-	}
-	if (viewHovered && !io.KeyCtrl)
-	{
-		if (ImGui::IsKeyPressed(ImGuiKey_W, false)) gizmoOperation = 0;
-		if (ImGui::IsKeyPressed(ImGuiKey_E, false)) gizmoOperation = 1;
-		if (ImGui::IsKeyPressed(ImGuiKey_R, false)) gizmoOperation = 2;
 	}
 	//選んだ物にエディタカメラを向ける
 	if (selected >= 0 && viewHovered && ImGui::IsKeyPressed(ImGuiKey_F, false))
@@ -954,6 +1091,7 @@ int EditorApp::run()
 		auto now = clock::now();
 		float dt = std::chrono::duration<float>(now - lastTime).count();
 		lastTime = now;
+		if (fixedStep && editor->isPlaying()) dt = 1.0f / 60.0f;
 		if (debug.fixedDeltaTime > 0) dt = debug.fixedDeltaTime;
 
 		// ---- ImGui の受付(入力をゲームに渡すかの判断に使う)
@@ -989,13 +1127,23 @@ int EditorApp::run()
 				buildDefaultLayout(dockspace);
 			layoutBuilt = true;
 		}
-		ImGui::DockSpaceOverViewport(dockspace, ImGui::GetMainViewport());
+		//上下の帯はドックより先に出して、ドックの場所を空けてもらう
+		if (editor->isPlaying()) ImGui::PushStyleColor(ImGuiCol_MenuBarBg, PLAY_TINT);
 		drawMenuBar();
+		if (editor->isPlaying()) ImGui::PopStyleColor();
+		drawToolbar();
+		drawStatusBar();
+		ImGui::DockSpaceOverViewport(dockspace, ImGui::GetMainViewport());
 		drawHierarchy();
 		drawInspector();
 		drawSceneView();
 		drawAssets();
 		drawSystems();
+		if (focusLog)
+		{
+			ImGui::SetWindowFocus(WIN_LOG);
+			focusLog = false;
+		}
 		drawLog();
 		drawPopups();
 		if (frame == 2 && io.IniFilename == nullptr) ImGui::SetWindowFocus(WIN_ASSETS); //配置を作り直した時は下の段をアセットにしておく
