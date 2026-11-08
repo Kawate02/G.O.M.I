@@ -3,6 +3,8 @@
 #include "SystemRegistry.h"
 #include "SettingManager.h"
 #include "ResourceManager.h"
+#include "SceneLoader.h"
+#include "Random.h"
 
 #include <imgui_internal.h>
 #include <imgui_impl_glfw.h>
@@ -27,6 +29,7 @@ namespace
 	const char* WIN_ASSETS = "アセット";
 	const char* WIN_SYSTEMS = "System";
 	const char* WIN_LOG = "ログ";
+	const char* WIN_REPLAYS = "再現テスト";
 	const char* ASSET_PAYLOAD = "GOMI_ASSET";
 
 	bool endsWith(const std::string& s, const char* ext)
@@ -42,6 +45,9 @@ namespace
 	const ImVec4 PLAY_TEXT(1.0f, 0.72f, 0.35f, 1.0f);
 	const ImVec4 COLOR_WARNING(1.0f, 0.8f, 0.3f, 1.0f);
 	const ImVec4 COLOR_ERROR(1.0f, 0.42f, 0.38f, 1.0f);
+	const ImVec4 COLOR_OK(0.45f, 0.8f, 0.4f, 1.0f);
+	const ImVec4 COLOR_RECORD(0.9f, 0.25f, 0.25f, 1.0f);
+	const int FAST_STEPS = 30; //速く流す時に1回の表示で進めるコマ数
 }
 
 EditorApp::EditorApp(const DebugOptions& options) : debug(options)
@@ -261,6 +267,16 @@ void EditorApp::drawMenuBar()
 		if (ImGui::MenuItem("1コマ進める", "F7", false, playing)) editor->stepFrame();
 		ImGui::Separator();
 		ImGui::MenuItem("Δt を 1/60 秒に固定", nullptr, &fixedStep);
+		ImGui::Separator();
+		if (ImGui::MenuItem("操作を記録する", nullptr, false, canStartReplay())) startRecording();
+		if (ImGui::MenuItem("再現テストを全部検査する", nullptr, false, !replayFiles.empty() && canStartReplay()))
+		{
+			replayQueue.clear();
+			for (auto& [name, r] : replayFiles) replayQueue.push_back(name);
+			std::string first = replayQueue.front();
+			replayQueue.erase(replayQueue.begin());
+			startReplay(first, ReplayCheck::Mode::Check, true);
+		}
 		ImGui::EndMenu();
 	}
 	ImGui::EndMainMenuBar();
@@ -298,6 +314,24 @@ void EditorApp::drawToolbar()
 	tip("一時停止して1フレームだけ進める (F7)");
 	ImGui::EndDisabled();
 	ImGui::SameLine();
+	if (recorder)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Button, COLOR_RECORD);
+		if (ImGui::Button("● 記録中")) editor->stop();
+		ImGui::PopStyleColor();
+		tip("押すと記録を終えて保存する(■ 停止 と同じ)");
+	}
+	else
+	{
+		std::string reason;
+		bool can = canStartReplay(&reason);
+		ImGui::BeginDisabled(!can);
+		if (ImGui::Button("● 記録")) startRecording();
+		ImGui::EndDisabled();
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled))
+			ImGui::SetTooltip("%s", can ? "保存したシーンを最初から再生し、操作を記録する。止めると再現テストとして保存する" : reason.c_str());
+	}
+	ImGui::SameLine();
 	ImGui::Checkbox("Δt 1/60 固定", &fixedStep);
 	tip("再生を毎フレーム 1/60 秒ずつ進める。同じ操作から毎回同じ結果になる");
 
@@ -321,7 +355,9 @@ void EditorApp::drawToolbar()
 		ImGui::SameLine(0, 24);
 		ImGui::TextColored(PLAY_TEXT, editor->isPaused() ? "一時停止中" : "再生中");
 		ImGui::SameLine();
-		ImGui::TextUnformatted("止めると変更は消えます");
+		if (recorder) ImGui::TextUnformatted("操作を記録しています");
+		else if (replayRun) ImGui::Text("再現テスト %s を流しています", replayRun->name.c_str());
+		else ImGui::TextUnformatted("止めると変更は消えます");
 	}
 
 	//右端にシーンのファイル名
@@ -352,7 +388,13 @@ void EditorApp::drawStatusBar()
 	if (playing) ImGui::TextColored(PLAY_TEXT, "%s", state);
 	else ImGui::TextUnformatted(state);
 	ImGui::SameLine(0, 20);
-	ImGui::Text("フレーム %d", editor->getPlayFrame());
+	if (replayRun) ImGui::Text("フレーム %d / %d", editor->getPlayFrame(), replayRun->replay.length);
+	else ImGui::Text("フレーム %d", editor->getPlayFrame());
+	if (recorder)
+	{
+		ImGui::SameLine(0, 20);
+		ImGui::TextColored(COLOR_RECORD, "● 記録中");
+	}
 	ImGui::SameLine(0, 20);
 	ImGui::Text("%.0f FPS", ImGui::GetIO().Framerate);
 	ImGui::SameLine(0, 20);
@@ -1033,6 +1075,42 @@ void EditorApp::drawPopups()
 		ImGui::EndPopup();
 	}
 
+	if (openRecordSave)
+	{
+		ImGui::OpenPopup("記録を保存");
+		openRecordSave = false;
+	}
+	if (ImGui::BeginPopupModal("記録を保存", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("%d フレーム(%.1f 秒)、入力の変化 %d 回、確認点 %d か所", pendingRecord.length, pendingRecord.length / static_cast<float>(pendingRecord.fps),
+			static_cast<int>(pendingRecord.events.size()), static_cast<int>(pendingRecord.checkpoints.size()));
+		ImGui::TextUnformatted("テストの名前(tests/replays/<名前>.json に保存)");
+		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+		ImGui::SetNextItemWidth(360);
+		bool enter = ImGui::InputText("##name", &recordName, ImGuiInputTextFlags_EnterReturnsTrue);
+		ImGui::Checkbox("続けて基準(確認点の画面と状態)を作る", &recordThenUpdate);
+		bool exists = replayFiles.count(recordName) > 0;
+		if (exists) ImGui::TextColored(COLOR_WARNING, "同じ名前のテストを上書きします");
+		if ((ImGui::Button("保存") || enter) && !recordName.empty())
+		{
+			try
+			{
+				pendingRecord.save(replayDir() / (recordName + ".json"));
+				log("操作の記録を保存しました: " + (replayDir() / (recordName + ".json")).generic_string());
+				refreshReplays(true);
+				if (recordThenUpdate) startReplay(recordName, ReplayCheck::Mode::Update, true);
+			}
+			catch (const std::exception& e)
+			{
+				log(std::string("記録を保存できませんでした: ") + e.what(), LogLevel::Error);
+			}
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("捨てる")) ImGui::CloseCurrentPopup();
+		ImGui::EndPopup();
+	}
+
 	if (openSaveAs)
 	{
 		ImGui::OpenPopup("名前を付けて保存");
@@ -1076,6 +1154,7 @@ void EditorApp::buildDefaultLayout(ImGuiID dockspace)
 	ImGui::DockBuilderDockWindow(WIN_ASSETS, bottom);
 	ImGui::DockBuilderDockWindow(WIN_SYSTEMS, bottom);
 	ImGui::DockBuilderDockWindow(WIN_LOG, bottom);
+	ImGui::DockBuilderDockWindow(WIN_REPLAYS, bottom);
 
 	ImGui::DockBuilderDockWindow(WIN_SCENE, center);
 	ImGui::DockBuilderFinish(dockspace);
@@ -1152,6 +1231,359 @@ void EditorApp::applyScriptedInput(int frame)
 	}
 }
 
+// ---- 再現テスト
+
+std::filesystem::path EditorApp::replayDir() const
+{
+	//assets の隣の tests/replays(ctest もここを流す)
+	return AssetDatabase::getInstance().getRoot().parent_path() / "tests" / "replays";
+}
+
+void EditorApp::refreshReplays(bool force)
+{
+	double now = ImGui::GetTime();
+	if (!force && now - replaysListedAt < 2.0) return;
+	replaysListedAt = now;
+	replayFiles.clear();
+	std::error_code ec;
+	for (auto& entry : std::filesystem::directory_iterator(replayDir(), ec))
+	{
+		if (!entry.is_regular_file() || entry.path().extension() != ".json") continue;
+		try
+		{
+			replayFiles[entry.path().stem().string()] = Replay::load(entry.path());
+		}
+		catch (const std::exception& e)
+		{
+			std::string name = entry.path().stem().string();
+			if (!replaySummaries.count(name) || replaySummaries[name].lines.empty() || replaySummaries[name].lines[0] != e.what())
+			{
+				replaySummaries[name] = { false, false, { e.what() } };
+				log(std::string("再現テストを読めません: ") + e.what(), LogLevel::Warning);
+			}
+		}
+	}
+}
+
+bool EditorApp::canStartReplay(std::string* reason) const
+{
+	auto fail = [&](const char* text) { if (reason) *reason = text; return false; };
+	if (recorder || (replayRun && !replayRun->finished)) return fail("記録・再現テストの途中");
+	if (editor->getPath().empty()) return fail("シーンを保存してから(記録は保存したシーンから始める)");
+	if (editor->isDirty()) return fail("保存していない変更がある(記録・再現テストはシーンを開き直して始める)");
+	return true;
+}
+
+void EditorApp::startRecording()
+{
+	if (!canStartReplay()) return;
+	if (editor->isPlaying()) editor->stop();
+	//ゲームと同じに、ファイルから読み直したばかりの状態から始める
+	std::string error, path = editor->getPath();
+	if (!editor->open(path, error))
+	{
+		log("記録を始められませんでした: " + error, LogLevel::Error);
+		return;
+	}
+	selected = -1;
+	const uint32_t seed = 1;
+	Random::seed(seed);
+	editor->play();
+	recorder.emplace(SceneEditor::sceneName(path), 60, seed);
+	recordLastFrame = 0;
+	log("操作の記録を始めました(■ 停止で終えて保存)");
+}
+
+void EditorApp::finishRecording()
+{
+	if (!recorder) return;
+	if (recordLastFrame > 0)
+	{
+		pendingRecord = recorder->finish(recordLastFrame);
+		recordName = pendingRecord.scene;
+		for (int i = 2; replayFiles.count(recordName); i++) recordName = pendingRecord.scene + "_" + std::to_string(i);
+		openRecordSave = true;
+	}
+	recorder.reset();
+}
+
+void EditorApp::startReplay(const std::string& name, ReplayCheck::Mode mode, bool fast)
+{
+	if (editor->isPlaying()) editor->stop();
+	replayRun.reset();
+	std::filesystem::path path = replayDir() / (name + ".json");
+	ReplayRun run;
+	run.name = name;
+	run.fast = fast;
+	try
+	{
+		run.replay = Replay::load(path);
+	}
+	catch (const std::exception& e)
+	{
+		log(std::string("再現テストを読めませんでした: ") + e.what(), LogLevel::Error);
+		return;
+	}
+	std::string scene = run.replay.scene;
+	if (scene.empty())
+	{
+		auto& db = AssetDatabase::getInstance();
+		if (db.exists("project.json")) scene = db.readJson("project.json").value("startScene", std::string());
+	}
+	std::string error;
+	if (!editor->open(SceneLoader::scenePath(scene), error))
+	{
+		log("再現テストのシーンを開けませんでした: " + error, LogLevel::Error);
+		return;
+	}
+	selected = -1;
+	Random::seed(run.replay.seed);
+	run.player.emplace(run.replay);
+	run.check.emplace(Replay::expectedDir(path), std::filesystem::temp_directory_path() / "gomi-replay" / name, mode);
+	replayRun = std::move(run);
+	replaySelected = name;
+	editor->play();
+	log(std::string(mode == ReplayCheck::Mode::Update ? "基準を作り直します: " : "再現テストを流します: ") + name);
+}
+
+void EditorApp::endReplay()
+{
+	if (!replayRun) return;
+	auto& run = *replayRun;
+	ReplaySummary summary;
+	summary.update = run.check->getMode() == ReplayCheck::Mode::Update;
+	summary.passed = run.check->passed(run.replay);
+	summary.lines = run.check->report(run.replay, run.name);
+	for (auto& line : summary.lines) log(line, summary.passed ? LogLevel::Info : LogLevel::Warning);
+	replaySummaries[run.name] = summary;
+}
+
+void EditorApp::seekReplay(int frame)
+{
+	if (!replayRun) return;
+	frame = std::clamp(frame, 1, replayRun->replay.length);
+	if (frame <= editor->getPlayFrame())
+	{
+		//戻る時は最初から流し直す(毎回同じ結果になるので、同じ所に着く)
+		std::string name = replayRun->name;
+		auto mode = replayRun->check->getMode();
+		bool fast = replayRun->fast;
+		replayRun.reset();
+		editor->stop();
+		startReplay(name, mode, fast);
+		if (!replayRun) return;
+	}
+	replayRun->seekTo = frame;
+	editor->setPaused(false);
+}
+
+int EditorApp::replaySteps() const
+{
+	if (!replayRun || !editor->isPlaying() || editor->isPaused()) return 1;
+	int now = editor->getPlayFrame();
+	int left = replayRun->replay.length - now;
+	if (left <= 0) return 1;
+	if (replayRun->seekTo > now) return std::min({ replayRun->seekTo - now, FAST_STEPS, left });
+	return replayRun->fast ? std::min(FAST_STEPS, left) : 1;
+}
+
+void EditorApp::afterReplayFrame()
+{
+	if (!replayRun) return;
+	auto& run = *replayRun;
+	if (!editor->isPlaying())
+	{
+		//途中で止めた・ゲームが終わった
+		if (!run.finished) endReplay();
+		replayRun.reset();
+		replayQueue.clear();
+		return;
+	}
+	int frame = editor->getPlayFrame();
+	if (frame != run.lastChecked && run.replay.isCheckpoint(frame))
+	{
+		run.lastChecked = frame;
+		Json state = { { "scene", editor->getPlayScene() }, { "frame", frame }, { "world", SceneLoader::save(editor->world()) } };
+		auto& result = run.check->checkpoint(frame, state, [&](const std::string& path) { return drawer.captureScreen(path); });
+		if (run.check->getMode() == ReplayCheck::Mode::Check && !result.ok()) log(run.name + ": フレーム " + std::to_string(frame) + " が基準と違います", LogLevel::Warning);
+	}
+	if (run.seekTo > 0 && frame >= run.seekTo)
+	{
+		run.seekTo = 0;
+		editor->setPaused(true);
+	}
+	if (!run.finished && frame >= run.replay.length)
+	{
+		run.finished = true;
+		endReplay();
+		if (!replayQueue.empty())
+		{
+			std::string next = replayQueue.front();
+			replayQueue.erase(replayQueue.begin());
+			startReplay(next, ReplayCheck::Mode::Check, true);
+		}
+		else editor->setPaused(true); //終わりの状態を見られるように止めておく
+	}
+}
+
+void EditorApp::drawTimeStrip()
+{
+	auto& run = *replayRun;
+	const Replay& r = run.replay;
+	int now = editor->getPlayFrame();
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+	ImVec2 p = ImGui::GetCursorScreenPos();
+	float w = std::max(50.0f, ImGui::GetContentRegionAvail().x);
+	float h = 30;
+	ImGui::InvisibleButton("strip", ImVec2(w, h));
+	bool hovered = ImGui::IsItemHovered();
+	auto xOf = [&](int f) { return p.x + 4 + (w - 8) * (r.length > 1 ? static_cast<float>(f - 1) / (r.length - 1) : 1.0f); };
+	auto frameAt = [&](float x) { return std::clamp(1 + static_cast<int>(std::round((x - p.x - 4) / (w - 8) * (r.length - 1))), 1, r.length); };
+
+	dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImGuiCol_FrameBg), 3);
+	if (now > 0) dl->AddRectFilled(p, ImVec2(xOf(now), p.y + h), ImGui::GetColorU32(ImVec4(PLAY_TINT.x, PLAY_TINT.y, PLAY_TINT.z, 0.6f)), 3);
+	//入力が変わったフレーム
+	for (auto& e : r.events)
+	{
+		float x = xOf(e.frame);
+		dl->AddLine(ImVec2(x, p.y + h * 0.55f), ImVec2(x, p.y + h - 2), ImGui::GetColorU32(ImGuiCol_TextDisabled));
+	}
+	//確認点(灰: まだ / 緑: 一致 / 赤: 違う)
+	for (int c : r.checkpoints)
+	{
+		ImU32 color = ImGui::GetColorU32(ImGuiCol_Text);
+		for (auto& res : run.check->getResults())
+		{
+			if (res.frame != c) continue;
+			color = ImGui::GetColorU32(run.check->getMode() == ReplayCheck::Mode::Update || res.ok() ? COLOR_OK : COLOR_ERROR);
+		}
+		float x = xOf(c);
+		dl->AddTriangleFilled(ImVec2(x - 5, p.y + 2), ImVec2(x + 5, p.y + 2), ImVec2(x, p.y + 11), color);
+	}
+	float cx = xOf(std::max(now, 1));
+	dl->AddLine(ImVec2(cx, p.y), ImVec2(cx, p.y + h), ImGui::GetColorU32(PLAY_TEXT), 2);
+	if (hovered)
+	{
+		int f = frameAt(ImGui::GetIO().MousePos.x);
+		ImGui::SetTooltip("フレーム %d(%.2f 秒)\nクリックでそこまで進めて止める\n▼ は確認点、下の線は入力が変わった所", f, f / static_cast<float>(r.fps));
+		if (ImGui::IsItemClicked()) seekReplay(f);
+	}
+	ImGui::Text("フレーム %d / %d(%.2f / %.2f 秒)", now, r.length, now / static_cast<float>(r.fps), r.length / static_cast<float>(r.fps));
+	ImGui::SameLine(0, 20);
+	ImGui::Checkbox("速く流す", &run.fast);
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("描かずに何コマも進める(確認点では必ず描いて比べる)");
+}
+
+void EditorApp::drawReplays()
+{
+	if (!ImGui::Begin(WIN_REPLAYS))
+	{
+		ImGui::End();
+		return;
+	}
+	refreshReplays();
+	std::string reason;
+	bool can = canStartReplay(&reason);
+
+	ImGui::BeginDisabled(!can);
+	if (ImGui::Button("● 記録")) startRecording();
+	ImGui::EndDisabled();
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled))
+		ImGui::SetTooltip("%s", can ? "今のシーンを最初から再生し、操作を記録する" : reason.c_str());
+	ImGui::SameLine();
+	ImGui::BeginDisabled(!can || replayFiles.empty());
+	if (ImGui::Button("全部検査"))
+	{
+		replayQueue.clear();
+		for (auto& [name, r] : replayFiles) replayQueue.push_back(name);
+		std::string first = replayQueue.front();
+		replayQueue.erase(replayQueue.begin());
+		startReplay(first, ReplayCheck::Mode::Check, true);
+	}
+	ImGui::EndDisabled();
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled))
+		ImGui::SetTooltip("%s", can ? "全部を速く流し、確認点の画面と状態を基準と比べる(ctest と同じ)" : reason.c_str());
+	ImGui::SameLine();
+	ImGui::TextDisabled("%s", replayDir().generic_string().c_str());
+
+	if (replayRun)
+	{
+		ImGui::Separator();
+		bool update = replayRun->check->getMode() == ReplayCheck::Mode::Update;
+		const char* head = replayRun->finished ? (update ? "基準を作り直しました:" : "流し終えました:") : (update ? "基準を作り直しています:" : "流しています:");
+		ImGui::Text("%s %s", head, replayRun->name.c_str());
+		if (replayRun->finished)
+		{
+			ImGui::SameLine();
+			ImGui::TextDisabled("(■ 停止でシーンに戻る。帯を押すとその場面まで流し直す)");
+		}
+		if (!replayQueue.empty())
+		{
+			ImGui::SameLine();
+			ImGui::TextDisabled("(残り %d 本)", static_cast<int>(replayQueue.size()));
+		}
+		drawTimeStrip();
+	}
+	ImGui::Separator();
+
+	if (replayFiles.empty() && replaySummaries.empty())
+	{
+		ImGui::TextDisabled("再現テストはまだありません。● 記録 で操作を記録すると、ここに並びます");
+	}
+	else if (ImGui::BeginTable("replays", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
+	{
+		ImGui::TableSetupColumn("名前", ImGuiTableColumnFlags_WidthStretch);
+		ImGui::TableSetupColumn("長さ");
+		ImGui::TableSetupColumn("確認点");
+		ImGui::TableSetupColumn("結果");
+		ImGui::TableSetupColumn("");
+		ImGui::TableHeadersRow();
+		for (auto& [name, r] : replayFiles)
+		{
+			ImGui::PushID(name.c_str());
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			if (ImGui::Selectable(name.c_str(), replaySelected == name, ImGuiSelectableFlags_AllowOverlap)) replaySelected = name;
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("シーン: %s\n入力の変化: %d 回", r.scene.empty() ? "(project.json の startScene)" : r.scene.c_str(), static_cast<int>(r.events.size()));
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text("%.1f 秒", r.length / static_cast<float>(r.fps));
+			ImGui::TableSetColumnIndex(2);
+			ImGui::Text("%d", static_cast<int>(r.checkpoints.size()));
+			ImGui::TableSetColumnIndex(3);
+			auto it = replaySummaries.find(name);
+			if (it == replaySummaries.end()) ImGui::TextDisabled("未実行");
+			else if (it->second.update) ImGui::TextColored(COLOR_OK, "基準を作成");
+			else if (it->second.passed) ImGui::TextColored(COLOR_OK, "一致");
+			else ImGui::TextColored(COLOR_ERROR, "違う");
+			ImGui::TableSetColumnIndex(4);
+			ImGui::BeginDisabled(!can);
+			if (ImGui::SmallButton("流す")) startReplay(name, ReplayCheck::Mode::Check, false);
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", can ? "記録の操作で再生し、確認点で基準と比べる" : reason.c_str());
+			ImGui::SameLine();
+			if (ImGui::SmallButton("基準を作り直す")) startReplay(name, ReplayCheck::Mode::Update, true);
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", can ? "今の動きを正しいものとして、確認点の画面と状態を保存し直す" : reason.c_str());
+			ImGui::EndDisabled();
+			ImGui::PopID();
+		}
+		ImGui::EndTable();
+	}
+
+	//選んだテストの結果(行を押すとコピー)
+	auto it = replaySummaries.find(replaySelected);
+	if (it != replaySummaries.end() && !it->second.lines.empty())
+	{
+		ImGui::Separator();
+		for (auto& line : it->second.lines)
+		{
+			bool bad = line.find("DIFFERS") != std::string::npos || line.find("FAILED") != std::string::npos || line.find("stopped") != std::string::npos;
+			if (bad) ImGui::PushStyleColor(ImGuiCol_Text, COLOR_ERROR);
+			if (ImGui::Selectable(line.c_str())) ImGui::SetClipboardText(line.c_str());
+			if (bad) ImGui::PopStyleColor();
+		}
+	}
+	ImGui::End();
+}
+
 int EditorApp::run()
 {
 	using clock = std::chrono::steady_clock;
@@ -1192,13 +1624,44 @@ int EditorApp::run()
 			std::fill(std::begin(inputState.key), std::end(inputState.key), 0);
 			std::fill(std::begin(inputState.deltakey), std::end(inputState.deltakey), 0);
 		}
+		//シーンの画面の外のクリック(ツールバーなど)はゲームに渡さない(記録にも残さない)
+		if (!viewHovered)
+		{
+			for (InputKey k : { InputKey::MOUSE_LEFT, InputKey::MOUSE_RIGHT, InputKey::MOUSE_MIDDLE, InputKey::MOUSE_4, InputKey::MOUSE_5 })
+			{
+				inputState.key[static_cast<int>(k)] = 0;
+				inputState.deltakey[static_cast<int>(k)] = 0;
+			}
+		}
 		if (viewSize.x > 0)
 		{
 			inputState.mouse.position = Vec2((io.MousePos.x - viewMin.x) * gameWidth / viewSize.x, (io.MousePos.y - viewMin.y) * gameHeight / viewSize.y);
 		}
 
-		editor->update(dt);
-		if (AudioCommand e; audioRequest.trigger(e)) audioQueue.addCommand({ e.audioID, e.volume });
+		if (recorder) dt = 1.0f / 60.0f;
+		if (replayRun) dt = replayRun->replay.deltaTime();
+		//速く流す時は描かずに何コマも進める(描画の積み残しとイベントはコマごとに捨てる)。確認点のコマで止めて描く
+		int steps = replaySteps();
+		for (int i = 0; i < steps; i++)
+		{
+			if (i > 0)
+			{
+				renderQueue.clear();
+				EventBus::getInstance().cleanup();
+			}
+			bool advance = editor->willAdvance();
+			int next = editor->getPlayFrame() + 1;
+			if (replayRun && advance) replayRun->player->apply(next, inputState);
+			if (recorder && advance)
+			{
+				recorder->record(next, inputState);
+				recordLastFrame = next;
+			}
+			editor->update(dt);
+			if (AudioCommand e; audioRequest.trigger(e) && i == steps - 1) audioQueue.addCommand({ e.audioID, e.volume });
+			if (replayRun && advance && replayRun->replay.isCheckpoint(next)) break;
+		}
+		if (recorder && !editor->isPlaying()) finishRecording();
 
 		// ---- 画面を組み立てる
 		ImGuiID dockspace = ImGui::GetID("EditorDock");
@@ -1226,6 +1689,7 @@ int EditorApp::run()
 			focusLog = false;
 		}
 		drawLog();
+		drawReplays();
 		drawPopups();
 		if (frame == 2 && io.IniFilename == nullptr) ImGui::SetWindowFocus(WIN_ASSETS); //配置を作り直した時は下の段をアセットにしておく
 		handleShortcuts();
@@ -1245,6 +1709,7 @@ int EditorApp::run()
 		}
 		drawer.setRenderTarget(gameTarget);
 		renderer.render(drawer, renderQueue, editor->world().getCamera());
+		afterReplayFrame();
 		drawer.setRenderTarget(-1);
 
 		// ---- エディタの画面

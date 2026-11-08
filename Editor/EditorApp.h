@@ -8,9 +8,13 @@
 #include "SceneEditor.h"
 #include "DebugOptions.h"
 #include "EditorCamera.h"
+#include "Replay.h"
 
 #include <imgui.h>
+#include <filesystem>
 #include <functional>
+#include <map>
+#include <optional>
 #include <memory>
 #include <streambuf>
 #include <string>
@@ -102,6 +106,37 @@ private:
 	std::vector<std::string> assetFiles;
 	double assetsListedAt = -100;
 
+	// ---- 再現テスト(操作の記録と再生)
+	struct ReplayRun
+	{
+		std::string name;
+		Replay replay;
+		std::optional<ReplayPlayer> player;
+		std::optional<ReplayCheck> check;
+		int seekTo = 0;        //ここまで速く進めて一時停止する
+		bool fast = false;     //1フレームに何コマも進める
+		bool finished = false;
+		int lastChecked = 0;   //比べ済みの確認点
+	};
+	struct ReplaySummary
+	{
+		bool passed = false;
+		bool update = false;   //基準を作り直した
+		std::vector<std::string> lines;
+	};
+	std::optional<ReplayRun> replayRun;
+	std::optional<ReplayRecorder> recorder;
+	int recordLastFrame = 0;
+	std::vector<std::string> replayQueue;   //「全部検査」の残り
+	std::map<std::string, ReplaySummary> replaySummaries;
+	std::map<std::string, Replay> replayFiles;
+	std::string replaySelected;
+	double replaysListedAt = -100;
+	bool openRecordSave = false;
+	Replay pendingRecord;
+	std::string recordName;
+	bool recordThenUpdate = true;
+
 	//保存していない変更がある時の確認
 	enum class Pending { None, NewScene, OpenScene, Quit };
 	Pending pending = Pending::None;
@@ -140,6 +175,19 @@ private:
 	void pickAt(const ImVec2& mouse);
 	glm::mat4 viewProjection() const;
 	void applyScriptedInput(int frame);
+
+	std::filesystem::path replayDir() const;
+	void refreshReplays(bool force = false);
+	bool canStartReplay(std::string* reason = nullptr) const;
+	void startRecording();
+	void finishRecording();
+	void startReplay(const std::string& name, ReplayCheck::Mode mode, bool fast);
+	void endReplay();
+	void seekReplay(int frame);
+	int replaySteps() const;
+	void afterReplayFrame();
+	void drawReplays();
+	void drawTimeStrip();
 public:
 	explicit EditorApp(const DebugOptions& options);
 	~EditorApp();

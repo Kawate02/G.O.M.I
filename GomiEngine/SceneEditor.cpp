@@ -363,8 +363,17 @@ void SceneEditor::play()
 	paused = false;
 	stepRequested = false;
 	playFrame = 0;
+	playScene = sceneName(path);
 	worldChange.trigger();
 	quitRequest.trigger();
+}
+
+std::string SceneEditor::sceneName(const std::string& path)
+{
+	const std::string prefix = "scenes/", ext = ".json";
+	if (path.size() > prefix.size() + ext.size() && path.compare(0, prefix.size(), prefix) == 0 && path.compare(path.size() - ext.size(), ext.size(), ext) == 0)
+		return path.substr(prefix.size(), path.size() - prefix.size() - ext.size());
+	return path;
 }
 
 void SceneEditor::stop()
@@ -401,6 +410,7 @@ void SceneEditor::update(float deltaTime)
 			try
 			{
 				rebuild(AssetDatabase::getInstance().readJson(SceneLoader::scenePath(next)));
+				playScene = next;
 			}
 			catch (const std::exception& e)
 			{

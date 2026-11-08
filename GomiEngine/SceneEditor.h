@@ -27,6 +27,7 @@ private:
 	bool stepRequested = false;
 	int playFrame = 0;     //再生してから進めたフレーム数
 	Json playSnapshot;     //再生前の状態
+	std::string playScene; //再生中の今のシーンの名前(ゲームの中で切り替わると変わる)
 	std::vector<Json> undoStack;
 	std::vector<Json> redoStack;
 	std::unordered_map<AssetID, std::vector<Json>> prefabCache; //プレハブの各 Entity のコンポーネント(既定値で埋めたもの)
@@ -112,6 +113,18 @@ public:
 	/// </summary>
 	void stepFrame();
 	inline int getPlayFrame() const { return playFrame; }
+	/// <summary>
+	/// 次の update でゲームが1フレーム進むか(記録・再生の入力をその時だけ渡す)
+	/// </summary>
+	inline bool willAdvance() const { return playing && (!paused || stepRequested); }
+	/// <summary>
+	/// 再生中の今のシーンの名前(scenes/Title.json なら Title)。ゲームの WorldManager と同じ呼び方
+	/// </summary>
+	inline const std::string& getPlayScene() const { return playScene; }
+	/// <summary>
+	/// シーンのファイルの場所から、ゲームでの呼び名にする(scenes/X.json → X)
+	/// </summary>
+	static std::string sceneName(const std::string& path);
 	/// <summary>
 	/// 再生中はゲームとして進め、止めている時・一時停止中は描画の System だけ動かす
 	/// </summary>
