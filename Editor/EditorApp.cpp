@@ -444,10 +444,37 @@ void EditorApp::drawHierarchy()
 	ImGui::End();
 }
 
+namespace
+{
+	/// <summary>
+	/// x/y/z を横に並べ、左端に軸の色(赤・緑・青)の線を付けたドラッグ欄
+	/// </summary>
+	bool dragVector(float* v, int n, float speed, bool& activated)
+	{
+		static const ImU32 colors[3] = { IM_COL32(225, 85, 80, 255), IM_COL32(115, 190, 80, 255), IM_COL32(80, 140, 235, 255) };
+		const float spacing = 4;
+		float w = (ImGui::GetContentRegionAvail().x - spacing * (n - 1)) / n;
+		bool changed = false;
+		for (int i = 0; i < n; i++)
+		{
+			if (i) ImGui::SameLine(0, spacing);
+			ImGui::PushID(i);
+			ImGui::SetNextItemWidth(w);
+			changed |= ImGui::DragFloat("##c", &v[i], speed, 0, 0, "%.3f");
+			activated |= ImGui::IsItemActivated();
+			ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+			ImGui::GetWindowDrawList()->AddRectFilled(mn, ImVec2(mn.x + 3, mx.y), colors[i]);
+			ImGui::PopID();
+		}
+		return changed;
+	}
+}
+
 bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& f)
 {
 	Json v = editor->getField(e, info.name, f.name);
-	const char* label = f.name.c_str();
+	const char* label = "##v";
+	ImGui::SetNextItemWidth(-FLT_MIN);
 	bool changed = false;
 	Json next;
 	auto startEdit = [&]() { if (ImGui::IsItemActivated()) editor->recordUndo(); };
@@ -479,8 +506,9 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 	case FieldKind::Vec2:
 	{
 		float a[2] = { v[0].get<float>(), v[1].get<float>() };
-		changed = ImGui::DragFloat2(label, a, 0.05f, 0, 0, "%.3f");
-		startEdit();
+		bool activated = false;
+		changed = dragVector(a, 2, 0.05f, activated);
+		if (activated) editor->recordUndo();
 		next = Json::array({ a[0], a[1] });
 		break;
 	}
@@ -488,8 +516,9 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 	{
 		float a[3] = { v[0].get<float>(), v[1].get<float>(), v[2].get<float>() };
 		float speed = f.name == "rotation" ? 0.5f : 0.05f;
-		changed = ImGui::DragFloat3(label, a, speed, 0, 0, "%.3f");
-		startEdit();
+		bool activated = false;
+		changed = dragVector(a, 3, speed, activated);
+		if (activated) editor->recordUndo();
 		next = Json::array({ a[0], a[1], a[2] });
 		break;
 	}
@@ -497,8 +526,8 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 	{
 		std::string s = v.get<std::string>();
 		bool isAsset = f.name == "path" || f.name == "asset" || f.name == "texture" || f.name == "mesh";
-		if (isAsset) ImGui::SetNextItemWidth(ImGui::CalcItemWidth() - 30);
-		changed = ImGui::InputText(isAsset ? "##value" : label, &s);
+		if (isAsset) ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 30);
+		changed = ImGui::InputText(label, &s);
 		startEdit();
 		next = s;
 		//アセット欄からドラッグして落とす
@@ -516,8 +545,6 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 		{
 			ImGui::SameLine(0, 2);
 			if (ImGui::Button("...")) ImGui::OpenPopup("pick");
-			ImGui::SameLine();
-			ImGui::TextUnformatted(label);
 			if (ImGui::BeginPopup("pick"))
 			{
 				std::vector<std::string> choices;
@@ -559,13 +586,20 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 	}
 	case FieldKind::Flags:
 	{
-		ImGui::TextUnformatted(label);
 		Json names = v;
+		bool firstFlag = true;
+		const float cellWidth = ImGui::GetContentRegionAvail().x;
+		float lineUsed = 0;
 		for (auto& n : f.enumNames)
 		{
 			if (n == "NONE") continue;
 			bool on = std::find(v.begin(), v.end(), Json(n)) != v.end();
-			ImGui::SameLine();
+			//入りきらなければ折り返す
+			float need = ImGui::CalcTextSize(n.c_str()).x + ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::GetStyle().ItemSpacing.x;
+			if (!firstFlag && lineUsed + need <= cellWidth) ImGui::SameLine();
+			else lineUsed = 0;
+			lineUsed += need;
+			firstFlag = false;
 			if (ImGui::Checkbox(n.c_str(), &on))
 			{
 				editor->recordUndo();
@@ -585,7 +619,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 	{
 		//型の決まった欄が無いもの(キー割り当ての表など)は JSON のまま直す
 		std::string text = v.dump(1);
-		ImGui::InputTextMultiline(label, &text, ImVec2(0, ImGui::GetTextLineHeight() * 6));
+		ImGui::InputTextMultiline(label, &text, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 6));
 		if (ImGui::IsItemDeactivatedAfterEdit())
 		{
 			try
@@ -611,6 +645,47 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 	return changed;
 }
 
+void EditorApp::drawFieldRows(Entity e, const ComponentInfo& info, bool runtime)
+{
+	auto& cm = editor->world().getComponentManager();
+	if (!ImGui::BeginTable("fields", 2, ImGuiTableFlags_SizingStretchProp)) return;
+	ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthFixed, 112);
+	ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+	for (auto& f : info.fields)
+	{
+		if (f.runtime != runtime) continue;
+		ImGui::PushID(f.name.c_str());
+		ImGui::TableNextRow();
+
+		//左: 名前。プレハブと違う値なら青くし、右クリックでプレハブの値に戻せる
+		ImGui::TableSetColumnIndex(0);
+		ImGui::AlignTextToFramePadding();
+		Json prefabValue = runtime ? Json() : editor->prefabField(e, info.name, f.name);
+		bool overridden = !prefabValue.is_null() && prefabValue != editor->getField(e, info.name, f.name);
+		if (overridden) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.7f, 1.0f, 1.0f));
+		ImGui::Selectable(f.name.c_str(), false, ImGuiSelectableFlags_AllowOverlap);
+		if (overridden) ImGui::PopStyleColor();
+		if (overridden)
+		{
+			ImGui::SetItemTooltip("プレハブと違う値(保存すると overrides に書かれる)\nプレハブの値: %s\n右クリックでプレハブの値に戻す", prefabValue.dump().c_str());
+			if (ImGui::BeginPopupContextItem("revert"))
+			{
+				if (ImGui::MenuItem("プレハブの値に戻す")) editor->revertToPrefab(e, info.name, f.name);
+				ImGui::EndPopup();
+			}
+		}
+
+		//右: 値
+		ImGui::TableSetColumnIndex(1);
+		ImGui::BeginDisabled(runtime);
+		drawField(e, info, f);
+		ImGui::EndDisabled();
+		ImGui::PopID();
+		if (!info.has(cm, e)) break; //編集でシーンが作り直された
+	}
+	ImGui::EndTable();
+}
+
 void EditorApp::drawInspector()
 {
 	ImGui::Begin(WIN_INSPECTOR);
@@ -629,6 +704,8 @@ void EditorApp::drawInspector()
 	ImGui::Separator();
 
 	auto& cm = editor->world().getComponentManager();
+	bool playChanged = editor->isPlaying() != inspectorPlaying;
+	inspectorPlaying = editor->isPlaying();
 	std::string toRemove;
 	for (auto& info : ComponentRegistry::getInstance().all())
 	{
@@ -637,15 +714,19 @@ void EditorApp::drawInspector()
 		bool open = true;
 		if (ImGui::CollapsingHeader(info.name.c_str(), &open, ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::PushItemWidth(-110);
-			for (auto& f : info.fields)
+			drawFieldRows(e, info, false);
+			bool hasRuntime = std::any_of(info.fields.begin(), info.fields.end(), [](const FieldInfo& f) { return f.runtime; });
+			if (hasRuntime && info.has(cm, e))
 			{
-				ImGui::PushID(f.name.c_str());
-				drawField(e, info, f);
-				ImGui::PopID();
-				if (!info.has(cm, e)) break; //編集でシーンが作り直された
+				//再生を始めたら開き、止めたら閉じる(その間は手で開け閉めできる)
+				if (playChanged) ImGui::SetNextItemOpen(editor->isPlaying(), ImGuiCond_Always);
+				if (ImGui::TreeNodeEx("実行時の値", ImGuiTreeNodeFlags_SpanAvailWidth))
+				{
+					ImGui::SetItemTooltip("ゲームが動いている間に変わる値。ここでは読むだけ");
+					drawFieldRows(e, info, true);
+					ImGui::TreePop();
+				}
 			}
-			ImGui::PopItemWidth();
 		}
 		if (!open) toRemove = info.name;
 		ImGui::PopID();

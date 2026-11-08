@@ -98,6 +98,7 @@ private:
 	std::streambuf* originalCerr = nullptr;
 	bool fixedStep = true;       //再生を 1/60 秒固定で進める(毎回同じ結果にする)
 	bool focusLog = false;
+	bool inspectorPlaying = false; //再生の切り替わりで「実行時の値」を開け閉めする
 	std::vector<std::string> assetFiles;
 	double assetsListedAt = -100;
 
@@ -126,6 +127,7 @@ private:
 	void drawHierarchy();
 	void drawInspector();
 	bool drawField(Entity e, const struct ComponentInfo& info, const struct FieldInfo& f);
+	void drawFieldRows(Entity e, const struct ComponentInfo& info, bool runtime);
 	void drawSceneView();
 	void drawAssets();
 	void drawSystems();
