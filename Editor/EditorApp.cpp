@@ -1691,7 +1691,7 @@ int EditorApp::run()
 		drawLog();
 		drawReplays();
 		drawPopups();
-		if (frame == 2 && io.IniFilename == nullptr) ImGui::SetWindowFocus(WIN_ASSETS); //配置を作り直した時は下の段をアセットにしておく
+		if (frame == 2 && io.IniFilename == nullptr) ImGui::SetWindowFocus(WIN_REPLAYS); //配置を作り直した時は下の段を再現テストにしておく(コンセプトの柱を目に入る所に)
 		handleShortcuts();
 		updateCamera();
 
