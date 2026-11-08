@@ -23,6 +23,9 @@ private:
 	AssetID path;          //空なら未保存の新しいシーン
 	bool dirty = false;
 	bool playing = false;
+	bool paused = false;
+	bool stepRequested = false;
+	int playFrame = 0;     //再生してから進めたフレーム数
 	Json playSnapshot;     //再生前の状態
 	std::vector<Json> undoStack;
 	std::vector<Json> redoStack;
@@ -87,7 +90,17 @@ public:
 	void stop();
 	inline bool isPlaying() const { return playing; }
 	/// <summary>
-	/// 再生中はゲームとして進め、止めている時は描画の System だけ動かす
+	/// 再生中に一時停止する/再開する(止めている時は何もしない)
+	/// </summary>
+	void setPaused(bool value);
+	inline bool isPaused() const { return playing && paused; }
+	/// <summary>
+	/// 一時停止中に1フレームだけ進める(次の update で進む)
+	/// </summary>
+	void stepFrame();
+	inline int getPlayFrame() const { return playFrame; }
+	/// <summary>
+	/// 再生中はゲームとして進め、止めている時・一時停止中は描画の System だけ動かす
 	/// </summary>
 	void update(float deltaTime);
 };

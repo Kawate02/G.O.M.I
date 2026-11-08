@@ -327,6 +327,9 @@ void SceneEditor::play()
 	if (playing) return;
 	playSnapshot = snapshot();
 	playing = true;
+	paused = false;
+	stepRequested = false;
+	playFrame = 0;
 	worldChange.trigger();
 	quitRequest.trigger();
 }
@@ -335,7 +338,24 @@ void SceneEditor::stop()
 {
 	if (!playing) return;
 	playing = false;
+	paused = false;
+	stepRequested = false;
+	playFrame = 0;
 	rebuild(playSnapshot);
+}
+
+void SceneEditor::setPaused(bool value)
+{
+	if (!playing) return;
+	paused = value;
+	stepRequested = false;
+}
+
+void SceneEditor::stepFrame()
+{
+	if (!playing) return;
+	paused = true;
+	stepRequested = true;
 }
 
 void SceneEditor::update(float deltaTime)
@@ -365,5 +385,8 @@ void SceneEditor::update(float deltaTime)
 		worldChange.trigger();
 		quitRequest.trigger();
 	}
-	currentWorld->update(deltaTime, playing);
+	bool advance = playing && (!paused || stepRequested);
+	stepRequested = false;
+	if (advance) playFrame++;
+	currentWorld->update(deltaTime, advance);
 }

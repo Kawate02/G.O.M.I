@@ -96,6 +96,29 @@ int main()
 	editor.stop();
 	CHECK(editor.getField(editor.entities()[0], "Transform", "position") == Json::parse("[100.0, 300.0, 0.0]"));
 
+	// 一時停止中は進まず、1コマ送りで1フレームだけ進む
+	editor.play();
+	editor.update(1.0f / 60);
+	CHECK(editor.getPlayFrame() == 1);
+	editor.setPaused(true);
+	float x0 = editor.getField(editor.entities()[0], "Transform", "position")[0].get<float>();
+	for (int i = 0; i < 5; i++) editor.update(1.0f / 60);
+	CHECK(editor.getPlayFrame() == 1);
+	CHECK(editor.getField(editor.entities()[0], "Transform", "position")[0].get<float>() == x0);
+	editor.stepFrame();
+	editor.update(1.0f / 60);
+	editor.update(1.0f / 60);
+	CHECK(editor.getPlayFrame() == 2);
+	CHECK(editor.getField(editor.entities()[0], "Transform", "position")[0].get<float>() > x0);
+	CHECK(editor.isPaused());
+	editor.setPaused(false);
+	editor.update(1.0f / 60);
+	CHECK(editor.getPlayFrame() == 3);
+	editor.stop();
+	CHECK(editor.getPlayFrame() == 0 && !editor.isPaused());
+	editor.setPaused(true); // 止めている時は何もしない
+	CHECK(!editor.isPaused());
+
 	// ゲーム内の「終了」は再生を止めるだけ
 	editor.play();
 	EventBus::getInstance().emit<int>(Event::Game_Quit, 0);
