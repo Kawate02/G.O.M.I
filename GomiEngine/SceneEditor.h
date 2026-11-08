@@ -29,6 +29,7 @@ private:
 	Json playSnapshot;     //再生前の状態
 	std::vector<Json> undoStack;
 	std::vector<Json> redoStack;
+	std::unordered_map<AssetID, std::vector<Json>> prefabCache; //プレハブの各 Entity のコンポーネント(既定値で埋めたもの)
 	EventRequest<std::string> worldChange{ Event::World_Change };
 	EventRequest<int> quitRequest{ Event::Game_Quit };
 
@@ -70,6 +71,18 @@ public:
 	/// </summary>
 	bool setField(Entity e, const std::string& component, const std::string& field, const Json& value, std::string* error = nullptr);
 	Json getField(Entity e, const std::string& component, const std::string& field);
+	/// <summary>
+	/// プレハブから置いた Entity なら、その項目のプレハブ側の値。プレハブから置いていない・プレハブに無いコンポーネントなら null
+	/// </summary>
+	Json prefabField(Entity e, const std::string& component, const std::string& field);
+	/// <summary>
+	/// 項目をプレハブの値に戻す(元に戻す記録もする)。戻せなければ false
+	/// </summary>
+	bool revertToPrefab(Entity e, const std::string& component, const std::string& field);
+	/// <summary>
+	/// プレハブを読み直す(外でプレハブが変わった時)
+	/// </summary>
+	inline void clearPrefabCache() { prefabCache.clear(); }
 
 	// ---- System の並び
 	std::vector<std::string> systems();

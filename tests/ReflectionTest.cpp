@@ -87,6 +87,10 @@ int main()
 		CHECK(reg.find("EntityTag")->findField("tags")->kind == FieldKind::Flags);
 		CHECK(reg.find("Transform")->findField("position")->kind == FieldKind::Vec3);
 		CHECK(reg.find(std::type_index(typeid(MoveComponent)))->name == "Move");
+		// 実行時の値の印
+		CHECK(reg.find("Move")->findField("result")->runtime);
+		CHECK(!reg.find("Move")->findField("speed")->runtime);
+		CHECK(reg.find("Physics")->findField("isGround")->runtime);
 	}
 
 	if (failures == 0) std::cout << "ReflectionTest: all passed" << std::endl;

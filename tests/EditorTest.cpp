@@ -49,6 +49,21 @@ int main()
 	player = editor.entities()[0];
 	CHECK(editor.getField(player, "Transform", "position") == Json::parse("[1.0, 2.0, 3.0]"));
 
+	// プレハブの値と、プレハブに戻す
+	CHECK(editor.prefabField(player, "Transform", "position") == Json::parse("[0.0, 0.0, 0.0]"));
+	CHECK(editor.prefabField(player, "Move", "maxSpeed") == Json(400.0));
+	editor.recordUndo();
+	editor.setField(player, "Move", "maxSpeed", 999);
+	CHECK(editor.revertToPrefab(player, "Move", "maxSpeed"));
+	player = editor.entities()[0];
+	CHECK(editor.getField(player, "Move", "maxSpeed") == Json(400.0));
+	editor.undo(); // 戻す前(999)に戻る
+	player = editor.entities()[0];
+	CHECK(editor.getField(player, "Move", "maxSpeed") == Json(999.0));
+	editor.redo();
+	player = editor.entities()[0];
+	CHECK(!editor.revertToPrefab(player, "Name", "name")); // プレハブに無いコンポーネント
+
 	// コンポーネントの付け外し
 	CHECK(editor.addComponent(player, "Name"));
 	CHECK(!editor.addComponent(player, "Name")); // 二重には付かない

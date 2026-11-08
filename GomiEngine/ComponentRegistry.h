@@ -45,6 +45,7 @@ struct FieldInfo
 	std::string name;
 	FieldKind kind;
 	std::vector<std::string> enumNames; //Enum / Flags の選択肢
+	bool runtime = false; //ゲームが動いている間に変わる値(速度・接地など)。エディタでは読むだけにする
 	std::function<Json(const void* component)> save;
 	std::function<void(void* component, const Json& value)> load;
 	std::function<void*(void* component)> address;
@@ -89,6 +90,17 @@ public:
 		size_t index;
 	public:
 		Builder(ComponentRegistry& registry, size_t index) : registry(registry), index(index) {}
+		/// <summary>
+		/// ゲームが動いている間に System が書き換える値として登録する(保存はするが、エディタでは読むだけ)
+		/// </summary>
+		template <typename F>
+		Builder& runtime(const char* fieldName, F C::* member)
+		{
+			field(fieldName, member);
+			registry.components[index].fields.back().runtime = true;
+			return *this;
+		}
+
 		template <typename F>
 		Builder& field(const char* fieldName, F C::* member)
 		{

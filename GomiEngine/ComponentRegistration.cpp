@@ -2,6 +2,7 @@
 #include "ComponentType.h"
 
 // 新しいコンポーネントを作ったら、ここに名前と項目を足すとシーンファイルで使えるようになる
+// .field は作る時に決める値、.runtime はゲームが動いている間に変わる値(エディタでは読むだけになる)
 void registerBuiltinComponents()
 {
 	static bool done = false;
@@ -26,13 +27,13 @@ void registerBuiltinComponents()
 		.field("useCamera", &RendererComponent::useCamera);
 
 	r.add<PhysicsComponent>("Physics")
-		.field("gravVel", &PhysicsComponent::gravVel)
-		.field("extraVel", &PhysicsComponent::extraVel)
+		.runtime("gravVel", &PhysicsComponent::gravVel)
+		.runtime("extraVel", &PhysicsComponent::extraVel)
 		.field("gravity", &PhysicsComponent::gravity)
 		.field("maxGravity", &PhysicsComponent::maxGravity)
 		.field("decay", &PhysicsComponent::decay)
 		.field("gravityDirection", &PhysicsComponent::gravityDirection)
-		.field("isGround", &PhysicsComponent::isGround);
+		.runtime("isGround", &PhysicsComponent::isGround);
 
 	r.add<PlayerControlComponent>("PlayerControl")
 		.field("actions", &PlayerControlComponent::actions)
@@ -41,9 +42,9 @@ void registerBuiltinComponents()
 		.field("dashSpeed", &PlayerControlComponent::dashSpeed);
 
 	r.add<MoveComponent>("Move")
-		.field("inputVel", &MoveComponent::inputVel)
-		.field("physVel", &MoveComponent::physVel)
-		.field("result", &MoveComponent::result)
+		.runtime("inputVel", &MoveComponent::inputVel)
+		.runtime("physVel", &MoveComponent::physVel)
+		.runtime("result", &MoveComponent::result)
 		.field("speed", &MoveComponent::speed)
 		.field("maxSpeed", &MoveComponent::maxSpeed)
 		.field("stopDamp", &MoveComponent::stopDamp)

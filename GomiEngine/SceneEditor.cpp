@@ -79,6 +79,7 @@ bool SceneEditor::open(const std::string& scene, std::string& error)
 	}
 	undoStack.clear();
 	redoStack.clear();
+	prefabCache.clear();
 	dirty = false;
 	return true;
 }
@@ -264,6 +265,38 @@ Json SceneEditor::getField(Entity e, const std::string& component, const std::st
 	const FieldInfo* f = info->findField(field);
 	if (!ptr || !f) return Json();
 	return f->save(ptr);
+}
+
+Json SceneEditor::prefabField(Entity e, const std::string& component, const std::string& field)
+{
+	const PrefabLink* link = currentWorld->getPrefabLink(e);
+	if (!link) return Json();
+	auto it = prefabCache.find(link->prefab);
+	if (it == prefabCache.end())
+	{
+		std::vector<Json> list;
+		try
+		{
+			Json prefab = AssetDatabase::getInstance().readJson(link->prefab);
+			for (auto& def : prefab.value("entities", Json::array())) list.push_back(SceneLoader::normalize(def.value("components", Json::object())));
+		}
+		catch (const std::exception&)
+		{
+		}
+		it = prefabCache.emplace(link->prefab, std::move(list)).first;
+	}
+	if (link->index < 0 || link->index >= static_cast<int>(it->second.size())) return Json();
+	const Json& comps = it->second[link->index];
+	if (!comps.contains(component) || !comps[component].contains(field)) return Json();
+	return comps[component][field];
+}
+
+bool SceneEditor::revertToPrefab(Entity e, const std::string& component, const std::string& field)
+{
+	Json value = prefabField(e, component, field);
+	if (value.is_null()) return false;
+	recordUndo();
+	return setField(e, component, field, value);
 }
 
 // ---- System
