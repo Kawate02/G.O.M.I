@@ -1,0 +1,24 @@
+{
+  "scene": "Title",
+  "fps": 60,
+  "seed": 1,
+  "length": 300,
+  "checkpoints": [120,240,300],
+  "input": [
+    {"frame":1,"mouse":[861.0,470.0]},
+    {"frame":40,"mouse":[400.0,400.0],"press":["MOUSE_LEFT"]},
+    {"frame":41,"release":["MOUSE_LEFT"]},
+    {"frame":42,"mouse":[861.0,470.0]},
+    {"frame":80,"press":["KEY_D"]},
+    {"frame":100,"press":["KEY_SPACE"]},
+    {"frame":113,"release":["KEY_SPACE"]},
+    {"frame":171,"release":["KEY_D"]},
+    {"frame":190,"press":["KEY_A"]},
+    {"frame":216,"release":["KEY_A"]},
+    {"frame":230,"press":["KEY_ESCAPE"]},
+    {"frame":231,"release":["KEY_ESCAPE"]},
+    {"frame":250,"mouse":[400.0,300.0],"press":["MOUSE_LEFT"]},
+    {"frame":251,"release":["MOUSE_LEFT"]},
+    {"frame":252,"mouse":[861.0,470.0]}
+  ]
+}

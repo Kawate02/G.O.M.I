@@ -117,8 +117,17 @@ add_custom_command(TARGET GomiEngine POST_BUILD
 
 # --- テスト(ctest で実行) ---
 enable_testing()
-foreach(test ComponentArrayTest ReflectionTest SceneTest CollisionTest ModelTest EditorTest)
+foreach(test ComponentArrayTest ReflectionTest SceneTest CollisionTest ModelTest EditorTest ReplayTest)
     add_executable(${test} tests/${test}.cpp)
     target_link_libraries(${test} PRIVATE GomiCore)
     add_test(NAME ${test} COMMAND ${test})
+endforeach()
+
+# 操作の記録(tests/replays/*.json)を流し、確認点の画面と状態を基準と比べる。基準を作り直す時は
+#   GomiEngine --replay tests/replays/<名前>.json --replay-update
+file(GLOB GOMI_REPLAYS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/replays/*.json)
+foreach(replay ${GOMI_REPLAYS})
+    get_filename_component(name ${replay} NAME_WE)
+    add_test(NAME Replay.${name} COMMAND GomiEngine --replay ${replay} --no-wait
+        WORKING_DIRECTORY $<TARGET_FILE_DIR:GomiEngine>)
 endforeach()

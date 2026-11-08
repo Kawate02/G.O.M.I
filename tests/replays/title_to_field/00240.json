@@ -1,0 +1,51 @@
+{
+  "frame": 240,
+  "scene": "Field",
+  "world": {
+    "entities": [
+      {
+        "overrides": {
+          "Move": {
+            "inputVel": [
+              500.0784,
+              0.0,
+              0.0
+            ],
+            "result": [
+              8.3346405,
+              0.0,
+              0.0
+            ]
+          },
+          "Physics": {
+            "isGround": false
+          },
+          "Transform": {
+            "position": [
+              1854.1648,
+              300.0,
+              0.0
+            ]
+          }
+        },
+        "prefab": "prefabs/player.json"
+      },
+      {
+        "prefab": "prefabs/background.json"
+      }
+    ],
+    "systems": [
+      "PlayerControlSystem",
+      "ForwardMoveSystem",
+      "PhysicsSystem",
+      "MoveResolveSystem",
+      "MoveSystem",
+      "CameraSystem",
+      "OffScreenSystem",
+      "RendererSystem",
+      "CollisionSystem",
+      "BackGroundSystem"
+    ],
+    "ui": []
+  }
+}
