@@ -161,7 +161,12 @@ int main()
 		CHECK(names[0] == "player" && names.back() == "player #2");
 		n.rename(n.entities().back(), "rival");
 		CHECK(n.displayName(n.entities().back()) == "rival");
-				n.rename(n.entities()[0], "hero");
+				n.recordUndo();
+		n.setField(n.entities()[0], "PlayerControl", "actions", Json::parse(R"({"JUMP":"KEY_RETURN","MOVE_LEFT":"KEY_A","MOVE_RIGHT":"KEY_D","MOVE_UP":"KEY_W","MOVE_DOWN":"KEY_S","DASH":"KEY_LSHIFT"})"));
+		auto keyChanges = n.changesFromSaved();
+		CHECK(keyChanges.size() == 2 && keyChanges[0].field == "actions.JUMP" && keyChanges[0].after == "KEY_RETURN"); // 表は中の項目ごと(もう1件は複製した player #2)
+		n.undo();
+		n.rename(n.entities()[0], "hero");
 		CHECK(n.displayNames()[0] == "hero");
 		n.undo();
 		CHECK(n.displayNames()[0] == "player");

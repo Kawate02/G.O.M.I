@@ -211,7 +211,21 @@ std::vector<SceneChange> SceneDiff::compare(const Json& before, const Json& afte
 			{
 				Json va = fa.contains(field) ? fa[field] : Json();
 				Json vb = fb.contains(field) ? fb[field] : Json();
-				if (va != vb) changes.push_back({ Kind::FieldChanged, label, index, name, field, va, vb });
+				if (va == vb) continue;
+				//表(キー割り当てなど)は中の項目ごとに出す
+				if (va.is_object() && vb.is_object())
+				{
+					std::set<std::string> keys;
+					for (auto& [k, v] : va.items()) keys.insert(k);
+					for (auto& [k, v] : vb.items()) keys.insert(k);
+					for (auto& k : keys)
+					{
+						Json a2 = va.contains(k) ? va[k] : Json();
+						Json b2 = vb.contains(k) ? vb[k] : Json();
+						if (a2 != b2) changes.push_back({ Kind::FieldChanged, label, index, name, field + "." + k, a2, b2 });
+					}
+				}
+				else changes.push_back({ Kind::FieldChanged, label, index, name, field, va, vb });
 			}
 		}
 	}

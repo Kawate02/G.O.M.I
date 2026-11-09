@@ -181,6 +181,7 @@ private:
 
 	// ---- ヒエラルキー
 	std::string hierarchyFilter;
+	std::string enumFilter;     //選択欄の中の絞り込み
 	bool focusFilter = false;
 	int renaming = -1;          //名前を直している Entity の並び順
 	bool renameFocus = false;

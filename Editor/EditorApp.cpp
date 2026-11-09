@@ -710,6 +710,89 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 		}
 		break;
 	}
+	case FieldKind::EnumMap:
+	{
+		//キー(左)→ 値(右)の表。値は絞り込める選択、× で外す、下の欄で足す
+		Json map = v.is_object() ? v : Json::object();
+		std::string removeKey;
+		if (ImGui::BeginTable("##map", 3, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg))
+		{
+			ImGui::TableSetupColumn("key", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+			ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+			ImGui::TableSetupColumn("x", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
+			for (auto& key : f.keyNames) //表示はキーの決まった順
+			{
+				if (!map.contains(key)) continue;
+				ImGui::PushID(key.c_str());
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::AlignTextToFramePadding();
+				ImGui::TextUnformatted(key.c_str());
+				ImGui::TableNextColumn();
+				ImGui::SetNextItemWidth(-FLT_MIN);
+				std::string cur = map[key].is_string() ? map[key].get<std::string>() : "";
+				std::string shown = cur.rfind("KEY_", 0) == 0 ? cur.substr(4) : cur;
+				ImGui::SetNextWindowSizeConstraints(ImVec2(200, 0), ImVec2(FLT_MAX, FLT_MAX));
+				if (ImGui::BeginCombo("##value", shown.c_str(), ImGuiComboFlags_HeightLarge))
+				{
+					if (ImGui::IsWindowAppearing())
+					{
+						enumFilter.clear();
+						ImGui::SetKeyboardFocusHere();
+					}
+					ImGui::SetNextItemWidth(-FLT_MIN);
+					ImGui::InputTextWithHint("##filter", "絞り込み", &enumFilter);
+					std::string lowerFilter = enumFilter;
+					for (auto& ch : lowerFilter) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+					for (auto& n : f.enumNames)
+					{
+						if (!lowerFilter.empty() && n.find(lowerFilter) == std::string::npos) continue;
+						if (ImGui::Selectable(n.rfind("KEY_", 0) == 0 ? n.c_str() + 4 : n.c_str(), n == cur) && n != cur)
+						{
+							map[key] = n;
+							changed = true;
+						}
+					}
+					ImGui::EndCombo();
+				}
+				ImGui::TableNextColumn();
+				if (ImGui::Button("x", ImVec2(ImGui::GetFrameHeight(), 0))) removeKey = key;
+				ImGui::SetItemTooltip("%s を外す", key.c_str());
+				ImGui::PopID();
+			}
+			ImGui::EndTable();
+		}
+		if (!removeKey.empty())
+		{
+			map.erase(removeKey);
+			changed = true;
+		}
+		//まだ無いキーを足す
+		std::vector<std::string> missing;
+		for (auto& key : f.keyNames) if (!map.contains(key)) missing.push_back(key);
+		if (!missing.empty())
+		{
+			ImGui::SetNextItemWidth(-FLT_MIN);
+			if (ImGui::BeginCombo("##add", "+ 足す", ImGuiComboFlags_None))
+			{
+				for (auto& key : missing)
+				{
+					if (ImGui::Selectable(key.c_str()))
+					{
+						map[key] = f.enumNames.empty() ? Json() : Json(f.enumNames.front());
+						changed = true;
+					}
+				}
+				ImGui::EndCombo();
+			}
+		}
+		if (changed)
+		{
+			editor->recordUndo();
+			next = map;
+		}
+		break;
+	}
 	case FieldKind::Other:
 	{
 		//型の決まった欄が無いもの(キー割り当ての表など)は JSON のまま直す

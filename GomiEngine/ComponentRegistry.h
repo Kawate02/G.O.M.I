@@ -3,6 +3,8 @@
 #include "ComponentManager.h"
 
 #include <functional>
+#include <map>
+#include <unordered_map>
 #include <string>
 #include <string_view>
 #include <typeindex>
@@ -21,8 +23,19 @@ enum class FieldKind
 	Vec3,
 	Enum,
 	Flags,
+	EnumMap, //列挙 → 列挙の表(キー割り当てなど)
 	Other,
 };
+
+/// <summary>
+/// std::unordered_map / std::map の、キーも値も名前付きの列挙のもの
+/// </summary>
+template <typename T>
+struct EnumMapTypes : std::false_type {};
+template <NamedEnum K, NamedEnum V, typename... Rest>
+struct EnumMapTypes<std::unordered_map<K, V, Rest...>> : std::true_type { using Key = K; using Value = V; };
+template <NamedEnum K, NamedEnum V, typename... Rest>
+struct EnumMapTypes<std::map<K, V, Rest...>> : std::true_type { using Key = K; using Value = V; };
 
 template <typename T>
 constexpr FieldKind fieldKindOf()
@@ -34,6 +47,7 @@ constexpr FieldKind fieldKindOf()
 	else if constexpr (std::is_same_v<T, Vec2>) return FieldKind::Vec2;
 	else if constexpr (std::is_same_v<T, Vec3>) return FieldKind::Vec3;
 	else if constexpr (NamedEnum<T>) return IsFlagEnum<T>::value ? FieldKind::Flags : FieldKind::Enum;
+	else if constexpr (EnumMapTypes<T>::value) return FieldKind::EnumMap;
 	else return FieldKind::Other;
 }
 
@@ -44,7 +58,8 @@ struct FieldInfo
 {
 	std::string name;
 	FieldKind kind;
-	std::vector<std::string> enumNames; //Enum / Flags の選択肢
+	std::vector<std::string> enumNames; //Enum / Flags の選択肢(EnumMap では値の選択肢)
+	std::vector<std::string> keyNames;  //EnumMap のキーの選択肢
 	bool runtime = false; //ゲームが動いている間に変わる値(速度・接地など)。エディタでは読むだけにする
 	std::function<Json(const void* component)> save;
 	std::function<void(void* component, const Json& value)> load;
@@ -110,6 +125,11 @@ public:
 			if constexpr (NamedEnum<F>)
 			{
 				for (auto& [e, n] : EnumNames<F>::list()) f.enumNames.push_back(n);
+			}
+			if constexpr (EnumMapTypes<F>::value)
+			{
+				for (auto& [e, n] : EnumNames<typename EnumMapTypes<F>::Key>::list()) f.keyNames.push_back(n);
+				for (auto& [e, n] : EnumNames<typename EnumMapTypes<F>::Value>::list()) f.enumNames.push_back(n);
 			}
 			f.save = [member](const void* c) { return ::toJson(static_cast<const C*>(c)->*member); };
 			f.load = [member](void* c, const Json& j) { ::fromJson(j, static_cast<C*>(c)->*member); };

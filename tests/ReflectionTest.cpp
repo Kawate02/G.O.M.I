@@ -1,3 +1,4 @@
+#include <algorithm>
 // コンポーネントの登録と JSON 変換のテスト。失敗したら行番号を出して 1 を返す
 #include "ComponentRegistry.h"
 #include "ComponentType.h"
@@ -60,6 +61,11 @@ int main()
 		auto& pc = cm.getComponentArray<PlayerControlComponent>().getComponent(e);
 		CHECK(pc.actions.size() == 2 && pc.actions[ActionID::JUMP] == InputKey::KEY_SPACE);
 		CHECK(reg.find("PlayerControl")->toJson(cm, e)["actions"]["MOVE_RIGHT"] == "KEY_D");
+		// キー割り当ては「列挙 → 列挙」の表としてエディタに出す
+		const FieldInfo* actions = reg.find("PlayerControl")->findField("actions");
+		CHECK(actions && actions->kind == FieldKind::EnumMap);
+		CHECK(actions && actions->keyNames.size() == 8 && actions->keyNames[0] == "MOVE_LEFT");
+		CHECK(actions && std::find(actions->enumNames.begin(), actions->enumNames.end(), "KEY_SPACE") != actions->enumNames.end());
 
 		CHECK(cm.getComponentArray<CollisionComponent>().getComponent(e).type == CollisionType::SPHERE);
 
