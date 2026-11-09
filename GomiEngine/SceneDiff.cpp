@@ -20,6 +20,40 @@ namespace
 	}
 }
 
+std::string SceneDiff::entityLabel(const Json& components, const std::string& prefab, int index, int members)
+{
+	std::string name = nameOf(components);
+	if (!name.empty()) return name;
+	if (!prefab.empty())
+	{
+		std::string file = fileName(prefab);
+		if (file.size() > 5 && file.compare(file.size() - 5, 5, ".json") == 0) file.resize(file.size() - 5);
+		return members > 1 ? file + " [" + std::to_string(index) + "]" : file;
+	}
+	auto field = [&](const char* comp, const char* key) -> std::string {
+		if (components.contains(comp) && components[comp].contains(key) && components[comp][key].is_string())
+			return components[comp][key].get<std::string>();
+		return "";
+	};
+	if (components.contains("Camera3D")) return "Camera3D";
+	if (components.contains("Light")) return "Light";
+	if (std::string mesh = field("MeshRenderer", "mesh"); !mesh.empty()) return mesh.substr(mesh.find_last_of("/:") + 1);
+	if (std::string image = field("Renderer", "path"); !image.empty()) return fileName(image);
+	return "Entity";
+}
+
+std::vector<std::string> SceneDiff::numbered(const std::vector<std::string>& labels)
+{
+	std::map<std::string, int> seen;
+	std::vector<std::string> out;
+	for (auto& label : labels)
+	{
+		int n = ++seen[label];
+		out.push_back(n > 1 ? label + " #" + std::to_string(n) : label);
+	}
+	return out;
+}
+
 std::string SceneDiff::shortValue(const Json& value, size_t limit)
 {
 	std::string s = value.is_null() ? "(none)" : value.dump();
@@ -45,13 +79,17 @@ std::string SceneChange::text() const
 Json SceneDiff::expand(const Json& scene)
 {
 	Json out = Json::array();
-	std::map<std::string, int> seen;
+	std::vector<std::string> labels;
 	auto push = [&](std::string label, Json components) {
-		int n = ++seen[label];
-		if (n > 1) label += " #" + std::to_string(n);
+		labels.push_back(label);
 		out.push_back({ { "label", label }, { "components", std::move(components) } });
 	};
 	if (!scene.is_object() || !scene.contains("entities") || !scene["entities"].is_array()) return out;
+	auto finish = [&] {
+		auto names = numbered(labels);
+		for (size_t i = 0; i < names.size(); i++) out[i]["label"] = names[i];
+		return out;
+	};
 	for (auto& item : scene["entities"])
 	{
 		if (!item.is_object()) continue;
@@ -65,7 +103,7 @@ Json SceneDiff::expand(const Json& scene)
 			}
 			catch (const std::exception&)
 			{
-				push(fileName(id) + " (unreadable)", Json::object());
+				push(entityLabel(Json::object(), id) + " (unreadable)", Json::object());
 				continue;
 			}
 			for (size_t i = 0; i < defs.size(); i++)
@@ -79,8 +117,7 @@ Json SceneDiff::expand(const Json& scene)
 				catch (const std::exception&)
 				{
 				}
-				std::string name = nameOf(comps);
-				push(name.empty() ? fileName(id) + " [" + std::to_string(i) + "]" : name, comps);
+				push(entityLabel(comps, id, static_cast<int>(i), static_cast<int>(defs.size())), comps);
 			}
 		}
 		else
@@ -93,11 +130,10 @@ Json SceneDiff::expand(const Json& scene)
 			catch (const std::exception&)
 			{
 			}
-			std::string name = nameOf(comps);
-			push(name.empty() ? "Entity" : name, comps);
+			push(entityLabel(comps), comps);
 		}
 	}
-	return out;
+	return finish();
 }
 
 std::vector<SceneChange> SceneDiff::compare(const Json& before, const Json& after)

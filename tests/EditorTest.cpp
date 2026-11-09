@@ -32,7 +32,8 @@ int main()
 	CHECK(editor.open("Field", error));
 	CHECK(editor.getPath() == "scenes/Field.json");
 	CHECK(editor.entities().size() == 5);
-	CHECK(editor.displayName(editor.entities()[0]) == "player.json [0]");
+	CHECK(editor.displayName(editor.entities()[0]) == "player");
+	CHECK(editor.displayName(editor.entities()[2]) == "background [1]"); // 仲間が複数のプレハブは [番号]
 	CHECK(!editor.open("NoSuchScene", error) && editor.getPath() == "scenes/Field.json");
 
 	// 項目を変える → 元に戻す → やり直す
@@ -79,7 +80,7 @@ int main()
 	CHECK(editor.entities().size() == 6);
 	editor.addComponent(box, "MeshRenderer");
 	Entity copy = editor.duplicate(box);
-	CHECK(editor.entities().size() == 7 && editor.displayName(copy) == "Box");
+	CHECK(editor.entities().size() == 7 && editor.displayName(copy) == "Box #2"); // 同じ名前は番号で区別
 	editor.destroy(copy);
 	CHECK(editor.entities().size() == 6);
 	auto trees = editor.createFromPrefab("prefabs/crate.json");
@@ -151,6 +152,22 @@ int main()
 
 	std::filesystem::remove(tmp);
 
+	// ---- 呼び名の番号と名前の変更
+	{
+		SceneEditor n(input, render, audio);
+		CHECK(n.open("Field", error));
+		n.duplicate(n.entities()[0]);
+		auto names = n.displayNames();
+		CHECK(names[0] == "player" && names.back() == "player #2");
+		n.rename(n.entities().back(), "rival");
+		CHECK(n.displayName(n.entities().back()) == "rival");
+				n.rename(n.entities()[0], "hero");
+		CHECK(n.displayNames()[0] == "hero");
+		n.undo();
+		CHECK(n.displayNames()[0] == "player");
+		CHECK(n.isDirty());
+	}
+
 	// ---- 保存済みとの差・外で変わったファイル(assets のコピーで試す)
 	{
 		namespace fs = std::filesystem;
@@ -180,11 +197,11 @@ int main()
 		w.createEntity("box");
 		auto changes = w.changesFromSaved();
 		CHECK(changes.size() == 2);
-		CHECK(has(changes, Kind::FieldChanged, "player.json [0]", "position"));
+		CHECK(has(changes, Kind::FieldChanged, "player", "position"));
 		CHECK(has(changes, Kind::EntityAdded, "box"));
-		CHECK(changes[0].text() == "player.json [0] > Transform.position: [100.0,300.0,0.0] -> [7.0,8.0,9.0]");
+		CHECK(changes[0].text() == "player > Transform.position: [100.0,300.0,0.0] -> [7.0,8.0,9.0]");
 		w.destroy(w.entities()[0]);
-		CHECK(has(w.changesFromSaved(), Kind::EntityRemoved, "player.json [0]"));
+		CHECK(has(w.changesFromSaved(), Kind::EntityRemoved, "player"));
 		w.undo();
 		w.undo();
 		w.undo();
@@ -215,10 +232,10 @@ int main()
 		CHECK(check.sceneConflict && !check.reloaded && w.hasSceneConflict());
 		CHECK(w.getField(w.entities()[0], "Move", "maxSpeed") == Json(1.0));
 		auto outside = w.fileChanges();
-		CHECK(outside.size() == 1 && has(outside, Kind::FieldChanged, "player.json [0]", "position"));
+		CHECK(outside.size() == 1 && has(outside, Kind::FieldChanged, "player", "position"));
 		w.keepEdits();
 		CHECK(!w.hasSceneConflict() && w.isDirty());
-		CHECK(has(w.changesFromSaved(), Kind::FieldChanged, "player.json [0]", "position")); // 保存すると 666 を上書きする所
+		CHECK(has(w.changesFromSaved(), Kind::FieldChanged, "player", "position")); // 保存すると 666 を上書きする所
 
 		scene["entities"][0]["overrides"]["Transform"]["position"] = Json::parse("[777, 1, 0]");
 		writeText("scenes/Field.json", scene.dump(4));

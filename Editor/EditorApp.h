@@ -169,6 +169,14 @@ private:
 	int paletteCursor = 0;
 	bool resetLayout = false;
 
+	// ---- ヒエラルキー
+	std::string hierarchyFilter;
+	bool focusFilter = false;
+	int renaming = -1;          //名前を直している Entity の並び順
+	bool renameFocus = false;
+	std::string renameText;
+	void startRename(int index);
+
 	//保存していない変更がある時の確認
 	enum class Pending { None, NewScene, OpenScene, Quit };
 	Pending pending = Pending::None;

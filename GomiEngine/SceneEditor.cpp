@@ -150,33 +150,37 @@ std::vector<Entity> SceneEditor::entities()
 	return result;
 }
 
+std::vector<std::string> SceneEditor::displayNames()
+{
+	std::vector<std::string> labels;
+	for (auto& e : entities())
+	{
+		Json comps = SceneLoader::componentsOf(*currentWorld, e);
+		if (const PrefabLink* link = currentWorld->getPrefabLink(e))
+			labels.push_back(SceneDiff::entityLabel(comps, link->prefab, link->index, static_cast<int>(prefabDefs(link->prefab).size())));
+		else labels.push_back(SceneDiff::entityLabel(comps));
+	}
+	return SceneDiff::numbered(labels);
+}
+
 std::string SceneEditor::displayName(Entity e)
 {
+	auto list = entities();
+	auto names = displayNames();
+	for (size_t i = 0; i < list.size(); i++)
+	{
+		if (list[i].id == e.id) return names[i];
+	}
+	return "Entity";
+}
+
+void SceneEditor::rename(Entity e, const std::string& name)
+{
+	if (!currentWorld->alive(e)) return;
+	recordUndo();
 	auto& cm = currentWorld->getComponentManager();
-	if (cm.has<NameComponent>(e))
-	{
-		auto& name = cm.getComponentArray<NameComponent>().getComponent(e).name;
-		if (!name.empty()) return name;
-	}
-	if (const PrefabLink* link = currentWorld->getPrefabLink(e))
-	{
-		std::string file = link->prefab.substr(link->prefab.find_last_of('/') + 1);
-		return file + " [" + std::to_string(link->index) + "]";
-	}
-	//名前が無ければ、役目の分かるコンポーネントから付ける
-	if (cm.has<Camera3DComponent>(e)) return "Camera3D";
-	if (cm.has<LightComponent>(e)) return "Light";
-	if (cm.has<MeshRendererComponent>(e))
-	{
-		auto& mesh = cm.getComponentArray<MeshRendererComponent>().getComponent(e).mesh;
-		return mesh.substr(mesh.find_last_of("/:") + 1);
-	}
-	if (cm.has<RendererComponent>(e))
-	{
-		auto& image = cm.getComponentArray<RendererComponent>().getComponent(e).path;
-		return image.substr(image.find_last_of('/') + 1);
-	}
-	return "Entity " + std::to_string(e.id);
+	if (cm.has<NameComponent>(e)) cm.getComponentArray<NameComponent>().getComponent(e).name = name;
+	else cm.addComponent(e, NameComponent{ name });
 }
 
 Entity SceneEditor::createEntity(const std::string& name)

@@ -248,6 +248,7 @@ void EditorApp::drawMenuBar()
 		menuItem("edit.redo");
 		ImGui::Separator();
 		menuItem("entity.create");
+		menuItem("entity.rename");
 		menuItem("entity.duplicate");
 		menuItem("entity.delete");
 		ImGui::EndMenu();
@@ -459,23 +460,62 @@ void EditorApp::drawHierarchy()
 	ImGui::EndDisabled();
 	ImGui::Separator();
 
+	if (focusFilter)
+	{
+		ImGui::SetKeyboardFocusHere();
+		focusFilter = false;
+	}
+	ImGui::SetNextItemWidth(-1);
+	ImGui::InputTextWithHint("##filter", "絞り込み (Ctrl+F)", &hierarchyFilter);
+
 	ImGui::BeginChild("list");
 	auto list = editor->entities();
+	auto names = editor->displayNames();
+	auto lower = [](std::string s) {
+		for (auto& ch : s) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+		return s;
+	};
+	std::string filter = lower(hierarchyFilter);
+	if (renaming >= static_cast<int>(list.size()) || playing) renaming = -1;
 	for (int i = 0; i < static_cast<int>(list.size()); i++)
 	{
+		if (!filter.empty() && lower(names[i]).find(filter) == std::string::npos && i != selected) continue;
 		ImGui::PushID(static_cast<int>(list[i].id));
-		std::string label = editor->displayName(list[i]);
+		if (renaming == i)
+		{
+			if (renameFocus)
+			{
+				ImGui::SetKeyboardFocusHere();
+				renameFocus = false;
+			}
+			ImGui::SetNextItemWidth(-1);
+			bool enter = ImGui::InputText("##rename", &renameText, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+			if (enter || ImGui::IsItemDeactivatedAfterEdit())
+			{
+				editor->rename(list[i], renameText);
+				renaming = -1;
+			}
+			else if (ImGui::IsItemDeactivated()) renaming = -1; //Esc
+			ImGui::PopID();
+			continue;
+		}
+		std::string label = names[i];
 		if (editor->world().getPrefabLink(list[i])) label = "◆ " + label;
-		if (ImGui::Selectable(label.c_str(), selected == i)) selected = i;
+		if (ImGui::Selectable(label.c_str(), selected == i, ImGuiSelectableFlags_AllowDoubleClick))
+		{
+			selected = i;
+			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !playing) startRename(i);
+		}
 		if (!playing && ImGui::BeginPopupContextItem())
 		{
 			selected = i;
-			if (ImGui::MenuItem("複製"))
+			if (ImGui::MenuItem("名前を変える", "F2")) startRename(i);
+			if (ImGui::MenuItem("複製", "Ctrl+D"))
 			{
 				editor->duplicate(list[i]);
 				selected = static_cast<int>(editor->entities().size()) - 1;
 			}
-			if (ImGui::MenuItem("削除"))
+			if (ImGui::MenuItem("削除", "Delete"))
 			{
 				editor->destroy(list[i]);
 				selected = -1;
@@ -2029,6 +2069,15 @@ void EditorApp::registerCommands()
 		editor->duplicate(selectedEntity());
 		lastSelected(1);
 	});
+	add("entity.rename", "名前を変える", "F2", ImGuiKey_F2, hasSelection, [this](const std::string& a) {
+		if (a.empty()) startRename(selected);
+		else editor->rename(selectedEntity(), a);
+	}).argName = "(省略可)新しい名前。省略するとヒエラルキーで直す";
+	add("hierarchy.search", "ヒエラルキーを絞り込む", "Ctrl+F", ImGuiMod_Ctrl | ImGuiKey_F, nullptr, [this](const std::string& a) {
+		ImGui::SetWindowFocus(WIN_HIERARCHY);
+		if (a.empty()) focusFilter = true;
+		else hierarchyFilter = a;
+	}).argName = "(省略可)絞り込む文字";
 	add("entity.delete", "削除", "Delete", ImGuiKey_Delete, hasSelection, [this](const std::string&) {
 		editor->destroy(selectedEntity());
 		selected = -1;
@@ -2036,9 +2085,10 @@ void EditorApp::registerCommands()
 	{
 		auto& c = add("entity.select", "選ぶ", "", 0, nullptr, [this](const std::string& a) {
 			auto list = editor->entities();
+			auto names = editor->displayNames();
 			for (int i = 0; i < static_cast<int>(list.size()); i++)
 			{
-				if (editor->displayName(list[i]) == a)
+				if (names[i] == a)
 				{
 					selected = i;
 					return;
@@ -2059,9 +2109,7 @@ void EditorApp::registerCommands()
 			log("選べませんでした(名前か並び順の番号): " + a, LogLevel::Warning);
 		});
 		c.choices = [this] {
-			std::vector<std::string> names;
-			for (auto e : editor->entities()) names.push_back(editor->displayName(e));
-			return names;
+			return editor->displayNames();
 		};
 		c.argName = "Entity の名前か並び順の番号";
 	}
@@ -2164,6 +2212,18 @@ void EditorApp::printCommands() const
 	for (auto& c : commands)
 		std::cout << c.id << "\t" << c.shortcut << "\t" << c.label << "\t" << c.argName << "\n";
 	std::cout.flush();
+}
+
+void EditorApp::startRename(int index)
+{
+	auto list = editor->entities();
+	if (index < 0 || index >= static_cast<int>(list.size()) || editor->isPlaying()) return;
+	selected = index;
+	renaming = index;
+	renameFocus = true;
+	Json name = editor->getField(list[index], "Name", "name");
+	renameText = name.is_string() && !name.get<std::string>().empty() ? name.get<std::string>() : editor->displayName(list[index]);
+	ImGui::SetWindowFocus(WIN_HIERARCHY);
 }
 
 void EditorApp::checkAllReplays()

@@ -76,7 +76,18 @@ public:
 	/// 生きている Entity を並び順で
 	/// </summary>
 	std::vector<Entity> entities();
+	/// <summary>
+	/// ヒエラルキーに出す呼び名。同じ呼び名は「crate #2」のように番号を付ける(差分の呼び名と同じ)
+	/// </summary>
 	std::string displayName(Entity e);
+	/// <summary>
+	/// entities() の順の呼び名
+	/// </summary>
+	std::vector<std::string> displayNames();
+	/// <summary>
+	/// 名前を変える(Name が無ければ付ける。元に戻す記録もする)
+	/// </summary>
+	void rename(Entity e, const std::string& name);
 	Entity createEntity(const std::string& name);
 	std::vector<Entity> createFromPrefab(const AssetID& prefab);
 	Entity duplicate(Entity e);
