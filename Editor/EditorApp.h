@@ -188,6 +188,13 @@ private:
 	std::string renameText;
 	void startRename(int index);
 
+	// ---- プレハブ
+	std::string returnScene;    //プレハブを開く前のシーン(「シーンに戻る」の行き先)
+	bool openPrefabSave = false;
+	std::string prefabSavePath;
+	void editPrefab(const std::string& prefab);
+	void savePrefab(const std::string& prefab);
+
 	//保存していない変更がある時の確認
 	enum class Pending { None, NewScene, OpenScene, Quit };
 	Pending pending = Pending::None;

@@ -54,6 +54,15 @@ private:
 	const std::vector<Json>& prefabDefs(const AssetID& prefab);
 	std::map<AssetID, FileStamp> scanFiles() const;
 	void rememberStamp(const AssetID& id);
+	/// <summary>
+	/// ファイルを読んでシーンの形にする(プレハブなら System を足して包む)
+	/// </summary>
+	Json readAsScene(const AssetID& id);
+	/// <summary>
+	/// id に書く中身(プレハブなら Entity の並びだけを短く)
+	/// </summary>
+	Json fileContent(const AssetID& id);
+	Json wrapPrefab(const Json& prefab) const;
 public:
 	static constexpr size_t MAX_UNDO = 100;
 
@@ -68,6 +77,18 @@ public:
 	bool save(std::string& error);
 	bool saveAs(const AssetID& id, std::string& error);
 	inline const AssetID& getPath() const { return path; }
+	/// <summary>
+	/// prefabs/ の下のファイルはプレハブとして開く・保存する({ "entities": [...] } だけのファイル)
+	/// </summary>
+	static bool isPrefabPath(const AssetID& id);
+	/// <summary>
+	/// プレハブを開いて直している(再生はできない)
+	/// </summary>
+	inline bool isPrefabMode() const { return isPrefabPath(path); }
+	/// <summary>
+	/// 選んだ Entity をプレハブのファイルに書き、その Entity をそのプレハブの配置にする(元に戻す記録もする)
+	/// </summary>
+	bool saveAsPrefab(Entity e, const AssetID& id, std::string& error);
 	inline bool isDirty() const { return dirty; }
 	inline World& world() { return *currentWorld; }
 

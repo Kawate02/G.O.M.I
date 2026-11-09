@@ -66,6 +66,10 @@ namespace SceneLoader
 	/// base から current で変わった所だけを返す(オブジェクトは中まで比べる)
 	/// </summary>
 	Json diff(const Json& base, const Json& current);
+	/// <summary>
+	/// コンポーネントの JSON から、既定値と同じ項目を省く(プレハブのファイルを短く書く)
+	/// </summary>
+	Json compact(const Json& components);
 
 	/// <summary>
 	/// UI の JSON から部品を作り、まとめて動かせる親のハンドルを返す

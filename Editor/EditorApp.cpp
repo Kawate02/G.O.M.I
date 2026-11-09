@@ -239,6 +239,16 @@ void EditorApp::drawMenuBar()
 		menuItem("scene.saveAs");
 		menuItem("scene.reload");
 		ImGui::Separator();
+		if (ImGui::BeginMenu("プレハブを開いて直す", !playing))
+		{
+			for (auto& s : assetsIn("prefabs", { ".json" }))
+			{
+				if (ImGui::MenuItem(s.c_str())) runCommand("prefab.open", s);
+			}
+			ImGui::EndMenu();
+		}
+		menuItem("prefab.back");
+		ImGui::Separator();
 		menuItem("app.quit");
 		ImGui::EndMenu();
 	}
@@ -249,6 +259,8 @@ void EditorApp::drawMenuBar()
 		ImGui::Separator();
 		menuItem("entity.create");
 		menuItem("entity.rename");
+		menuItem("prefab.saveSelection");
+		menuItem("prefab.edit");
 		menuItem("entity.duplicate");
 		menuItem("entity.delete");
 		ImGui::EndMenu();
@@ -283,6 +295,7 @@ void EditorApp::drawMenuBar()
 void EditorApp::togglePlay()
 {
 	if (editor->isPlaying()) editor->stop();
+	else if (editor->isPrefabMode()) log("プレハブを直している間は再生できません(シーンに戻ってから)", LogLevel::Warning);
 	else editor->play();
 }
 
@@ -301,8 +314,11 @@ void EditorApp::drawToolbar()
 	}
 	auto tip = [](const char* text) { if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("%s", text); };
 
+	ImGui::BeginDisabled(!playing && editor->isPrefabMode());
 	if (ImGui::Button(playing ? "■ 停止" : "▶ 再生")) togglePlay();
-	tip(playing ? "止めると、再生中の変更は消えて再生前に戻る (F5)" : "ゲームとして動かす (F5)");
+	ImGui::EndDisabled();
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled))
+		ImGui::SetTooltip("%s", playing ? "止めると、再生中の変更は消えて再生前に戻る (F5)" : editor->isPrefabMode() ? "プレハブはシーンに戻ってから動かす" : "ゲームとして動かす (F5)");
 	ImGui::SameLine();
 	ImGui::BeginDisabled(!playing);
 	if (ImGui::Button(editor->isPaused() ? "▶ 再開" : "|| 一時停止")) editor->setPaused(!editor->isPaused());
@@ -356,6 +372,17 @@ void EditorApp::drawToolbar()
 		if (recorder) ImGui::TextUnformatted("操作を記録しています");
 		else if (replayRun) ImGui::Text("再現テスト %s を流しています", replayRun->name.c_str());
 		else ImGui::TextUnformatted("止めると変更は消えます");
+	}
+
+	if (editor->isPrefabMode())
+	{
+		ImGui::SameLine(0, 24);
+		ImGui::TextColored(ImVec4(0.45f, 0.7f, 1.0f, 1.0f), "プレハブを直しています");
+		if (!returnScene.empty())
+		{
+			ImGui::SameLine();
+			if (ImGui::SmallButton(("← " + returnScene + " に戻る").c_str())) runCommand("prefab.back");
+		}
 	}
 
 	//右端にシーンのファイル名
@@ -510,6 +537,11 @@ void EditorApp::drawHierarchy()
 		{
 			selected = i;
 			if (ImGui::MenuItem("名前を変える", "F2")) startRename(i);
+			if (ImGui::MenuItem("プレハブにする...")) runCommand("prefab.saveSelection");
+			if (const PrefabLink* link = editor->world().getPrefabLink(list[i]))
+			{
+				if (ImGui::MenuItem(("プレハブを開いて直す (" + link->prefab + ")").c_str())) runCommand("prefab.edit");
+			}
 			if (ImGui::MenuItem("複製", "Ctrl+D"))
 			{
 				editor->duplicate(list[i]);
@@ -1183,6 +1215,7 @@ void EditorApp::drawAssets()
 		if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 		{
 			if (f.rfind("scenes/", 0) == 0 && !editor->isPlaying()) request(Pending::OpenScene, f);
+			if (f.rfind("prefabs/", 0) == 0 && !editor->isPlaying()) editPrefab(f);
 		}
 		if (ImGui::BeginDragDropSource())
 		{
@@ -1327,6 +1360,30 @@ void EditorApp::drawPopups()
 			ImGui::CloseCurrentPopup();
 		}
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("今は決めない(状態バーと差分タブから決められる)");
+		ImGui::EndPopup();
+	}
+
+	if (openPrefabSave)
+	{
+		ImGui::OpenPopup("プレハブにする");
+		openPrefabSave = false;
+	}
+	if (ImGui::BeginPopupModal("プレハブにする", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::TextUnformatted("選んだ Entity をプレハブのファイルに書き、この Entity をその配置にする");
+		ImGui::TextDisabled("assets フォルダからの場所(prefabs/ の下)");
+		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+		ImGui::SetNextItemWidth(360);
+		bool enter = ImGui::InputText("##prefabPath", &prefabSavePath, ImGuiInputTextFlags_EnterReturnsTrue);
+		bool exists = AssetDatabase::getInstance().exists(prefabSavePath);
+		if (exists) ImGui::TextColored(COLOR_WARNING, "同じ名前のファイルがあります。上書きします");
+		if (ImGui::Button(exists ? "上書きして保存" : "保存") || enter)
+		{
+			savePrefab(prefabSavePath);
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("やめる")) ImGui::CloseCurrentPopup();
 		ImGui::EndPopup();
 	}
 
@@ -1536,6 +1593,7 @@ bool EditorApp::canStartReplay(std::string* reason) const
 	auto fail = [&](const char* text) { if (reason) *reason = text; return false; };
 	if (recorder || (replayRun && !replayRun->finished)) return fail("記録・再現テストの途中");
 	if (editor->getPath().empty()) return fail("シーンを保存してから(記録は保存したシーンから始める)");
+	if (editor->isPrefabMode()) return fail("プレハブを直している間は記録できない(シーンに戻ってから)");
 	if (editor->isDirty()) return fail("保存していない変更がある(記録・再現テストはシーンを開き直して始める)");
 	return true;
 }
@@ -2184,6 +2242,7 @@ void EditorApp::registerCommands()
 	auto stopped = [this] { return !editor->isPlaying(); };
 	auto playing = [this] { return editor->isPlaying(); };
 	auto hasSelection = [this] { return selected >= 0 && !editor->isPlaying(); };
+	auto hasSelectionNow = hasSelection;
 	auto lastSelected = [this](int count) { selected = static_cast<int>(editor->entities().size()) - count; };
 
 	// ---- ファイル
@@ -2241,6 +2300,28 @@ void EditorApp::registerCommands()
 		if (a.empty()) focusFilter = true;
 		else hierarchyFilter = a;
 	}).argName = "(省略可)絞り込む文字";
+	add("prefab.saveSelection", "選んだ物をプレハブにする", "", 0, hasSelection, [this](const std::string& a) {
+		if (!a.empty())
+		{
+			savePrefab(a);
+			return;
+		}
+		std::string name = editor->displayName(selectedEntity());
+		for (auto& ch : name) if (ch == ' ' || ch == '#' || ch == '[' || ch == ']') ch = '_';
+		prefabSavePath = "prefabs/" + name + ".json";
+		openPrefabSave = true;
+	}).argName = "(省略可)保存先(prefabs/X.json)。省略すると名前を聞く";
+	add("prefab.edit", "選んだ物のプレハブを開いて直す", "", 0, [this, hasSelectionNow] { return hasSelectionNow() && editor->world().getPrefabLink(selectedEntity()) != nullptr; }, [this](const std::string&) {
+		editPrefab(editor->world().getPrefabLink(selectedEntity())->prefab);
+	});
+	{
+		auto& c = add("prefab.open", "プレハブを開いて直す", "", 0, stopped, [this](const std::string& a) { editPrefab(a); });
+		c.choices = [this] { return assetsIn("prefabs", { ".json" }); };
+		c.argName = "プレハブ(prefabs/X.json)";
+	}
+	add("prefab.back", "プレハブからシーンに戻る", "", 0, [this] { return editor->isPrefabMode() && !returnScene.empty(); }, [this](const std::string&) {
+		request(Pending::OpenScene, returnScene);
+	});
 	add("entity.delete", "削除", "Delete", ImGuiKey_Delete, hasSelection, [this](const std::string&) {
 		editor->destroy(selectedEntity());
 		selected = -1;
@@ -2387,6 +2468,25 @@ void EditorApp::startRename(int index)
 	Json name = editor->getField(list[index], "Name", "name");
 	renameText = name.is_string() && !name.get<std::string>().empty() ? name.get<std::string>() : editor->displayName(list[index]);
 	ImGui::SetWindowFocus(WIN_HIERARCHY);
+}
+
+void EditorApp::editPrefab(const std::string& prefab)
+{
+	if (!editor->isPrefabMode() && !editor->getPath().empty()) returnScene = editor->getPath();
+	request(Pending::OpenScene, prefab);
+}
+
+void EditorApp::savePrefab(const std::string& prefab)
+{
+	std::string error, id = prefab;
+	if (id.rfind("prefabs/", 0) != 0) id = "prefabs/" + id;
+	if (id.size() < 5 || id.compare(id.size() - 5, 5, ".json") != 0) id += ".json";
+	if (editor->saveAsPrefab(selectedEntity(), id, error))
+	{
+		log("プレハブにしました: " + id + "(シーンを保存すると、この配置が prefab で書かれる)");
+		refreshAssets(true);
+	}
+	else log("プレハブにできませんでした: " + error, LogLevel::Error);
 }
 
 void EditorApp::checkAllReplays()

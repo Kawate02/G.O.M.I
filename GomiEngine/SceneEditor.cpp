@@ -47,6 +47,37 @@ const std::vector<Json>& SceneEditor::prefabDefs(const AssetID& prefab)
 
 // ---- ファイル
 
+bool SceneEditor::isPrefabPath(const AssetID& id)
+{
+	return id.rfind("prefabs/", 0) == 0;
+}
+
+Json SceneEditor::wrapPrefab(const Json& prefab) const
+{
+	//プレハブは Entity の並びだけなので、見て動かすための System を足してシーンにする
+	return { { "systems", defaultSystems }, { "entities", prefab.value("entities", Json::array()) }, { "ui", Json::array() } };
+}
+
+Json SceneEditor::readAsScene(const AssetID& id)
+{
+	Json data = AssetDatabase::getInstance().readJson(id);
+	if (!isPrefabPath(id)) return data;
+	if (!data.is_object() || !data.contains("entities")) throw std::runtime_error(id + ": a prefab needs \"entities\"");
+	for (auto& [key, v] : data.items())
+	{
+		if (key != "entities") throw std::runtime_error(id + ": unknown key in a prefab: \"" + key + "\"");
+	}
+	return wrapPrefab(data);
+}
+
+Json SceneEditor::fileContent(const AssetID& id)
+{
+	if (!isPrefabPath(id)) return snapshot();
+	Json entitiesJson = Json::array();
+	for (auto& e : entities()) entitiesJson.push_back({ { "components", SceneLoader::compact(SceneLoader::componentsOf(*currentWorld, e)) } });
+	return { { "entities", entitiesJson } };
+}
+
 void SceneEditor::newScene()
 {
 	if (playing) stop();
@@ -74,7 +105,7 @@ bool SceneEditor::open(const std::string& scene, std::string& error)
 	AssetID id = SceneLoader::scenePath(scene);
 	try
 	{
-		Json data = AssetDatabase::getInstance().readJson(id);
+		Json data = readAsScene(id);
 		AssetID old = path;
 		auto oldCache = prefabCache;
 		path = id;
@@ -120,10 +151,10 @@ bool SceneEditor::saveAs(const AssetID& id, std::string& error)
 		error = "stop playing before saving";
 		return false;
 	}
-	Json scene = snapshot();
+	Json content = fileContent(id);
 	try
 	{
-		AssetDatabase::getInstance().writeJson(id, scene);
+		AssetDatabase::getInstance().writeJson(id, content);
 	}
 	catch (const std::exception& e)
 	{
@@ -131,7 +162,7 @@ bool SceneEditor::saveAs(const AssetID& id, std::string& error)
 		return false;
 	}
 	path = id;
-	savedScene = scene;
+	savedScene = isPrefabPath(id) ? wrapPrefab(content) : content;
 	scenePending = false;
 	rememberStamp(id); //自分の保存は「外で変わった」に数えない
 	dirty = false;
@@ -172,6 +203,42 @@ std::string SceneEditor::displayName(Entity e)
 		if (list[i].id == e.id) return names[i];
 	}
 	return "Entity";
+}
+
+bool SceneEditor::saveAsPrefab(Entity e, const AssetID& id, std::string& error)
+{
+	if (playing || !currentWorld->alive(e))
+	{
+		error = playing ? "stop playing first" : "no entity";
+		return false;
+	}
+	if (!isPrefabPath(id))
+	{
+		error = "a prefab must be under prefabs/: " + id;
+		return false;
+	}
+	Json file = { { "entities", Json::array({ { { "components", SceneLoader::compact(SceneLoader::componentsOf(*currentWorld, e)) } } }) } };
+	try
+	{
+		AssetDatabase::getInstance().writeJson(id, file);
+	}
+	catch (const std::exception& ex)
+	{
+		error = ex.what();
+		return false;
+	}
+	rememberStamp(id);
+	recordUndo();
+	//その Entity を新しいプレハブの配置にする(配置の番号は今ある物の次)
+	int instance = 0;
+	for (auto& other : entities())
+	{
+		if (const PrefabLink* l = currentWorld->getPrefabLink(other)) instance = std::max(instance, l->instance + 1);
+	}
+	prefabCache.erase(id);
+	prefabDefs(id);
+	currentWorld->setPrefabLink(e, PrefabLink{ id, 0, instance });
+	return true;
 }
 
 void SceneEditor::rename(Entity e, const std::string& name)
@@ -413,7 +480,7 @@ SceneEditor::FileCheck SceneEditor::checkFiles()
 		Json disk;
 		try
 		{
-			disk = db.readJson(path);
+			disk = readAsScene(path);
 		}
 		catch (const std::exception& e)
 		{
@@ -451,7 +518,7 @@ bool SceneEditor::reloadFromFile(std::string& error)
 	Json disk;
 	try
 	{
-		disk = AssetDatabase::getInstance().readJson(path);
+		disk = readAsScene(path);
 	}
 	catch (const std::exception& e)
 	{
@@ -543,7 +610,7 @@ void SceneEditor::redo()
 
 void SceneEditor::play()
 {
-	if (playing) return;
+	if (playing || isPrefabMode()) return; //プレハブはシーンに置いてから動かす
 	playSnapshot = snapshot();
 	playing = true;
 	paused = false;

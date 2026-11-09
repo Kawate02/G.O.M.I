@@ -282,6 +282,38 @@ int main()
 		w.stop();
 		CHECK(w.checkFiles().sceneConflict); // やり直しで未保存になっているので待つ
 
+		// ---- プレハブにする・プレハブを開いて直す
+		w.reloadFromFile(error);
+		Entity box = w.createEntity("Box");
+		w.addComponent(box, "MeshRenderer");
+		w.setField(box, "Transform", "position", Json::parse("[3, 0, 0]"));
+		CHECK(!w.saveAsPrefab(box, "scenes/bad.json", error)); // prefabs/ の下だけ
+		CHECK(w.saveAsPrefab(box, "prefabs/box.json", error));
+		Json boxFile = db.readJson("prefabs/box.json");
+		CHECK(boxFile["entities"].size() == 1);
+		CHECK(boxFile["entities"][0]["components"]["Name"]["name"] == "Box");
+		CHECK(!boxFile["entities"][0]["components"]["Transform"].contains("rotation")); // 既定値の項目は書かない(scale の既定は 0 なので書かれる)
+		CHECK(w.world().getPrefabLink(w.entities().back()) != nullptr);
+		CHECK(w.save(error));
+		Json saved = db.readJson("scenes/Field.json");
+		CHECK(saved["entities"].back()["prefab"] == "prefabs/box.json");
+		CHECK(w.checkFiles().changed.empty()); // 自分で書いたプレハブは外の変更に数えない
+
+		CHECK(w.open("prefabs/box.json", error) && w.isPrefabMode());
+		CHECK(w.entities().size() == 1 && w.displayName(w.entities()[0]) == "Box");
+		w.play();
+		CHECK(!w.isPlaying()); // プレハブは再生しない
+		w.recordUndo();
+		w.setField(w.entities()[0], "MeshRenderer", "color", Json::parse("[0.1, 0.2, 0.3]"));
+		CHECK(w.changesFromSaved().size() == 1);
+		CHECK(w.save(error));
+		boxFile = db.readJson("prefabs/box.json");
+		CHECK(boxFile.size() == 1 && boxFile.contains("entities")); // プレハブの形のまま
+		CHECK(boxFile["entities"][0]["components"]["MeshRenderer"]["color"][2].get<float>() > 0.29f);
+		CHECK(w.changesFromSaved().empty());
+		CHECK(w.open("Field", error) && !w.isPrefabMode());
+		CHECK(w.getField(w.entities().back(), "MeshRenderer", "color")[2].get<float>() > 0.29f); // シーンの配置に反映
+
 		db.setRoot(AssetDatabase::findRoot(""));
 		fs::remove_all(copy);
 	}

@@ -240,6 +240,18 @@ Json SceneLoader::diff(const Json& base, const Json& current)
 	return out;
 }
 
+Json SceneLoader::compact(const Json& components)
+{
+	Json out = Json::object();
+	for (auto& [name, fields] : components.items())
+	{
+		Json defaults = normalize(Json{ { name, Json::object() } });
+		Json d = defaults.contains(name) ? diff(defaults[name], fields) : fields;
+		out[name] = d.is_object() ? d : Json::object();
+	}
+	return out;
+}
+
 std::vector<Entity> SceneLoader::instantiate(World& world, const AssetID& prefabId, const Json& overrides)
 {
 	Json item = { { "prefab", prefabId } };
