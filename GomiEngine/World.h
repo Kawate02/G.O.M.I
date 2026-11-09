@@ -77,6 +77,11 @@ public:
 	void addSystem(const std::string& name);
 	UIHandle spawnUI(const AssetID& prefab, Vec2 pos, int layer);
 	inline void setPauseUI(const AssetID& path) { pauseUIPath = path; }
+	/// <summary>
+	/// シーンの JSON に入らない、動いている間の状態(フレーム数・ポーズ中か)。巻き戻しで覚えて戻す
+	/// </summary>
+	Json runState() const;
+	void restoreRunState(const Json& state);
 	inline const std::vector<std::string>& getSystemNames() const { return systemNames; }
 	inline const Json& getUIEntries() const { return uiEntries; }
 	inline void setUIEntries(const Json& entries) { uiEntries = entries; }

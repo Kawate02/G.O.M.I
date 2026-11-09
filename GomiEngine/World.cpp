@@ -112,3 +112,18 @@ void World::flushDestroyed()
 	}
 	pendingDestroy.clear();
 }
+Json World::runState() const
+{
+	return { { "frameCount", frameCount }, { "pause", pause } };
+}
+
+void World::restoreRunState(const Json& state)
+{
+	frameCount = state.value("frameCount", 0);
+	bool paused = state.value("pause", false);
+	if (paused && !pause && !pauseUIPath.empty())
+	{
+		pauseUI = spawnUI(pauseUIPath, { 0, 0 }, 1);
+		pause = true;
+	}
+}

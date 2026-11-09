@@ -51,6 +51,7 @@ namespace
 	const ImVec4 COLOR_OK(0.45f, 0.8f, 0.4f, 1.0f);
 	const ImVec4 COLOR_RECORD(0.9f, 0.25f, 0.25f, 1.0f);
 	const int FAST_STEPS = 30; //速く流す時に1回の表示で進めるコマ数
+	const int SNAPSHOT_EVERY = 60; //記録を流す時、巻き戻し用に状態を覚える間隔(フレーム)
 }
 
 EditorApp::EditorApp(const DebugOptions& options) : debug(options)
@@ -1682,6 +1683,8 @@ void EditorApp::endReplay()
 	summary.passed = run.check->passed(run.replay);
 	summary.lines = run.check->report(run.replay, run.name);
 	for (auto& line : summary.lines) log(line, summary.passed ? LogLevel::Info : LogLevel::Warning);
+	if (!summary.passed && run.restored && !summary.update)
+		log("巻き戻した所から流した結果です。覚えた状態に入らない値があると違いが出るので、最初から流して確かめてください", LogLevel::Warning);
 	replaySummaries[run.name] = summary;
 }
 
@@ -1691,7 +1694,27 @@ void EditorApp::seekReplay(int frame)
 	frame = std::clamp(frame, 1, replayRun->replay.length);
 	if (frame <= editor->getPlayFrame())
 	{
-		//戻る時は最初から流し直す(毎回同じ結果になるので、同じ所に着く)
+		//戻る時は、その前で一番近い覚えた状態から流し直す(毎回同じ結果になるので、同じ所に着く)
+		auto it = replayRun->snapshots.upper_bound(frame);
+		if (it != replayRun->snapshots.begin())
+		{
+			--it;
+			auto& s = it->second;
+			std::string error;
+			if (editor->restorePlayState(s.state, error))
+			{
+				Random::loadState(s.random);
+				replayRun->player = s.player;
+				replayRun->check = s.check;
+				replayRun->lastChecked = s.lastChecked;
+				replayRun->finished = false;
+				replayRun->restored = true;
+				replayRun->seekTo = frame > it->first ? frame : 0;
+				editor->setPaused(frame == it->first);
+				return;
+			}
+			log("覚えた状態に戻せませんでした(最初から流し直します): " + error, LogLevel::Warning);
+		}
 		std::string name = replayRun->name;
 		auto mode = replayRun->check->getMode();
 		bool fast = replayRun->fast;
@@ -1733,6 +1756,11 @@ void EditorApp::afterReplayFrame()
 		Json state = { { "scene", editor->getPlayScene() }, { "frame", frame }, { "world", SceneLoader::save(editor->world()) } };
 		auto& result = run.check->checkpoint(frame, state, [&](const std::string& path) { return drawer.captureScreen(path); });
 		if (run.check->getMode() == ReplayCheck::Mode::Check && !result.ok()) log(run.name + ": フレーム " + std::to_string(frame) + " が基準と違います", LogLevel::Warning);
+	}
+	//巻き戻し用に状態を覚える(確認点で比べた後の結果ごと)
+	if (frame > 0 && frame % SNAPSHOT_EVERY == 0 && !run.snapshots.count(frame))
+	{
+		run.snapshots.emplace(frame, ReplayRun::Snapshot{ editor->playState(), Random::saveState(), *run.player, *run.check, run.lastChecked });
 	}
 	if (run.seekTo > 0 && frame >= run.seekTo)
 	{
@@ -2411,6 +2439,17 @@ void EditorApp::registerCommands()
 		update.choices = names;
 		update.argName = "再現テストの名前";
 	}
+
+	add("replay.seek", "再現テストの場面へ進む・戻る", "", 0, [this] { return replayRun.has_value(); }, [this](const std::string& a) {
+		try
+		{
+			seekReplay(std::stoi(a));
+		}
+		catch (...)
+		{
+			log("フレームの番号を渡してください: " + a, LogLevel::Error);
+		}
+	}).argName = "フレーム番号";
 
 	// ---- 表示
 	add("gizmo.move", "ギズモ: 移動", "W", ImGuiKey_W, nullptr, [this](const std::string&) { gizmoOperation = 0; });

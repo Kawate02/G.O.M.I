@@ -698,6 +698,34 @@ void SceneEditor::stop()
 	rebuild(playSnapshot);
 }
 
+Json SceneEditor::playState()
+{
+	return { { "world", SceneLoader::save(*currentWorld) }, { "scene", playScene }, { "frame", playFrame }, { "run", currentWorld->runState() } };
+}
+
+bool SceneEditor::restorePlayState(const Json& state, std::string& error)
+{
+	if (!playing)
+	{
+		error = "not playing";
+		return false;
+	}
+	try
+	{
+		rebuild(state.at("world"));
+		currentWorld->restoreRunState(state.value("run", Json::object()));
+	}
+	catch (const std::exception& e)
+	{
+		error = e.what();
+		return false;
+	}
+	playScene = state.value("scene", playScene);
+	playFrame = state.value("frame", 0);
+	stepRequested = false;
+	return true;
+}
+
 void SceneEditor::setPaused(bool value)
 {
 	if (!playing) return;

@@ -144,6 +144,17 @@ private:
 		bool fast = false;     //1フレームに何コマも進める
 		bool finished = false;
 		int lastChecked = 0;   //比べ済みの確認点
+		//巻き戻し用に覚えた状態(SNAPSHOT_EVERY フレームごと)
+		struct Snapshot
+		{
+			Json state;          //SceneEditor::playState()
+			std::string random;
+			ReplayPlayer player;
+			ReplayCheck check;
+			int lastChecked = 0;
+		};
+		std::map<int, Snapshot> snapshots;
+		bool restored = false; //覚えた状態から流し直した(結果が違えば、最初から流して確かめるよう出す)
 	};
 	struct ReplaySummary
 	{

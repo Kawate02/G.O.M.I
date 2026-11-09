@@ -203,6 +203,14 @@ public:
 	void stepFrame();
 	inline int getPlayFrame() const { return playFrame; }
 	/// <summary>
+	/// 再生中の今の状態(World・シーンの名前・フレーム・ポーズなど)。巻き戻し用
+	/// </summary>
+	Json playState();
+	/// <summary>
+	/// 再生中に playState() で覚えた状態に戻す(再生前の状態は変えない)
+	/// </summary>
+	bool restorePlayState(const Json& state, std::string& error);
+	/// <summary>
 	/// 次の update でゲームが1フレーム進むか(記録・再生の入力をその時だけ渡す)
 	/// </summary>
 	inline bool willAdvance() const { return playing && (!paused || stepRequested); }
