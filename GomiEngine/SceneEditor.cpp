@@ -26,11 +26,23 @@ void SceneEditor::rebuild(const Json& scene)
 	next->initialize(scene, path.empty() ? "(new scene)" : path);
 	if (currentWorld) currentWorld->release();
 	currentWorld = std::move(next);
+	//作った時のプレハブの中身を覚える(外でプレハブが変わっても、overrides を自分の変更だけにする)
+	for (auto& e : currentWorld->getEntities())
+	{
+		if (const PrefabLink* link = currentWorld->alive(e) ? currentWorld->getPrefabLink(e) : nullptr) prefabDefs(link->prefab);
+	}
 }
 
 Json SceneEditor::snapshot()
 {
-	return SceneLoader::save(*currentWorld);
+	return SceneLoader::save(*currentWorld, [this](const AssetID& id) { return prefabDefs(id); });
+}
+
+const std::vector<Json>& SceneEditor::prefabDefs(const AssetID& prefab)
+{
+	auto it = prefabCache.find(prefab);
+	if (it == prefabCache.end()) it = prefabCache.emplace(prefab, SceneLoader::prefabComponents(prefab)).first;
+	return it->second;
 }
 
 // ---- ファイル
@@ -47,7 +59,10 @@ void SceneEditor::newScene()
 		{ "Name", { { "name", "Light" } } },
 		{ "Light", Json::object() } } } });
 	path.clear();
+	prefabCache.clear();
 	rebuild(scene);
+	savedScene = snapshot();
+	scenePending = false;
 	undoStack.clear();
 	redoStack.clear();
 	dirty = false;
@@ -61,7 +76,9 @@ bool SceneEditor::open(const std::string& scene, std::string& error)
 	{
 		Json data = AssetDatabase::getInstance().readJson(id);
 		AssetID old = path;
+		auto oldCache = prefabCache;
 		path = id;
+		prefabCache.clear();
 		try
 		{
 			rebuild(data);
@@ -69,17 +86,19 @@ bool SceneEditor::open(const std::string& scene, std::string& error)
 		catch (...)
 		{
 			path = old;
+			prefabCache = oldCache;
 			throw;
 		}
+		savedScene = data;
 	}
 	catch (const std::exception& e)
 	{
 		error = e.what();
 		return false;
 	}
+	scenePending = false;
 	undoStack.clear();
 	redoStack.clear();
-	prefabCache.clear();
 	dirty = false;
 	return true;
 }
@@ -101,9 +120,10 @@ bool SceneEditor::saveAs(const AssetID& id, std::string& error)
 		error = "stop playing before saving";
 		return false;
 	}
+	Json scene = snapshot();
 	try
 	{
-		AssetDatabase::getInstance().writeJson(id, snapshot());
+		AssetDatabase::getInstance().writeJson(id, scene);
 	}
 	catch (const std::exception& e)
 	{
@@ -111,6 +131,9 @@ bool SceneEditor::saveAs(const AssetID& id, std::string& error)
 		return false;
 	}
 	path = id;
+	savedScene = scene;
+	scenePending = false;
+	rememberStamp(id); //自分の保存は「外で変わった」に数えない
 	dirty = false;
 	return true;
 }
@@ -271,22 +294,9 @@ Json SceneEditor::prefabField(Entity e, const std::string& component, const std:
 {
 	const PrefabLink* link = currentWorld->getPrefabLink(e);
 	if (!link) return Json();
-	auto it = prefabCache.find(link->prefab);
-	if (it == prefabCache.end())
-	{
-		std::vector<Json> list;
-		try
-		{
-			Json prefab = AssetDatabase::getInstance().readJson(link->prefab);
-			for (auto& def : prefab.value("entities", Json::array())) list.push_back(SceneLoader::normalize(def.value("components", Json::object())));
-		}
-		catch (const std::exception&)
-		{
-		}
-		it = prefabCache.emplace(link->prefab, std::move(list)).first;
-	}
-	if (link->index < 0 || link->index >= static_cast<int>(it->second.size())) return Json();
-	const Json& comps = it->second[link->index];
+	const auto& defs = prefabDefs(link->prefab);
+	if (link->index < 0 || link->index >= static_cast<int>(defs.size())) return Json();
+	const Json& comps = defs[link->index];
 	if (!comps.contains(component) || !comps[component].contains(field)) return Json();
 	return comps[component][field];
 }
@@ -297,6 +307,178 @@ bool SceneEditor::revertToPrefab(Entity e, const std::string& component, const s
 	if (value.is_null()) return false;
 	recordUndo();
 	return setField(e, component, field, value);
+}
+
+// ---- 保存済みとの差・外で変わったファイル
+
+std::vector<SceneChange> SceneEditor::changesFromSaved()
+{
+	return SceneDiff::compare(savedScene, playing ? playSnapshot : snapshot());
+}
+
+std::map<AssetID, SceneEditor::FileStamp> SceneEditor::scanFiles() const
+{
+	namespace fs = std::filesystem;
+	std::map<AssetID, FileStamp> stamps;
+	const fs::path& root = AssetDatabase::getInstance().getRoot();
+	std::error_code ec;
+	for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
+	{
+		if (!it->is_regular_file(ec) || it->path().extension() != ".json") continue;
+		FileStamp s;
+		s.time = it->last_write_time(ec);
+		s.size = it->file_size(ec);
+		stamps[fs::relative(it->path(), root, ec).generic_string()] = s;
+	}
+	return stamps;
+}
+
+void SceneEditor::rememberStamp(const AssetID& id)
+{
+	if (!filesWatched) return;
+	std::error_code ec;
+	auto file = AssetDatabase::getInstance().resolve(id);
+	FileStamp s;
+	s.time = std::filesystem::last_write_time(file, ec);
+	if (!ec) s.size = std::filesystem::file_size(file, ec);
+	if (!ec) fileStamps[id] = s;
+}
+
+SceneEditor::FileCheck SceneEditor::checkFiles()
+{
+	FileCheck result;
+	if (playing) return result; //止めた時に調べる
+	auto now = scanFiles();
+	if (!filesWatched)
+	{
+		fileStamps = std::move(now);
+		filesWatched = true;
+		return result;
+	}
+	for (auto& [id, stamp] : now)
+	{
+		auto it = fileStamps.find(id);
+		if (it == fileStamps.end() || !(it->second == stamp)) result.changed.push_back(id);
+	}
+	for (auto& [id, stamp] : fileStamps)
+	{
+		if (!now.count(id)) result.changed.push_back(id);
+	}
+	fileStamps = std::move(now);
+	if (result.changed.empty()) return result;
+
+	bool sceneHit = false;
+	bool others = false;
+	for (auto& id : result.changed)
+	{
+		if (!path.empty() && id == path) sceneHit = true;
+		else others = true;
+	}
+
+	//プレハブ・UI・project.json: 自分の変更を残したまま作り直す
+	if (others)
+	{
+		Json scene = snapshot(); //読み込んだ時のプレハブとの差で書く
+		auto oldCache = prefabCache;
+		Json oldProject = project;
+		auto& db = AssetDatabase::getInstance();
+		prefabCache.clear();
+		try
+		{
+			project = db.exists("project.json") ? db.readJson("project.json") : Json::object();
+			rebuild(scene);
+			result.refreshed = true;
+		}
+		catch (const std::exception& e)
+		{
+			prefabCache = oldCache;
+			project = oldProject;
+			result.error = e.what();
+		}
+	}
+
+	if (sceneHit)
+	{
+		auto& db = AssetDatabase::getInstance();
+		if (!db.exists(path))
+		{
+			result.error = path + ": the file was removed (save to write it again)";
+			dirty = true;
+			return result;
+		}
+		Json disk;
+		try
+		{
+			disk = db.readJson(path);
+		}
+		catch (const std::exception& e)
+		{
+			result.error = e.what();
+			return result;
+		}
+		if (disk == savedScene) return result; //中身は同じ
+		diskScene = disk;
+		if (dirty)
+		{
+			scenePending = true;
+			result.sceneConflict = true;
+			return result;
+		}
+		std::string error;
+		if (reloadFromFile(error)) result.reloaded = true;
+		else result.error = error;
+	}
+	return result;
+}
+
+std::vector<SceneChange> SceneEditor::fileChanges()
+{
+	return SceneDiff::compare(savedScene, diskScene);
+}
+
+bool SceneEditor::reloadFromFile(std::string& error)
+{
+	if (playing) stop();
+	if (path.empty())
+	{
+		error = "no file to reload";
+		return false;
+	}
+	Json disk;
+	try
+	{
+		disk = AssetDatabase::getInstance().readJson(path);
+	}
+	catch (const std::exception& e)
+	{
+		error = e.what();
+		return false;
+	}
+	Json before = snapshot();
+	try
+	{
+		rebuild(disk);
+	}
+	catch (const std::exception& e)
+	{
+		error = e.what();
+		return false;
+	}
+	undoStack.push_back(before);
+	if (undoStack.size() > MAX_UNDO) undoStack.erase(undoStack.begin());
+	redoStack.clear();
+	savedScene = disk;
+	diskScene = disk;
+	scenePending = false;
+	dirty = false;
+	return true;
+}
+
+void SceneEditor::keepEdits()
+{
+	savedScene = diskScene; //差分は「保存したら上書きされる所」になる
+	scenePending = false;
+	dirty = true;
 }
 
 // ---- System

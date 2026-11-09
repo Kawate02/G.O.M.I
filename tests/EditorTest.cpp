@@ -3,6 +3,7 @@
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 
 static int failures = 0;
@@ -149,6 +150,120 @@ int main()
 	CHECK(editor.systems().size() == 9);
 
 	std::filesystem::remove(tmp);
+
+	// ---- 保存済みとの差・外で変わったファイル(assets のコピーで試す)
+	{
+		namespace fs = std::filesystem;
+		fs::path copy = fs::temp_directory_path() / "gomi_editor_watch";
+		fs::remove_all(copy);
+		fs::copy(db.getRoot(), copy, fs::copy_options::recursive);
+		db.setRoot(copy);
+		auto writeText = [&](const std::string& id, const std::string& text) {
+			std::ofstream(db.resolve(id), std::ios::binary) << text;
+		};
+		auto has = [](const std::vector<SceneChange>& list, SceneChange::Kind kind, const std::string& entity, const std::string& field = "") {
+			for (auto& c : list)
+				if (c.kind == kind && c.entity == entity && (field.empty() || c.field == field)) return true;
+			return false;
+		};
+		using Kind = SceneChange::Kind;
+
+		SceneEditor w(input, render, audio);
+		CHECK(w.open("Field", error));
+		CHECK(w.changesFromSaved().empty());
+		CHECK(w.checkFiles().changed.empty()); // 最初は覚えるだけ
+
+		// 項目の変更・Entity の追加・削除が、Entity・コンポーネント・項目の単位で出る
+		Entity p = w.entities()[0];
+		w.recordUndo();
+		w.setField(p, "Transform", "position", Json::parse("[7, 8, 9]"));
+		w.createEntity("box");
+		auto changes = w.changesFromSaved();
+		CHECK(changes.size() == 2);
+		CHECK(has(changes, Kind::FieldChanged, "player.json [0]", "position"));
+		CHECK(has(changes, Kind::EntityAdded, "box"));
+		CHECK(changes[0].text() == "player.json [0] > Transform.position: [100.0,300.0,0.0] -> [7.0,8.0,9.0]");
+		w.destroy(w.entities()[0]);
+		CHECK(has(w.changesFromSaved(), Kind::EntityRemoved, "player.json [0]"));
+		w.undo();
+		w.undo();
+		w.undo();
+
+		// 自分の保存は外の変更に数えない。保存したら差は無くなる
+		p = w.entities()[0];
+		w.recordUndo();
+		w.setField(p, "Transform", "position", Json::parse("[1, 1, 0]"));
+		CHECK(w.save(error));
+		CHECK(w.changesFromSaved().empty());
+		CHECK(w.checkFiles().changed.empty());
+
+		// 外で変わった: 未保存の変更が無ければ読み直す(元に戻せる)
+		Json scene = db.readJson("scenes/Field.json");
+		scene["entities"][0]["overrides"]["Transform"]["position"] = Json::parse("[555, 1, 0]");
+		writeText("scenes/Field.json", scene.dump(2));
+		auto check = w.checkFiles();
+		CHECK(check.reloaded && !check.sceneConflict && check.error.empty());
+		CHECK(w.getField(w.entities()[0], "Transform", "position") == Json::parse("[555.0, 1.0, 0.0]"));
+		CHECK(!w.isDirty() && w.canUndo() && w.changesFromSaved().empty());
+
+		// 未保存の変更があれば待つ。外の変更が見え、「このまま」か「読み直す」を選べる
+		w.recordUndo();
+		w.setField(w.entities()[0], "Move", "maxSpeed", 1);
+		scene["entities"][0]["overrides"]["Transform"]["position"] = Json::parse("[666, 1, 0]");
+		writeText("scenes/Field.json", scene.dump(2));
+		check = w.checkFiles();
+		CHECK(check.sceneConflict && !check.reloaded && w.hasSceneConflict());
+		CHECK(w.getField(w.entities()[0], "Move", "maxSpeed") == Json(1.0));
+		auto outside = w.fileChanges();
+		CHECK(outside.size() == 1 && has(outside, Kind::FieldChanged, "player.json [0]", "position"));
+		w.keepEdits();
+		CHECK(!w.hasSceneConflict() && w.isDirty());
+		CHECK(has(w.changesFromSaved(), Kind::FieldChanged, "player.json [0]", "position")); // 保存すると 666 を上書きする所
+
+		scene["entities"][0]["overrides"]["Transform"]["position"] = Json::parse("[777, 1, 0]");
+		writeText("scenes/Field.json", scene.dump(4));
+		CHECK(w.checkFiles().sceneConflict);
+		CHECK(w.reloadFromFile(error));
+		CHECK(!w.isDirty() && !w.hasSceneConflict());
+		CHECK(w.getField(w.entities()[0], "Transform", "position") == Json::parse("[777.0, 1.0, 0.0]"));
+		CHECK(w.getField(w.entities()[0], "Move", "maxSpeed") == Json(400.0));
+		w.undo(); // 読み直す前の自分の変更に戻れる
+		CHECK(w.getField(w.entities()[0], "Move", "maxSpeed") == Json(1.0));
+		w.redo();
+
+		// プレハブが外で変わった: 読み直し、シーン側の変更(overrides)は残す
+		Json prefab = db.readJson("prefabs/player.json");
+		prefab["entities"][0]["components"]["Move"]["maxSpeed"] = 123;
+		writeText("prefabs/player.json", prefab.dump(2));
+		check = w.checkFiles();
+		CHECK(check.refreshed && check.error.empty());
+		CHECK(w.getField(w.entities()[0], "Move", "maxSpeed") == Json(123.0));
+		CHECK(w.getField(w.entities()[0], "Transform", "position") == Json::parse("[777.0, 1.0, 0.0]"));
+		CHECK(w.changesFromSaved().empty());
+
+		// 書きかけ・壊れたファイルは読まずに今のまま。直ったら読む
+		writeText("prefabs/player.json", "{ \"entities\": [");
+		check = w.checkFiles();
+		CHECK(!check.error.empty() && !check.refreshed);
+		CHECK(w.getField(w.entities()[0], "Move", "maxSpeed") == Json(123.0));
+		CHECK(w.prefabField(w.entities()[0], "Move", "maxSpeed") == Json(123.0)); // プレハブとのつながりも残る
+		prefab["entities"][0]["components"]["Move"]["maxSpeed"] = 321;
+		writeText("prefabs/player.json", prefab.dump(2));
+		CHECK(w.checkFiles().refreshed);
+		CHECK(w.getField(w.entities()[0], "Move", "maxSpeed") == Json(321.0));
+
+		// 再生中は調べない(止めてから)
+		w.play();
+		scene["entities"][0]["overrides"]["Transform"]["position"] = Json::parse("[888, 1, 0]");
+		writeText("scenes/Field.json", scene.dump(2));
+		CHECK(w.checkFiles().changed.empty());
+		w.stop();
+		CHECK(w.checkFiles().sceneConflict); // やり直しで未保存になっているので待つ
+
+		db.setRoot(AssetDatabase::findRoot(""));
+		fs::remove_all(copy);
+	}
+
 	if (failures == 0) std::cout << "EditorTest: all passed" << std::endl;
 	return failures == 0 ? 0 : 1;
 }

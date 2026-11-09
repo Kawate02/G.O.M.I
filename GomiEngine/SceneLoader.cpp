@@ -263,7 +263,28 @@ std::vector<Entity> SceneLoader::instantiate(World& world, const AssetID& prefab
 	return result;
 }
 
+std::vector<Json> SceneLoader::prefabComponents(const AssetID& prefabId)
+{
+	std::vector<Json> list;
+	try
+	{
+		Json prefab = AssetDatabase::getInstance().readJson(prefabId);
+		for (auto& def : prefab.value("entities", Json::array())) list.push_back(normalize(def.value("components", Json::object())));
+	}
+	catch (const std::exception&)
+	{
+		//プレハブが消えていたら空(つながりを切って展開して書く)
+		list.clear();
+	}
+	return list;
+}
+
 Json SceneLoader::save(World& world)
+{
+	return save(world, prefabComponents);
+}
+
+Json SceneLoader::save(World& world, const std::function<std::vector<Json>(const AssetID&)>& prefabs)
 {
 	Json scene = Json::object();
 	scene["systems"] = world.getSystemNames();
@@ -273,17 +294,7 @@ Json SceneLoader::save(World& world)
 	auto prefabEntities = [&](const AssetID& id) -> const std::vector<Json>& {
 		auto it = prefabCache.find(id);
 		if (it != prefabCache.end()) return it->second;
-		std::vector<Json> list;
-		try
-		{
-			Json prefab = AssetDatabase::getInstance().readJson(id);
-			for (auto& def : prefab.value("entities", Json::array())) list.push_back(normalize(def.value("components", Json::object())));
-		}
-		catch (const std::exception&)
-		{
-			//プレハブが消えていたら、つながりを切って展開して書く
-		}
-		return prefabCache[id] = list;
+		return prefabCache[id] = prefabs(id);
 	};
 
 	//同じ配置(instance)の仲間を集める

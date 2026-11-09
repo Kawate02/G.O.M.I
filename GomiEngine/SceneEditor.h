@@ -2,6 +2,10 @@
 #include "World.h"
 #include "SceneLoader.h"
 #include "EventRequest.h"
+#include "SceneDiff.h"
+
+#include <filesystem>
+#include <map>
 
 #include <memory>
 #include <string>
@@ -33,9 +37,23 @@ private:
 	std::unordered_map<AssetID, std::vector<Json>> prefabCache; //プレハブの各 Entity のコンポーネント(既定値で埋めたもの)
 	EventRequest<std::string> worldChange{ Event::World_Change };
 	EventRequest<int> quitRequest{ Event::Game_Quit };
+	Json savedScene;       //開いた・保存した時のファイルの中身(差分の元)
+	struct FileStamp
+	{
+		std::filesystem::file_time_type time;
+		uintmax_t size = 0;
+		bool operator==(const FileStamp& o) const { return time == o.time && size == o.size; }
+	};
+	std::map<AssetID, FileStamp> fileStamps; //assets の JSON の前回の更新時刻
+	bool filesWatched = false;
+	bool scenePending = false; //開いているシーンが外で変わったが、未保存の変更があるので待っている
+	Json diskScene;            //その時のファイルの中身
 
 	void rebuild(const Json& scene);
 	Json snapshot();
+	const std::vector<Json>& prefabDefs(const AssetID& prefab);
+	std::map<AssetID, FileStamp> scanFiles() const;
+	void rememberStamp(const AssetID& id);
 public:
 	static constexpr size_t MAX_UNDO = 100;
 
@@ -84,6 +102,37 @@ public:
 	/// プレハブを読み直す(外でプレハブが変わった時)
 	/// </summary>
 	inline void clearPrefabCache() { prefabCache.clear(); }
+
+	// ---- 保存済みとの差・外で変わったファイル
+	/// <summary>
+	/// 保存済み(開いた・保存した時のファイル)から今の状態への違い。再生中は再生前の状態と比べる
+	/// </summary>
+	std::vector<SceneChange> changesFromSaved();
+	struct FileCheck
+	{
+		std::vector<AssetID> changed; //変わった・増えた・消えた JSON
+		bool reloaded = false;        //開いているシーンを読み直した(未保存の変更が無かった)
+		bool sceneConflict = false;   //開いているシーンが変わったが、未保存の変更があるので待っている
+		bool refreshed = false;       //プレハブ・UI 等を読み直した(自分の変更は残る)
+		std::string error;            //読めなかった(書きかけ・壊れている)。今の状態のまま
+	};
+	/// <summary>
+	/// assets の JSON が外で変わったか調べ、変わっていれば読み直す。最初の呼び出しは覚えるだけ。再生中は何もしない
+	/// </summary>
+	FileCheck checkFiles();
+	inline bool hasSceneConflict() const { return scenePending; }
+	/// <summary>
+	/// 外でファイルに入った変更(保存済み → 今のファイル)
+	/// </summary>
+	std::vector<SceneChange> fileChanges();
+	/// <summary>
+	/// 未保存の変更を捨ててファイルを読み直す(元に戻すで今の状態に戻れる)
+	/// </summary>
+	bool reloadFromFile(std::string& error);
+	/// <summary>
+	/// 外の変更を読まずに今の状態を続ける(次の保存でファイルを上書きする)
+	/// </summary>
+	void keepEdits();
 
 	// ---- System の並び
 	std::vector<std::string> systems();
