@@ -68,6 +68,7 @@ Visual Studio で開く時は、フォルダを開く(CMake として読み込�
 - ▶ 再生(F5)でゲームとして動かし、■ 停止で再生前の状態に戻る(再生中の変更は残らない。再生中は帯と枠がオレンジ)。一時停止(F6)・1コマ送り(F7)。「Δt 1/60 固定」なら毎回同じ結果になる
 - 下の状態バーに、再生の状態・フレーム・FPS・選択・未保存と、最後の警告/エラー(押すとログを開く)が出る
 - Ctrl+Z / Ctrl+Y で元に戻す・やり直す、Ctrl+S で保存、Ctrl+D で複製、Delete で削除
+- Ctrl+Shift+P でコマンドパレット。全操作を名前か ID(`scene.open` など)で探して Enter で実行する(↑↓ で選ぶ。最近使った物が上)。シーン・プレハブ・Entity・再現テストを選ぶ物は候補ごとに1行出る。メニューとショートカットも同じコマンドを呼ぶ
 - 保存すると、プレハブから置いた物は `prefab` + 変えた項目だけの `overrides` で書かれる。プレハブの2番目以降を変えたり、コンポーネントを外したりすると、つながりを切って中身を全部書く
 - 保存していない変更があると、開く・新規・終了の前に確認が出る
 - assets の JSON が外で(AI やテキストエディタで)書き換えられたら、0.5 秒ほどで読み直す。プレハブ・UI が変わった時は自分の変更を残したまま作り直す。開いているシーンが変わった時、保存していない変更が無ければそのまま読み直し(Ctrl+Z で前に戻せる)、あれば「外で入った変更」を見せて読み直すか続けるかを聞く。書きかけで読めない時は今のまま。再生中は止めてから読む
@@ -103,6 +104,9 @@ Visual Studio で開く時は、フォルダを開く(CMake として読み込�
 GomiEngine.exe --world Field --fixed-dt 60 --key 10-60:D --screenshot 60:shot.png --frames 61
 GomiEngine.exe --world Field --save-scene 1:saved.json --frames 1   # 今の World をシーンとして保存
 GomiEngine.exe --world saved.json                                   # 保存したシーンを開く
+GomiEditor.exe --list-commands                                      # エディタのコマンドの一覧(ID・ショートカット・名前・引数をタブ区切り)
+GomiEditor.exe --world Field --command 30:entity.select=player --command 31:entity.duplicate --screenshot 40:shot.png --frames 41
+GomiEditor.exe --world Field --type "30:{CTRL+SHIFT+P}" --type "40:複製" --type "50:{ENTER}"   # キーも押せる
 ```
 
 テストは `ctest --test-dir build -C Debug`。
