@@ -869,8 +869,25 @@ void EditorApp::drawSceneView()
 	//ギズモを触っていない時の左クリックで、そこにある物を選ぶ
 	if (viewHovered && !editor->isPlaying() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
 	{
-		pickAt(ImGui::GetIO().MousePos);
+		ImVec2 mouse = ImGui::GetIO().MousePos;
+		//今選んでいるスプライトの上なら、それを動かす(重なった物の下を選び直さない)
+		Vec2 min, max;
+		float sx = viewSize.x / gameWidth, sy = viewSize.y / gameHeight;
+		bool onSelected = selected >= 0 && spriteRect(selectedEntity(), min, max)
+			&& mouse.x >= viewMin.x + min.x * sx && mouse.x <= viewMin.x + max.x * sx && mouse.y >= viewMin.y + min.y * sy && mouse.y <= viewMin.y + max.y * sy;
+		if (!onSelected) pickAt(mouse);
+		Vec2 dummyMin, dummyMax;
+		if (selected >= 0 && spriteRect(selectedEntity(), dummyMin, dummyMax))
+		{
+			drag2D = true;
+			drag2DMoved = false;
+			dragMouseStart = mouse;
+			Json p = editor->getField(selectedEntity(), "Transform", "position");
+			dragPosStart = Vec3(p[0].get<float>(), p[1].get<float>(), p[2].get<float>());
+		}
 	}
+	if (!editor->isPlaying()) drawSelection2D();
+	else drag2D = false;
 	ImGui::End();
 }
 
@@ -969,18 +986,13 @@ void EditorApp::pickAt(const ImVec2& mouse)
 	{
 		//2D: スプライトの四角の中で、一番手前(layer → order が大きい)もの
 		Vec2 p(u * gameWidth, v * gameHeight);
-		Vec2 cameraPos = editor->world().getCamera().position;
 		std::pair<int, int> top{ -1000000, -1000000 };
 		for (int i = 0; i < static_cast<int>(list.size()); i++)
 		{
 			Entity e = list[i];
-			if (!cm.has<RendererComponent>(e) || !cm.has<TransformComponent>(e)) continue;
+			Vec2 min, max;
+			if (!spriteRect(e, min, max)) continue;
 			auto& r = cm.getComponentArray<RendererComponent>().getComponent(e);
-			auto& t = cm.getComponentArray<TransformComponent>().getComponent(e);
-			Vec2 size = AssetDatabase::getInstance().imageSize(r.path);
-			Vec2 min(t.position.x, t.position.y);
-			if (r.useCamera) min -= cameraPos;
-			Vec2 max = min + Vec2(size.x * t.scale.x, size.y * t.scale.y);
 			if (p.x < min.x || p.y < min.y || p.x > max.x || p.y > max.y) continue;
 			std::pair<int, int> key{ r.layer, r.order };
 			if (key >= top)
@@ -991,6 +1003,74 @@ void EditorApp::pickAt(const ImVec2& mouse)
 		}
 	}
 	selected = best;
+}
+
+bool EditorApp::spriteRect(Entity e, Vec2& min, Vec2& max)
+{
+	auto& cm = editor->world().getComponentManager();
+	if (!editor->world().alive(e) || !cm.has<RendererComponent>(e) || !cm.has<TransformComponent>(e)) return false;
+	auto& r = cm.getComponentArray<RendererComponent>().getComponent(e);
+	auto& t = cm.getComponentArray<TransformComponent>().getComponent(e);
+	Vec2 size = AssetDatabase::getInstance().imageSize(r.path);
+	if (size.x <= 0 || size.y <= 0) size = Vec2(32, 32); //画像が読めなくても選べるように
+	min = Vec2(t.position.x, t.position.y);
+	if (r.useCamera) min -= editor->world().getCamera().position;
+	max = min + Vec2(size.x * t.scale.x, size.y * t.scale.y);
+	return true;
+}
+
+void EditorApp::drawSelection2D()
+{
+	Entity e = selectedEntity();
+	Vec2 min, max;
+	bool sprite = selected >= 0 && spriteRect(e, min, max);
+	ImGuiIO& io = ImGui::GetIO();
+	float sx = viewSize.x / gameWidth, sy = viewSize.y / gameHeight;
+
+	//ドラッグ中: 動いた分を位置に足す(最初に動いた時に元に戻す記録)
+	if (drag2D)
+	{
+		if (!sprite || !ImGui::IsMouseDown(ImGuiMouseButton_Left) || editor->isPlaying())
+		{
+			drag2D = false;
+		}
+		else
+		{
+			ImVec2 d(io.MousePos.x - dragMouseStart.x, io.MousePos.y - dragMouseStart.y);
+			if (!drag2DMoved && (std::abs(d.x) > 2 || std::abs(d.y) > 2))
+			{
+				editor->recordUndo();
+				drag2DMoved = true;
+				e = selectedEntity();
+			}
+			if (drag2DMoved)
+			{
+				Vec3 pos = dragPosStart;
+				pos.x += d.x / sx;
+				pos.y += d.y / sy;
+				if (!io.KeyShift) //Shift を押している間は 1px 単位にしない
+				{
+					pos.x = std::round(pos.x);
+					pos.y = std::round(pos.y);
+				}
+				editor->setField(e, "Transform", "position", toJson(pos));
+				spriteRect(e, min, max);
+			}
+		}
+	}
+
+	if (!sprite) return;
+	ImVec2 a(viewMin.x + min.x * sx, viewMin.y + min.y * sy);
+	ImVec2 b(viewMin.x + max.x * sx, viewMin.y + max.y * sy);
+	auto* draw = ImGui::GetWindowDrawList();
+	draw->PushClipRect(viewMin, ImVec2(viewMin.x + viewSize.x, viewMin.y + viewSize.y), true);
+	draw->AddRect(ImVec2(a.x - 1, a.y - 1), ImVec2(b.x + 1, b.y + 1), IM_COL32(0, 0, 0, 160), 0, 0, 3.0f);
+	draw->AddRect(ImVec2(a.x - 1, a.y - 1), ImVec2(b.x + 1, b.y + 1), IM_COL32(255, 200, 60, 255), 0, 0, 1.5f);
+	//左上(位置の基準点)に小さな四角
+	draw->AddRectFilled(ImVec2(a.x - 3, a.y - 3), ImVec2(a.x + 3, a.y + 3), IM_COL32(255, 200, 60, 255));
+	draw->PopClipRect();
+	bool over = io.MousePos.x >= a.x && io.MousePos.x <= b.x && io.MousePos.y >= a.y && io.MousePos.y <= b.y;
+	if (viewHovered && over && !editor->isPlaying()) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
 }
 
 void EditorApp::drawAssets()
