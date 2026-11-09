@@ -16,6 +16,7 @@
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <iostream>
@@ -101,6 +102,7 @@ EditorApp::EditorApp(const DebugOptions& options) : debug(options)
 		if (!editor->open(debug.startWorld, error)) log("開けませんでした: " + error, LogLevel::Error);
 	}
 	selected = debug.select;
+	registerCommands();
 	refreshAssets(true);
 }
 
@@ -224,63 +226,54 @@ void EditorApp::drawMenuBar()
 	bool playing = editor->isPlaying();
 	if (ImGui::BeginMenu("ファイル"))
 	{
-		if (ImGui::MenuItem("新しいシーン", "Ctrl+N", false, !playing)) request(Pending::NewScene);
+		menuItem("scene.new");
 		if (ImGui::BeginMenu("開く", !playing))
 		{
 			for (auto& s : assetsIn("scenes", { ".json" }))
 			{
-				if (ImGui::MenuItem(s.c_str())) request(Pending::OpenScene, s);
+				if (ImGui::MenuItem(s.c_str())) runCommand("scene.open", s);
 			}
 			ImGui::EndMenu();
 		}
-		if (ImGui::MenuItem("保存", "Ctrl+S", false, !playing)) saveScene();
-		if (ImGui::MenuItem("名前を付けて保存...", nullptr, false, !playing))
-		{
-			openSaveAs = true;
-			saveAsPath = editor->getPath().empty() ? "scenes/NewScene.json" : editor->getPath();
-		}
-		if (ImGui::MenuItem("ファイルから読み直す", nullptr, false, !playing && !editor->getPath().empty())) reloadScene();
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("今の変更を捨ててファイルを読む(Ctrl+Z で戻せる)");
+		menuItem("scene.save");
+		menuItem("scene.saveAs");
+		menuItem("scene.reload");
 		ImGui::Separator();
-		if (ImGui::MenuItem("終了")) request(Pending::Quit);
+		menuItem("app.quit");
 		ImGui::EndMenu();
 	}
 	if (ImGui::BeginMenu("編集"))
 	{
-		if (ImGui::MenuItem("元に戻す", "Ctrl+Z", false, editor->canUndo())) editor->undo();
-		if (ImGui::MenuItem("やり直す", "Ctrl+Y", false, editor->canRedo())) editor->redo();
+		menuItem("edit.undo");
+		menuItem("edit.redo");
 		ImGui::Separator();
-		bool has = selected >= 0;
-		if (ImGui::MenuItem("複製", "Ctrl+D", false, has && !playing))
-		{
-			editor->duplicate(selectedEntity());
-			selected = static_cast<int>(editor->entities().size()) - 1;
-		}
-		if (ImGui::MenuItem("削除", "Delete", false, has && !playing))
-		{
-			editor->destroy(selectedEntity());
-			selected = -1;
-		}
+		menuItem("entity.create");
+		menuItem("entity.duplicate");
+		menuItem("entity.delete");
 		ImGui::EndMenu();
 	}
-
 	if (ImGui::BeginMenu("再生"))
 	{
-		if (ImGui::MenuItem(playing ? "停止" : "再生", "F5")) togglePlay();
-		if (ImGui::MenuItem(editor->isPaused() ? "再開" : "一時停止", "F6", false, playing)) editor->setPaused(!editor->isPaused());
-		if (ImGui::MenuItem("1コマ進める", "F7", false, playing)) editor->stepFrame();
+		menuItem("play.toggle");
+		menuItem("play.pause");
+		menuItem("play.step");
 		ImGui::Separator();
-		ImGui::MenuItem("Δt を 1/60 秒に固定", nullptr, &fixedStep);
+		if (ImGui::MenuItem("Δt を 1/60 秒に固定", nullptr, fixedStep)) runCommand("play.fixedStep");
 		ImGui::Separator();
-		if (ImGui::MenuItem("操作を記録する", nullptr, false, canStartReplay())) startRecording();
-		if (ImGui::MenuItem("再現テストを全部検査する", nullptr, false, !replayFiles.empty() && canStartReplay()))
+		menuItem("replay.record");
+		menuItem("replay.checkAll");
+		ImGui::EndMenu();
+	}
+	if (ImGui::BeginMenu("表示"))
+	{
+		menuItem("palette.open");
+		ImGui::Separator();
+		for (auto& c : commands)
 		{
-			replayQueue.clear();
-			for (auto& [name, r] : replayFiles) replayQueue.push_back(name);
-			std::string first = replayQueue.front();
-			replayQueue.erase(replayQueue.begin());
-			startReplay(first, ReplayCheck::Mode::Check, true);
+			if (c.id.rfind("window.", 0) == 0) menuItem(c.id);
 		}
+		ImGui::Separator();
+		menuItem("layout.reset");
 		ImGui::EndMenu();
 	}
 	ImGui::EndMainMenuBar();
@@ -1222,38 +1215,11 @@ void EditorApp::buildDefaultLayout(ImGuiID dockspace)
 
 void EditorApp::handleShortcuts()
 {
-	ImGuiIO& io = ImGui::GetIO();
-	if (io.WantTextInput) return;
-	if (ImGui::IsKeyPressed(ImGuiKey_F5, false)) togglePlay();
-	if (ImGui::IsKeyPressed(ImGuiKey_F6, false) && editor->isPlaying()) editor->setPaused(!editor->isPaused());
-	if (ImGui::IsKeyPressed(ImGuiKey_F7, false) && editor->isPlaying()) editor->stepFrame();
-	if (!io.KeyCtrl)
+	if (ImGui::GetIO().WantTextInput) return;
+	for (auto& c : commands)
 	{
-		if (ImGui::IsKeyPressed(ImGuiKey_W, false)) gizmoOperation = 0;
-		if (ImGui::IsKeyPressed(ImGuiKey_E, false)) gizmoOperation = 1;
-		if (ImGui::IsKeyPressed(ImGuiKey_R, false)) gizmoOperation = 2;
-	}
-	if (editor->isPlaying()) return;
-	bool ctrl = io.KeyCtrl;
-	if (ctrl && ImGui::IsKeyPressed(ImGuiKey_Z, false)) editor->undo();
-	if (ctrl && ImGui::IsKeyPressed(ImGuiKey_Y, false)) editor->redo();
-	if (ctrl && ImGui::IsKeyPressed(ImGuiKey_S, false)) saveScene();
-	if (ctrl && ImGui::IsKeyPressed(ImGuiKey_N, false)) request(Pending::NewScene);
-	if (selected >= 0 && ctrl && ImGui::IsKeyPressed(ImGuiKey_D, false))
-	{
-		editor->duplicate(selectedEntity());
-		selected = static_cast<int>(editor->entities().size()) - 1;
-	}
-	if (selected >= 0 && ImGui::IsKeyPressed(ImGuiKey_Delete, false) && !ImGui::IsAnyItemActive())
-	{
-		editor->destroy(selectedEntity());
-		selected = -1;
-	}
-	//選んだ物にエディタカメラを向ける
-	if (selected >= 0 && viewHovered && ImGui::IsKeyPressed(ImGuiKey_F, false))
-	{
-		Json p = editor->getField(selectedEntity(), "Transform", "position");
-		if (p.is_array()) camera.target = glm::vec3(p[0].get<float>(), p[1].get<float>(), p[2].get<float>());
+		if (!c.chord || c.choices || !ImGui::IsKeyChordPressed(c.chord)) continue;
+		if (c.shortcutWhen ? c.shortcutWhen() : c.isEnabled()) c.run("");
 	}
 }
 
@@ -1286,6 +1252,43 @@ void EditorApp::applyScriptedInput(int frame)
 			io.AddKeyEvent(ImGuiKey_A, true);
 			io.AddKeyEvent(ImGuiKey_A, false);
 			io.AddKeyEvent(ImGuiMod_Ctrl, false);
+		}
+		else if (text.size() > 2 && text.front() == '{' && text.back() == '}')
+		{
+			//{CTRL+SHIFT+P} {DOWN} {ESC} のようなキー
+			std::string chord = text.substr(1, text.size() - 2);
+			std::vector<ImGuiKey> mods;
+			ImGuiKey key = ImGuiKey_None;
+			size_t pos = 0;
+			while (pos <= chord.size())
+			{
+				size_t plus = chord.find('+', pos);
+				std::string part = chord.substr(pos, plus == std::string::npos ? std::string::npos : plus - pos);
+				pos = plus == std::string::npos ? chord.size() + 1 : plus + 1;
+				if (part == "CTRL") mods.push_back(ImGuiMod_Ctrl);
+				else if (part == "SHIFT") mods.push_back(ImGuiMod_Shift);
+				else if (part == "ALT") mods.push_back(ImGuiMod_Alt);
+				else if (part.size() == 1 && part[0] >= 'A' && part[0] <= 'Z') key = static_cast<ImGuiKey>(ImGuiKey_A + (part[0] - 'A'));
+				else if (part.size() == 1 && part[0] >= '0' && part[0] <= '9') key = static_cast<ImGuiKey>(ImGuiKey_0 + (part[0] - '0'));
+				else if (part.size() >= 2 && part[0] == 'F' && std::isdigit(static_cast<unsigned char>(part[1]))) key = static_cast<ImGuiKey>(ImGuiKey_F1 + std::stoi(part.substr(1)) - 1);
+				else if (part == "UP") key = ImGuiKey_UpArrow;
+				else if (part == "DOWN") key = ImGuiKey_DownArrow;
+				else if (part == "LEFT") key = ImGuiKey_LeftArrow;
+				else if (part == "RIGHT") key = ImGuiKey_RightArrow;
+				else if (part == "ESC") key = ImGuiKey_Escape;
+				else if (part == "DELETE") key = ImGuiKey_Delete;
+				else if (part == "TAB") key = ImGuiKey_Tab;
+				else if (part == "BACKSPACE") key = ImGuiKey_Backspace;
+				else if (part == "SPACE") key = ImGuiKey_Space;
+				else std::cerr << "unknown key in --type: " << text << std::endl;
+			}
+			for (auto m : mods) io.AddKeyEvent(m, true);
+			if (key != ImGuiKey_None)
+			{
+				io.AddKeyEvent(key, true);
+				io.AddKeyEvent(key, false);
+			}
+			for (auto m : mods) io.AddKeyEvent(m, false);
 		}
 		else io.AddInputCharactersUTF8(text.c_str());
 	}
@@ -1554,11 +1557,7 @@ void EditorApp::drawReplays()
 	ImGui::BeginDisabled(!can || replayFiles.empty());
 	if (ImGui::Button("全部検査"))
 	{
-		replayQueue.clear();
-		for (auto& [name, r] : replayFiles) replayQueue.push_back(name);
-		std::string first = replayQueue.front();
-		replayQueue.erase(replayQueue.begin());
-		startReplay(first, ReplayCheck::Mode::Check, true);
+		checkAllReplays();
 	}
 	ImGui::EndDisabled();
 	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled))
@@ -1646,6 +1645,11 @@ void EditorApp::drawReplays()
 
 int EditorApp::run()
 {
+	if (debug.listCommands)
+	{
+		printCommands();
+		return 0;
+	}
 	using clock = std::chrono::steady_clock;
 	auto lastTime = clock::now();
 	auto nextFrame = lastTime;
@@ -1734,6 +1738,11 @@ int EditorApp::run()
 				buildDefaultLayout(dockspace);
 			layoutBuilt = true;
 		}
+		if (resetLayout)
+		{
+			buildDefaultLayout(dockspace);
+			resetLayout = false;
+		}
 		//上下の帯はドックより先に出して、ドックの場所を空けてもらう
 		if (editor->isPlaying()) ImGui::PushStyleColor(ImGuiCol_MenuBarBg, PLAY_TINT);
 		drawMenuBar();
@@ -1761,7 +1770,13 @@ int EditorApp::run()
 		drawChanges();
 		drawPopups();
 		if (frame == 2 && io.IniFilename == nullptr) ImGui::SetWindowFocus(WIN_REPLAYS); //配置を作り直した時は下の段を再現テストにしておく(コンセプトの柱を目に入る所に)
+		drawPalette();
 		handleShortcuts();
+		for (auto& c : debug.commandsAt(frame))
+		{
+			auto eq = c.find('=');
+			runCommand(c.substr(0, eq), eq == std::string::npos ? "" : c.substr(eq + 1));
+		}
 		updateCamera();
 
 		// ---- シーンの画面を描き先に描く(止めている時の 3D はエディタカメラから)
@@ -1946,4 +1961,332 @@ void EditorApp::drawChanges()
 	}
 	if (!changes.empty()) drawChangeTable("##changes", changes, "保存済み", "今", true);
 	ImGui::End();
+}
+
+// ---- コマンド
+
+void EditorApp::registerCommands()
+{
+	auto add = [this](const char* id, const char* label, const char* shortcut, ImGuiKeyChord chord, std::function<bool()> enabled, std::function<void(const std::string&)> run) -> EditorCommand& {
+		EditorCommand c;
+		c.id = id;
+		c.label = label;
+		c.shortcut = shortcut;
+		c.chord = chord;
+		c.enabled = std::move(enabled);
+		c.run = std::move(run);
+		commands.push_back(std::move(c));
+		return commands.back();
+	};
+	auto stopped = [this] { return !editor->isPlaying(); };
+	auto playing = [this] { return editor->isPlaying(); };
+	auto hasSelection = [this] { return selected >= 0 && !editor->isPlaying(); };
+	auto lastSelected = [this](int count) { selected = static_cast<int>(editor->entities().size()) - count; };
+
+	// ---- ファイル
+	add("scene.new", "新しいシーン", "Ctrl+N", ImGuiMod_Ctrl | ImGuiKey_N, stopped, [this](const std::string&) { request(Pending::NewScene); });
+	{
+		auto& c = add("scene.open", "シーンを開く", "", 0, stopped, [this](const std::string& a) { request(Pending::OpenScene, a); });
+		c.choices = [this] { return assetsIn("scenes", { ".json" }); };
+		c.argName = "シーン(Field か scenes/Field.json)";
+	}
+	add("scene.save", "保存", "Ctrl+S", ImGuiMod_Ctrl | ImGuiKey_S, stopped, [this](const std::string&) { saveScene(); });
+	add("scene.saveAs", "名前を付けて保存", "", 0, stopped, [this](const std::string& a) {
+		if (a.empty())
+		{
+			openSaveAs = true;
+			saveAsPath = editor->getPath().empty() ? "scenes/NewScene.json" : editor->getPath();
+			return;
+		}
+		std::string error, id = SceneLoader::scenePath(a);
+		if (editor->saveAs(id, error))
+		{
+			log("保存しました: " + id);
+			refreshAssets(true);
+		}
+		else log("保存できませんでした: " + error, LogLevel::Error);
+	}).argName = "(省略可)保存先(scenes/X.json)。省略すると名前を聞く";
+	add("scene.reload", "ファイルから読み直す", "", 0, [this] { return !editor->isPlaying() && !editor->getPath().empty(); }, [this](const std::string&) { reloadScene(); });
+	add("app.quit", "終了", "", 0, nullptr, [this](const std::string&) { request(Pending::Quit); });
+
+	// ---- 編集
+	add("edit.undo", "元に戻す", "Ctrl+Z", ImGuiMod_Ctrl | ImGuiKey_Z, [this] { return editor->canUndo(); }, [this](const std::string&) { editor->undo(); });
+	add("edit.redo", "やり直す", "Ctrl+Y", ImGuiMod_Ctrl | ImGuiKey_Y, [this] { return editor->canRedo(); }, [this](const std::string&) { editor->redo(); });
+	add("entity.create", "空の Entity を作る", "", 0, stopped, [this, lastSelected](const std::string& a) {
+		editor->createEntity(a.empty() ? "Entity" : a);
+		lastSelected(1);
+	}).argName = "(省略可)名前";
+	{
+		auto& c = add("entity.placePrefab", "プレハブを置く", "", 0, stopped, [this, lastSelected](const std::string& a) {
+			auto made = editor->createFromPrefab(a);
+			if (made.empty()) log("プレハブを置けませんでした: " + a, LogLevel::Error);
+			else lastSelected(static_cast<int>(made.size()));
+		});
+		c.choices = [this] { return assetsIn("prefabs", { ".json" }); };
+		c.argName = "プレハブ(prefabs/X.json)";
+	}
+	add("entity.duplicate", "複製", "Ctrl+D", ImGuiMod_Ctrl | ImGuiKey_D, hasSelection, [this, lastSelected](const std::string&) {
+		editor->duplicate(selectedEntity());
+		lastSelected(1);
+	});
+	add("entity.delete", "削除", "Delete", ImGuiKey_Delete, hasSelection, [this](const std::string&) {
+		editor->destroy(selectedEntity());
+		selected = -1;
+	}).shortcutWhen = [this] { return selected >= 0 && !editor->isPlaying() && !ImGui::IsAnyItemActive(); };
+	{
+		auto& c = add("entity.select", "選ぶ", "", 0, nullptr, [this](const std::string& a) {
+			auto list = editor->entities();
+			for (int i = 0; i < static_cast<int>(list.size()); i++)
+			{
+				if (editor->displayName(list[i]) == a)
+				{
+					selected = i;
+					return;
+				}
+			}
+			try
+			{
+				int i = std::stoi(a);
+				if (i >= 0 && i < static_cast<int>(list.size()))
+				{
+					selected = i;
+					return;
+				}
+			}
+			catch (...)
+			{
+			}
+			log("選べませんでした(名前か並び順の番号): " + a, LogLevel::Warning);
+		});
+		c.choices = [this] {
+			std::vector<std::string> names;
+			for (auto e : editor->entities()) names.push_back(editor->displayName(e));
+			return names;
+		};
+		c.argName = "Entity の名前か並び順の番号";
+	}
+	add("view.focusSelected", "選んだ物にエディタカメラを向ける", "F", ImGuiKey_F, [this] { return selected >= 0; }, [this](const std::string&) {
+		Json p = editor->getField(selectedEntity(), "Transform", "position");
+		if (p.is_array()) camera.target = glm::vec3(p[0].get<float>(), p[1].get<float>(), p[2].get<float>());
+	}).shortcutWhen = [this] { return selected >= 0 && viewHovered; };
+
+	// ---- 再生
+	add("play.toggle", "再生 / 停止", "F5", ImGuiKey_F5, nullptr, [this](const std::string&) { togglePlay(); });
+	add("play.pause", "一時停止 / 再開", "F6", ImGuiKey_F6, playing, [this](const std::string&) { editor->setPaused(!editor->isPaused()); });
+	add("play.step", "1コマ進める", "F7", ImGuiKey_F7, playing, [this](const std::string&) { editor->stepFrame(); });
+	add("play.fixedStep", "Δt 1/60 固定を切り替える", "", 0, nullptr, [this](const std::string&) { fixedStep = !fixedStep; });
+	add("replay.record", "操作を記録する", "", 0, [this] { return canStartReplay(); }, [this](const std::string&) { startRecording(); });
+	add("replay.checkAll", "再現テストを全部検査する", "", 0, [this] { return !replayFiles.empty() && canStartReplay(); }, [this](const std::string&) { checkAllReplays(); });
+	{
+		auto names = [this] {
+			std::vector<std::string> list;
+			for (auto& [name, r] : replayFiles) list.push_back(name);
+			return list;
+		};
+		auto& run = add("replay.run", "再現テストを流す", "", 0, [this] { return canStartReplay(); }, [this](const std::string& a) { startReplay(a, ReplayCheck::Mode::Check, false); });
+		run.choices = names;
+		run.argName = "再現テストの名前";
+		auto& update = add("replay.update", "再現テストの基準を作り直す", "", 0, [this] { return canStartReplay(); }, [this](const std::string& a) { startReplay(a, ReplayCheck::Mode::Update, true); });
+		update.choices = names;
+		update.argName = "再現テストの名前";
+	}
+
+	// ---- 表示
+	add("gizmo.move", "ギズモ: 移動", "W", ImGuiKey_W, nullptr, [this](const std::string&) { gizmoOperation = 0; });
+	add("gizmo.rotate", "ギズモ: 回転", "E", ImGuiKey_E, nullptr, [this](const std::string&) { gizmoOperation = 1; });
+	add("gizmo.scale", "ギズモ: 拡大", "R", ImGuiKey_R, nullptr, [this](const std::string&) { gizmoOperation = 2; });
+	add("view.editorCamera", "エディタカメラを切り替える", "", 0, nullptr, [this](const std::string&) { useEditorCamera = !useEditorCamera; });
+	add("palette.open", "コマンドパレット", "Ctrl+Shift+P", ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_P, nullptr, [this](const std::string&) { openPalette = true; });
+	const std::pair<const char*, const char*> windows[] = {
+		{ "window.hierarchy", WIN_HIERARCHY }, { "window.inspector", WIN_INSPECTOR }, { "window.scene", WIN_SCENE },
+		{ "window.replays", WIN_REPLAYS }, { "window.changes", WIN_CHANGES }, { "window.assets", WIN_ASSETS },
+		{ "window.systems", WIN_SYSTEMS }, { "window.log", WIN_LOG },
+	};
+	for (auto& [id, name] : windows)
+	{
+		std::string label = std::string(name) + "を開く";
+		std::string window = name;
+		add(id, label.c_str(), "", 0, nullptr, [this, window](const std::string&) {
+			if (window == WIN_LOG) focusLog = true;
+			else if (window == WIN_CHANGES) focusChanges = true;
+			else ImGui::SetWindowFocus(window.c_str());
+		});
+	}
+	add("layout.reset", "窓の配置を初めに戻す", "", 0, nullptr, [this](const std::string&) { resetLayout = true; });
+}
+
+const EditorCommand* EditorApp::findCommand(const std::string& id) const
+{
+	for (auto& c : commands)
+	{
+		if (c.id == id) return &c;
+	}
+	return nullptr;
+}
+
+bool EditorApp::runCommand(const std::string& id, const std::string& arg)
+{
+	const EditorCommand* c = findCommand(id);
+	if (!c)
+	{
+		log("知らないコマンド: " + id + "(--list-commands で一覧)", LogLevel::Error);
+		return false;
+	}
+	if (!c->isEnabled())
+	{
+		log("今は使えないコマンド: " + id, LogLevel::Warning);
+		return false;
+	}
+	if (c->choices && arg.empty())
+	{
+		log("コマンド " + id + " には引数が要ります: " + c->argName, LogLevel::Error);
+		return false;
+	}
+	std::string key = id + "\n" + arg;
+	recentCommands.erase(std::remove(recentCommands.begin(), recentCommands.end(), key), recentCommands.end());
+	recentCommands.insert(recentCommands.begin(), key);
+	if (recentCommands.size() > 10) recentCommands.pop_back();
+	c->run(arg);
+	return true;
+}
+
+void EditorApp::menuItem(const std::string& id)
+{
+	const EditorCommand* c = findCommand(id);
+	if (!c) return;
+	if (ImGui::MenuItem(c->label.c_str(), c->shortcut.empty() ? nullptr : c->shortcut.c_str(), false, c->isEnabled())) runCommand(id);
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", c->id.c_str());
+}
+
+void EditorApp::printCommands() const
+{
+	//ID・ショートカット・名前・引数をタブ区切りで(AI やスクリプトが読む)
+	for (auto& c : commands)
+		std::cout << c.id << "\t" << c.shortcut << "\t" << c.label << "\t" << c.argName << "\n";
+	std::cout.flush();
+}
+
+void EditorApp::checkAllReplays()
+{
+	if (replayFiles.empty()) return;
+	replayQueue.clear();
+	for (auto& [name, r] : replayFiles) replayQueue.push_back(name);
+	std::string first = replayQueue.front();
+	replayQueue.erase(replayQueue.begin());
+	startReplay(first, ReplayCheck::Mode::Check, true);
+}
+
+void EditorApp::drawPalette()
+{
+	const char* POPUP = "##palette";
+	if (openPalette)
+	{
+		ImGui::OpenPopup(POPUP);
+		openPalette = false;
+		paletteQuery.clear();
+		paletteCursor = 0;
+	}
+	ImGuiViewport* vp = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 50), ImGuiCond_Always, ImVec2(0.5f, 0));
+	ImGui::SetNextWindowSize(ImVec2(std::min(680.0f, vp->WorkSize.x - 40), 0));
+	if (!ImGui::BeginPopup(POPUP)) return;
+
+	if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+	ImGui::SetNextItemWidth(-1);
+	bool enter = ImGui::InputTextWithHint("##query", "コマンドを名前・ID で探す(↑↓ で選び Enter で実行、Esc で閉じる)", &paletteQuery, ImGuiInputTextFlags_EnterReturnsTrue);
+	if (ImGui::IsItemEdited()) paletteCursor = 0;
+	if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+	{
+		ImGui::CloseCurrentPopup();
+		ImGui::EndPopup();
+		return;
+	}
+
+	//候補: 引数が要るコマンドは候補ごとに1行。最近使った物を先に
+	struct Entry
+	{
+		const EditorCommand* command;
+		std::string arg;
+		std::string text;
+		int order;
+	};
+	auto lower = [](std::string s) {
+		for (auto& ch : s) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+		return s;
+	};
+	std::vector<std::string> words;
+	{
+		std::string q = lower(paletteQuery);
+		size_t pos = 0;
+		while (pos < q.size())
+		{
+			size_t sp = q.find(' ', pos);
+			if (sp == std::string::npos) sp = q.size();
+			if (sp > pos) words.push_back(q.substr(pos, sp - pos));
+			pos = sp + 1;
+		}
+	}
+	std::vector<Entry> entries;
+	int order = 0;
+	auto consider = [&](const EditorCommand& c, const std::string& arg) {
+		std::string text = c.label + (arg.empty() ? "" : ": " + arg);
+		std::string hay = lower(text + " " + c.id + " " + c.shortcut);
+		for (auto& w : words)
+		{
+			if (hay.find(w) == std::string::npos) return;
+		}
+		auto recent = std::find(recentCommands.begin(), recentCommands.end(), c.id + "\n" + arg);
+		int rank = recent == recentCommands.end() ? 1000 + order : static_cast<int>(recent - recentCommands.begin());
+		entries.push_back({ &c, arg, text, rank });
+		order++;
+	};
+	for (auto& c : commands)
+	{
+		if (c.id == "palette.open") continue;
+		if (c.choices)
+		{
+			for (auto& arg : c.choices()) consider(c, arg);
+		}
+		else consider(c, "");
+	}
+	std::stable_sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) { return a.order < b.order; });
+
+	if (!entries.empty())
+	{
+		if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) paletteCursor = std::min(paletteCursor + 1, static_cast<int>(entries.size()) - 1);
+		if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) paletteCursor = std::max(paletteCursor - 1, 0);
+	}
+	paletteCursor = std::clamp(paletteCursor, 0, std::max(0, static_cast<int>(entries.size()) - 1));
+
+	const Entry* chosen = nullptr;
+	if (enter && !entries.empty() && entries[paletteCursor].command->isEnabled()) chosen = &entries[paletteCursor];
+	float rowH = ImGui::GetTextLineHeightWithSpacing();
+	ImGui::BeginChild("##list", ImVec2(0, rowH * std::clamp(static_cast<float>(entries.size()), 1.0f, 14.0f) + 8));
+	if (entries.empty()) ImGui::TextDisabled("見つかりません");
+	for (int i = 0; i < static_cast<int>(entries.size()); i++)
+	{
+		const Entry& e = entries[i];
+		bool can = e.command->isEnabled();
+		ImGui::PushID(i);
+		ImGui::BeginDisabled(!can);
+		if (ImGui::Selectable(e.text.c_str(), i == paletteCursor) && can) chosen = &e;
+		ImGui::EndDisabled();
+		if (i == paletteCursor && (ImGui::IsKeyPressed(ImGuiKey_DownArrow) || ImGui::IsKeyPressed(ImGuiKey_UpArrow))) ImGui::SetScrollHereY();
+		//右に ID とショートカット
+		std::string right = e.command->id + (e.command->shortcut.empty() ? "" : "   " + e.command->shortcut);
+		float w = ImGui::CalcTextSize(right.c_str()).x;
+		ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - w);
+		ImGui::TextDisabled("%s", right.c_str());
+		ImGui::PopID();
+	}
+	ImGui::EndChild();
+	if (chosen)
+	{
+		std::string id = chosen->command->id, arg = chosen->arg;
+		ImGui::CloseCurrentPopup();
+		ImGui::EndPopup();
+		runCommand(id, arg);
+		return;
+	}
+	ImGui::EndPopup();
 }

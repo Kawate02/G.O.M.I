@@ -1,6 +1,11 @@
 #include "DebugOptions.h"
 #include <algorithm>
 #include <cstdio>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shellapi.h>
+#endif
 
 namespace
 {
@@ -27,12 +32,39 @@ namespace
 
 std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 {
+	//Windows の argv は ANSI(CP932)なので、日本語の引数(--type・--command)が化ける。元のコマンドラインを UTF-8 で読み直す
+	std::vector<std::string> args(argv, argv + argc);
+#ifdef _WIN32
+	int count = 0;
+	if (LPWSTR* wide = CommandLineToArgvW(GetCommandLineW(), &count))
+	{
+		if (count == argc)
+		{
+			for (int i = 0; i < count; i++)
+			{
+				int n = WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, nullptr, 0, nullptr, nullptr);
+				std::string s(n > 0 ? n : 1, ' ');
+				if (n > 1) WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, s.data(), n, nullptr, nullptr);
+				s.resize(n > 0 ? n - 1 : 0);
+				args[i] = s;
+			}
+		}
+		LocalFree(wide);
+	}
+#endif
+	return parse(args);
+}
+
+std::optional<std::string> DebugOptions::parse(const std::vector<std::string>& argv)
+{
+	int argc = static_cast<int>(argv.size());
 	for (int i = 1; i < argc; i++)
 	{
 		std::string opt = argv[i];
 		//値を取らないもの
 		if (opt == "--replay-update") { replayUpdate = true; continue; }
 		if (opt == "--no-wait") { noWait = true; continue; }
+		if (opt == "--list-commands") { listCommands = true; continue; }
 		if (i + 1 >= argc) return "missing value for " + opt;
 		std::string value = argv[++i];
 		int start = 0, end = 0;
@@ -68,6 +100,11 @@ std::optional<std::string> DebugOptions::parse(int argc, char** argv)
 		{
 			if (!splitFrame(value, start, end, rest)) return "bad --type: " + value;
 			typed.push_back({ start, rest });
+		}
+		else if (opt == "--command")
+		{
+			if (!splitFrame(value, start, end, rest) || rest.empty()) return "bad --command: " + value;
+			commands.push_back({ start, rest });
 		}
 		else if (opt == "--drag")
 		{
@@ -156,6 +193,16 @@ std::vector<std::string> DebugOptions::typedAt(int frame) const
 {
 	std::vector<std::string> result;
 	for (auto& s : typed)
+	{
+		if (s.frame == frame) result.push_back(s.path);
+	}
+	return result;
+}
+
+std::vector<std::string> DebugOptions::commandsAt(int frame) const
+{
+	std::vector<std::string> result;
+	for (auto& s : commands)
 	{
 		if (s.frame == frame) result.push_back(s.path);
 	}

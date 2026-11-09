@@ -56,6 +56,23 @@ enum class LogLevel
 	Error,
 };
 
+/// <summary>
+/// エディタの操作1つ。メニュー・ショートカット・コマンドパレット・起動オプション(--command)が同じ ID で呼ぶ
+/// </summary>
+struct EditorCommand
+{
+	std::string id;        //"scene.save" のような名前(起動オプション・将来の AI からの呼び出しに使う)
+	std::string label;     //メニュー・パレットに出す名前
+	std::string shortcut;  //表示用("Ctrl+S")
+	ImGuiKeyChord chord = 0;
+	std::function<bool()> enabled;          //空なら常に使える
+	std::function<bool()> shortcutWhen;     //ショートカットが効く条件(空なら enabled と同じ)
+	std::function<void(const std::string&)> run;
+	std::function<std::vector<std::string>()> choices; //引数の候補(あれば引数が要る)
+	std::string argName;   //引数の説明(一覧用)
+	inline bool isEnabled() const { return !enabled || enabled(); }
+};
+
 class EditorApp
 {
 private:
@@ -144,6 +161,14 @@ private:
 	bool openFileConflict = false;
 	bool focusChanges = false;
 
+	// ---- コマンド
+	std::vector<EditorCommand> commands;
+	std::vector<std::string> recentCommands; //"ID\n引数"。新しい順
+	bool openPalette = false;
+	std::string paletteQuery;
+	int paletteCursor = 0;
+	bool resetLayout = false;
+
 	//保存していない変更がある時の確認
 	enum class Pending { None, NewScene, OpenScene, Quit };
 	Pending pending = Pending::None;
@@ -195,6 +220,16 @@ private:
 	void afterReplayFrame();
 	void drawReplays();
 	void drawTimeStrip();
+	void registerCommands();
+	const EditorCommand* findCommand(const std::string& id) const;
+	/// <summary>
+	/// ID で実行する。知らない・今は使えない・引数が足りない時はログに出して false
+	/// </summary>
+	bool runCommand(const std::string& id, const std::string& arg = "");
+	void menuItem(const std::string& id);
+	void drawPalette();
+	void printCommands() const;
+	void checkAllReplays();
 	void checkFiles();
 	void reloadScene();
 	void refreshChanges(bool force = false);
