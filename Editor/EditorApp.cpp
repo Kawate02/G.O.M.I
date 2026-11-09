@@ -30,6 +30,8 @@ namespace
 	const char* WIN_SYSTEMS = "System";
 	const char* WIN_LOG = "ログ";
 	const char* WIN_REPLAYS = "再現テスト";
+	const char* WIN_CHANGES = "差分";
+	const char* POPUP_CONFLICT = "外でファイルが変わりました";
 	const char* ASSET_PAYLOAD = "GOMI_ASSET";
 
 	bool endsWith(const std::string& s, const char* ext)
@@ -237,6 +239,8 @@ void EditorApp::drawMenuBar()
 			openSaveAs = true;
 			saveAsPath = editor->getPath().empty() ? "scenes/NewScene.json" : editor->getPath();
 		}
+		if (ImGui::MenuItem("ファイルから読み直す", nullptr, false, !playing && !editor->getPath().empty())) reloadScene();
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("今の変更を捨ててファイルを読む(Ctrl+Z で戻せる)");
 		ImGui::Separator();
 		if (ImGui::MenuItem("終了")) request(Pending::Quit);
 		ImGui::EndMenu();
@@ -400,8 +404,24 @@ void EditorApp::drawStatusBar()
 	ImGui::SameLine(0, 20);
 	ImGui::Text("選択: %s", selected >= 0 ? editor->displayName(selectedEntity()).c_str() : "なし");
 	ImGui::SameLine(0, 20);
-	if (editor->isDirty()) ImGui::TextColored(COLOR_WARNING, "未保存");
+	if (editor->isDirty())
+	{
+		refreshChanges();
+		std::string text = changes.empty() ? "未保存" : "未保存 " + std::to_string(changes.size()) + " 件";
+		ImGui::PushStyleColor(ImGuiCol_Text, COLOR_WARNING);
+		if (ImGui::Selectable(text.c_str(), false, 0, ImVec2(ImGui::CalcTextSize(text.c_str()).x, 0))) focusChanges = true;
+		ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("押すと差分を開く");
+	}
 	else ImGui::TextDisabled("保存済み");
+	if (editor->hasSceneConflict())
+	{
+		ImGui::SameLine(0, 20);
+		ImGui::PushStyleColor(ImGuiCol_Text, COLOR_WARNING);
+		if (ImGui::Selectable("外でファイルが変わりました", false, 0, ImVec2(ImGui::CalcTextSize("外でファイルが変わりました").x, 0))) openFileConflict = true;
+		ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("押すと読み直すか決める");
+	}
 
 	//最後の警告・エラー(押すとログを開く)
 	if (!lastProblem.empty())
@@ -1075,6 +1095,45 @@ void EditorApp::drawPopups()
 		ImGui::EndPopup();
 	}
 
+	if (openFileConflict && !ImGui::IsPopupOpen(POPUP_CONFLICT))
+	{
+		ImGui::OpenPopup(POPUP_CONFLICT);
+		openFileConflict = false;
+	}
+	ImGui::SetNextWindowSizeConstraints(ImVec2(560, 0), ImVec2(900, 600));
+	if (ImGui::BeginPopupModal(POPUP_CONFLICT, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("%s が外で書き換えられました。エディタには保存していない変更があります。", editor->getPath().c_str());
+		ImGui::TextDisabled("外で入った変更: %d 件", static_cast<int>(fileChangeList.size()));
+		float rows = static_cast<float>(std::min<size_t>(fileChangeList.size(), 10) + 1);
+		ImGui::BeginChild("##outside", ImVec2(820, rows * (ImGui::GetTextLineHeight() + ImGui::GetStyle().CellPadding.y * 2) + ImGui::GetStyle().WindowPadding.y * 2 + 4), ImGuiChildFlags_Borders);
+		drawChangeTable("##outsideTable", fileChangeList, "前", "ファイル", false);
+		ImGui::EndChild();
+		if (ImGui::Button("読み直す"))
+		{
+			reloadScene();
+			ImGui::CloseCurrentPopup();
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("エディタの変更を捨ててファイルを読む(Ctrl+Z で戻せる)");
+		ImGui::SameLine();
+		if (ImGui::Button("このまま続ける"))
+		{
+			editor->keepEdits();
+			refreshChanges(true);
+			log("外の変更を読まずに続けます。保存すると " + editor->getPath() + " を上書きします", LogLevel::Warning);
+			ImGui::CloseCurrentPopup();
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("保存するとファイルを上書きする(差分は「保存したら変わる所」になる)");
+		ImGui::SameLine();
+		if (ImGui::Button("あとで"))
+		{
+			focusChanges = true;
+			ImGui::CloseCurrentPopup();
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("今は決めない(状態バーと差分タブから決められる)");
+		ImGui::EndPopup();
+	}
+
 	if (openRecordSave)
 	{
 		ImGui::OpenPopup("記録を保存");
@@ -1155,6 +1214,7 @@ void EditorApp::buildDefaultLayout(ImGuiID dockspace)
 	ImGui::DockBuilderDockWindow(WIN_SYSTEMS, bottom);
 	ImGui::DockBuilderDockWindow(WIN_LOG, bottom);
 	ImGui::DockBuilderDockWindow(WIN_REPLAYS, bottom);
+	ImGui::DockBuilderDockWindow(WIN_CHANGES, bottom);
 
 	ImGui::DockBuilderDockWindow(WIN_SCENE, center);
 	ImGui::DockBuilderFinish(dockspace);
@@ -1663,6 +1723,9 @@ int EditorApp::run()
 		}
 		if (recorder && !editor->isPlaying()) finishRecording();
 
+		//外で変わった assets の JSON を見る(0.5 秒ごと。再生中は止めてから)
+		if (frame == 1 || frame % 30 == 0) checkFiles();
+
 		// ---- 画面を組み立てる
 		ImGuiID dockspace = ImGui::GetID("EditorDock");
 		if (!layoutBuilt)
@@ -1690,6 +1753,12 @@ int EditorApp::run()
 		}
 		drawLog();
 		drawReplays();
+		if (focusChanges)
+		{
+			ImGui::SetWindowFocus(WIN_CHANGES);
+			focusChanges = false;
+		}
+		drawChanges();
 		drawPopups();
 		if (frame == 2 && io.IniFilename == nullptr) ImGui::SetWindowFocus(WIN_REPLAYS); //配置を作り直した時は下の段を再現テストにしておく(コンセプトの柱を目に入る所に)
 		handleShortcuts();
@@ -1739,4 +1808,142 @@ int EditorApp::run()
 		while (clock::now() < nextFrame) std::this_thread::yield();
 	}
 	return 0;
+}
+
+// ---- 保存済みとの差・外で変わったファイル
+
+void EditorApp::checkFiles()
+{
+	auto result = editor->checkFiles();
+	if (result.changed.empty()) return;
+	refreshAssets(true);
+	std::string others;
+	int count = 0;
+	for (auto& id : result.changed)
+	{
+		if (id == editor->getPath()) continue;
+		if (count < 3) others += (count ? ", " : "") + id;
+		count++;
+	}
+	if (count > 3) others += " ほか " + std::to_string(count - 3) + " 件";
+	if (result.refreshed) log("外で変わったファイルを読み直しました: " + others);
+	if (result.reloaded) log("外で変わったシーンを読み直しました: " + editor->getPath() + "(Ctrl+Z で前に戻せる)");
+	if (result.sceneConflict)
+	{
+		fileChangeList = editor->fileChanges();
+		openFileConflict = true;
+		log(editor->getPath() + " が外で変わりましたが、保存していない変更があるので読み直していません", LogLevel::Warning);
+	}
+	if (!result.error.empty()) log("外で変わったファイルを読めませんでした(書きかけかもしれません。今の状態のまま): " + result.error, LogLevel::Warning);
+	refreshChanges(true);
+}
+
+void EditorApp::reloadScene()
+{
+	std::string error;
+	if (editor->reloadFromFile(error)) log("ファイルから読み直しました: " + editor->getPath() + "(Ctrl+Z で前に戻せる)");
+	else log("読み直せませんでした: " + error, LogLevel::Error);
+	refreshChanges(true);
+}
+
+void EditorApp::refreshChanges(bool force)
+{
+	double now = ImGui::GetTime();
+	if (!force && now - changesAt < 0.25) return;
+	changesAt = now;
+	changes = editor->changesFromSaved();
+}
+
+void EditorApp::drawChangeTable(const char* id, const std::vector<SceneChange>& list, const char* beforeLabel, const char* afterLabel, bool canSelect)
+{
+	using Kind = SceneChange::Kind;
+	ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
+	if (!ImGui::BeginTable(id, 4, flags)) return;
+	ImGui::TableSetupScrollFreeze(0, 1);
+	ImGui::TableSetupColumn("Entity", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+	ImGui::TableSetupColumn("項目", ImGuiTableColumnFlags_WidthStretch, 1.4f);
+	ImGui::TableSetupColumn(beforeLabel, ImGuiTableColumnFlags_WidthStretch, 1.5f);
+	ImGui::TableSetupColumn(afterLabel, ImGuiTableColumnFlags_WidthStretch, 1.5f);
+	ImGui::TableHeadersRow();
+	for (size_t i = 0; i < list.size(); i++)
+	{
+		const SceneChange& c = list[i];
+		ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+		std::string entity = c.entity, item, before, after;
+		switch (c.kind)
+		{
+		case Kind::EntityAdded: color = COLOR_OK; item = "(Entity を追加)"; break;
+		case Kind::EntityRemoved: color = COLOR_ERROR; item = "(Entity を削除)"; break;
+		case Kind::ComponentAdded: color = COLOR_OK; item = "+ " + c.component; break;
+		case Kind::ComponentRemoved: color = COLOR_ERROR; item = "- " + c.component; break;
+		case Kind::FieldChanged:
+			item = c.field.empty() ? c.component : c.component + "." + c.field;
+			before = SceneDiff::shortValue(c.before, 48);
+			after = SceneDiff::shortValue(c.after, 48);
+			break;
+		case Kind::SystemsChanged: entity = "(シーン)"; item = "System の並び"; before = SceneDiff::shortValue(c.before, 48); after = SceneDiff::shortValue(c.after, 48); break;
+		case Kind::UIChanged: entity = "(シーン)"; item = "UI"; before = SceneDiff::shortValue(c.before, 48); after = SceneDiff::shortValue(c.after, 48); break;
+		}
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+		ImGui::PushID(static_cast<int>(i));
+		ImGui::PushStyleColor(ImGuiCol_Text, color);
+		bool chosen = canSelect && c.index >= 0 && selected == c.index;
+		if (ImGui::Selectable(entity.c_str(), chosen, ImGuiSelectableFlags_SpanAllColumns) && canSelect && c.index >= 0) selected = c.index;
+		ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered() && (c.kind == Kind::FieldChanged || c.kind == Kind::SystemsChanged || c.kind == Kind::UIChanged))
+		{
+			ImGui::BeginTooltip();
+			ImGui::TextDisabled("%s", beforeLabel);
+			ImGui::TextUnformatted(c.before.dump(2).c_str());
+			ImGui::TextDisabled("%s", afterLabel);
+			ImGui::TextUnformatted(c.after.dump(2).c_str());
+			ImGui::EndTooltip();
+		}
+		ImGui::PopID();
+		ImGui::TableNextColumn();
+		ImGui::TextColored(color, "%s", item.c_str());
+		ImGui::TableNextColumn();
+		ImGui::TextDisabled("%s", before.c_str());
+		ImGui::TableNextColumn();
+		ImGui::TextUnformatted(after.c_str());
+	}
+	ImGui::EndTable();
+}
+
+void EditorApp::drawChanges()
+{
+	if (!ImGui::Begin(WIN_CHANGES))
+	{
+		ImGui::End();
+		return;
+	}
+	refreshChanges();
+	const std::string& path = editor->getPath();
+	if (editor->hasSceneConflict())
+	{
+		ImGui::TextColored(COLOR_WARNING, "%s が外で書き換えられました(保存していない変更があるので読み直していません)", path.c_str());
+		if (ImGui::Button("読み直す")) reloadScene();
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("エディタの変更を捨ててファイルを読む(Ctrl+Z で戻せる)");
+		ImGui::SameLine();
+		if (ImGui::Button("このまま続ける"))
+		{
+			editor->keepEdits();
+			refreshChanges(true);
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("保存するとファイルを上書きする");
+		ImGui::SameLine();
+		if (ImGui::Button("外の変更を見る")) openFileConflict = true;
+		ImGui::Separator();
+	}
+	std::string base = path.empty() ? std::string("新しいシーン(作った時)") : path;
+	if (changes.empty()) ImGui::TextDisabled("%s と同じです", base.c_str());
+	else ImGui::Text("%s からの変更: %d 件", base.c_str(), static_cast<int>(changes.size()));
+	if (editor->isPlaying())
+	{
+		ImGui::SameLine();
+		ImGui::TextDisabled("(再生前の状態と比べています)");
+	}
+	if (!changes.empty()) drawChangeTable("##changes", changes, "保存済み", "今", true);
+	ImGui::End();
 }

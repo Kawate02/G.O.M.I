@@ -137,6 +137,13 @@ private:
 	std::string recordName;
 	bool recordThenUpdate = true;
 
+	// ---- 保存済みとの差・外で変わったファイル
+	std::vector<SceneChange> changes;      //保存済み → 今
+	double changesAt = -100;
+	std::vector<SceneChange> fileChangeList; //外で入った変更(保存済み → ファイル)
+	bool openFileConflict = false;
+	bool focusChanges = false;
+
 	//保存していない変更がある時の確認
 	enum class Pending { None, NewScene, OpenScene, Quit };
 	Pending pending = Pending::None;
@@ -188,6 +195,11 @@ private:
 	void afterReplayFrame();
 	void drawReplays();
 	void drawTimeStrip();
+	void checkFiles();
+	void reloadScene();
+	void refreshChanges(bool force = false);
+	void drawChanges();
+	void drawChangeTable(const char* id, const std::vector<SceneChange>& list, const char* beforeLabel, const char* afterLabel, bool canSelect);
 public:
 	explicit EditorApp(const DebugOptions& options);
 	~EditorApp();
