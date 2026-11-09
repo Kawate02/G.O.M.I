@@ -241,6 +241,65 @@ bool SceneEditor::saveAsPrefab(Entity e, const AssetID& id, std::string& error)
 	return true;
 }
 
+Json SceneEditor::copyEntity(Entity e)
+{
+	if (!currentWorld->alive(e)) return Json();
+	Json comps = SceneLoader::componentsOf(*currentWorld, e);
+	if (const PrefabLink* link = currentWorld->getPrefabLink(e))
+	{
+		const auto& defs = prefabDefs(link->prefab);
+		bool missing = false;
+		if (!defs.empty())
+		{
+			for (auto& [name, v] : defs[0].items()) missing = missing || !comps.contains(name);
+		}
+		if (defs.size() == 1 && link->index == 0 && !missing)
+		{
+			Json item = { { "prefab", link->prefab } };
+			Json overrides = SceneLoader::diff(defs[0], comps);
+			if (overrides.is_object() && !overrides.empty()) item["overrides"] = overrides;
+			return item;
+		}
+	}
+	return { { "components", SceneLoader::compact(comps) } };
+}
+
+bool SceneEditor::pasteEntities(const Json& items, int& count, std::string& error)
+{
+	count = 0;
+	if (playing)
+	{
+		error = "stop playing first";
+		return false;
+	}
+	Json list = items.is_array() ? items : Json::array({ items });
+	//{ "Transform": {...} } のようにコンポーネントだけ渡されたら components に包む
+	for (auto& item : list)
+	{
+		if (item.is_object() && !item.contains("components") && !item.contains("prefab")) item = { { "components", item } };
+	}
+	size_t countBefore = entities().size();
+	Json before = snapshot();
+	Json scene = before;
+	for (auto& item : list) scene["entities"].push_back(item);
+	try
+	{
+		rebuild(scene);
+	}
+	catch (const std::exception& e)
+	{
+		error = e.what();
+		rebuild(before);
+		return false;
+	}
+	undoStack.push_back(before);
+	if (undoStack.size() > MAX_UNDO) undoStack.erase(undoStack.begin());
+	redoStack.clear();
+	dirty = true;
+	count = static_cast<int>(entities().size() - countBefore);
+	return true;
+}
+
 void SceneEditor::rename(Entity e, const std::string& name)
 {
 	if (!currentWorld->alive(e)) return;

@@ -166,6 +166,20 @@ int main()
 		auto keyChanges = n.changesFromSaved();
 		CHECK(keyChanges.size() == 2 && keyChanges[0].field == "actions.JUMP" && keyChanges[0].after == "KEY_RETURN"); // 表は中の項目ごと(もう1件は複製した player #2)
 		n.undo();
+		// JSON で写す・貼る(AI とのやりとり用)
+		Json copied = n.copyEntity(n.entities()[0]);
+		CHECK(copied["prefab"] == "prefabs/player.json" && copied["overrides"]["Transform"]["position"][0] == 100.0);
+		int pasted = 0;
+		CHECK(n.pasteEntities(copied, pasted, error) && pasted == 1);
+		CHECK(n.displayNames().back() == "player #2"); // 複製した方は rival に変えてある
+		CHECK(n.pasteEntities(Json::parse(R"([{ "components": { "Name": { "name": "a" } } }, { "Name": { "name": "b" }, "Transform": {} }])"), pasted, error) && pasted == 2);
+		CHECK(n.displayNames().back() == "b");
+		size_t before = n.entities().size();
+		CHECK(!n.pasteEntities(Json::parse(R"({ "components": { "Nope": {} } })"), pasted, error) && !error.empty());
+		CHECK(n.entities().size() == before); // 間違いがあれば何も足さない
+		n.undo();
+		n.undo();
+		CHECK(n.entities().size() == before - 3);
 		n.rename(n.entities()[0], "hero");
 		CHECK(n.displayNames()[0] == "hero");
 		n.undo();

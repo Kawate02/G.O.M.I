@@ -109,6 +109,14 @@ public:
 	/// 名前を変える(Name が無ければ付ける。元に戻す記録もする)
 	/// </summary>
 	void rename(Entity e, const std::string& name);
+	/// <summary>
+	/// Entity をシーンの entities の1項目の形で返す。1体だけのプレハブの配置なら { "prefab", "overrides" }、それ以外は既定値を省いた { "components" }
+	/// </summary>
+	Json copyEntity(Entity e);
+	/// <summary>
+	/// シーンの entities の項目(1つか配列)を足す。シーンを読む時と同じに厳しく調べ、間違いがあれば何もせず false。足した数を count に
+	/// </summary>
+	bool pasteEntities(const Json& items, int& count, std::string& error);
 	Entity createEntity(const std::string& name);
 	std::vector<Entity> createFromPrefab(const AssetID& prefab);
 	Entity duplicate(Entity e);

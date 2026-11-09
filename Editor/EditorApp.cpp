@@ -261,6 +261,8 @@ void EditorApp::drawMenuBar()
 		menuItem("entity.rename");
 		menuItem("prefab.saveSelection");
 		menuItem("prefab.edit");
+		menuItem("entity.copy");
+		menuItem("entity.paste");
 		menuItem("entity.duplicate");
 		menuItem("entity.delete");
 		ImGui::EndMenu();
@@ -542,6 +544,7 @@ void EditorApp::drawHierarchy()
 			{
 				if (ImGui::MenuItem(("プレハブを開いて直す (" + link->prefab + ")").c_str())) runCommand("prefab.edit");
 			}
+			if (ImGui::MenuItem("JSON で写す", "Ctrl+C")) runCommand("entity.copy");
 			if (ImGui::MenuItem("複製", "Ctrl+D"))
 			{
 				editor->duplicate(list[i]);
@@ -2322,6 +2325,32 @@ void EditorApp::registerCommands()
 	add("prefab.back", "プレハブからシーンに戻る", "", 0, [this] { return editor->isPrefabMode() && !returnScene.empty(); }, [this](const std::string&) {
 		request(Pending::OpenScene, returnScene);
 	});
+	add("entity.copy", "JSON で写す", "Ctrl+C", ImGuiMod_Ctrl | ImGuiKey_C, [this] { return selected >= 0; }, [this](const std::string&) {
+		Json item = editor->copyEntity(selectedEntity());
+		ImGui::SetClipboardText(item.dump(2).c_str());
+		log("写しました(シーンの entities の1項目の形): " + editor->displayName(selectedEntity()));
+	});
+	add("entity.paste", "JSON を貼る", "Ctrl+V", ImGuiMod_Ctrl | ImGuiKey_V, stopped, [this](const std::string& a) {
+		std::string text = a.empty() ? (ImGui::GetClipboardText() ? ImGui::GetClipboardText() : "") : a;
+		Json items;
+		try
+		{
+			items = Json::parse(text);
+		}
+		catch (const std::exception& e)
+		{
+			log(std::string("貼れませんでした(JSON ではない): ") + e.what(), LogLevel::Error);
+			return;
+		}
+		int count = 0;
+		std::string error;
+		if (editor->pasteEntities(items, count, error))
+		{
+			selected = static_cast<int>(editor->entities().size()) - count;
+			log("貼りました: " + std::to_string(count) + " 個");
+		}
+		else log("貼れませんでした: " + error, LogLevel::Error);
+	}).argName = "(省略可)JSON。省略するとクリップボードから";
 	add("entity.delete", "削除", "Delete", ImGuiKey_Delete, hasSelection, [this](const std::string&) {
 		editor->destroy(selectedEntity());
 		selected = -1;
