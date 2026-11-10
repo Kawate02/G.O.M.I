@@ -4,7 +4,7 @@ CLAUDE.mdに追記・修正する時の基準は `D:/claude/knowledge/notes/CLAU
 
 ユーザーの過去作の、C++製のECSゲームエンジン(`GomiEngine/`)。2Dと3Dを描け、ImGuiのエディタ(`Editor/`、`GomiEditor`)でシーンを組み立てられる(2026-11-08 に3D・エディタ対応が完了)。描画は OpenGL 4.5(GLFW)、音声は miniaudio、ビルドは CMake(2026-11-07 に DxLib から移行)。`portfolio/` はポートフォリオ用のページ。
 
-- コードを変えたら Debug ビルドし、`--fixed-dt 60` 付きの起動オプションで操作を再現して撮った画面を、変更前の画面と比べて確認する。`ctest` も通す(操作の記録を流して基準の画面・状態と比べる再現テスト `Replay.*` を含む。見た目や動きを意図して変えた時は、画面を確かめてから `--replay-update` で基準を更新する)。エディタも同じ起動オプション(`--click`・`--drag`・`--type`、コマンドを ID で呼ぶ `--command`。一覧は `GomiEditor --list-commands`)で操作を再現して撮る。エディタで保存を試す時は assets のコピーを `--assets` で渡す
+- コードを変えたら `tools/verify.sh` を流す(下の確認を1コマンドで行い要約だけ出す。変更前にも一度流して基準を撮る)。中身は、Debug ビルドし、`--fixed-dt 60` 付きの起動オプションで操作を再現して撮った画面を、変更前の画面と比べて確認する。`ctest` も通す(操作の記録を流して基準の画面・状態と比べる再現テスト `Replay.*` を含む。見た目や動きを意図して変えた時は、画面を確かめてから `--replay-update` で基準を更新する)。エディタも同じ起動オプション(`--click`・`--drag`・`--type`、コマンドを ID で呼ぶ `--command`。一覧は `GomiEditor --list-commands`)で操作を再現して撮る。エディタで保存を試す時は assets のコピーを `--assets` で渡す
 - エディタの中身(編集・元に戻す・再生/停止・保存)は `SceneEditor`(画面無し・テストあり)、画面は `Editor/EditorApp.cpp`。編集の処理は SceneEditor 側に書く。エディタの操作を足す時は `registerCommands()` にコマンドとして足す(メニュー・ショートカット・パレット・`--command` に同じ ID で出る)
 - ゲームの中身(シーン・プレハブ・UI・画像・音)は `assets/` の JSON とファイル。C++ に静的に書かない。新しいコンポーネント・System は登録ファイル(`ComponentRegistration.cpp` / `SystemRegistry.cpp`)に足す
 - ソースは UTF-8(MSVC に `/utf-8` を付けている)。Shift-JIS で保存しない

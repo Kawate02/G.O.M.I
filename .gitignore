@@ -422,3 +422,6 @@ GomiEngine/Dx/
 
 # CMake build output
 /build/
+
+# 動作確認スクリプト(tools/verify.sh)の撮影・ログ
+/verify/
