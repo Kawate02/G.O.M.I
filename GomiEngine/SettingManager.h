@@ -1,5 +1,6 @@
 #pragma once
 #include "include/json.hpp"
+#include <filesystem>
 #include <fstream>
 
 #include "Utilities.h"
@@ -11,7 +12,8 @@ class SettingManager
 private:
 	SettingManager() = default;
 	std::map<std::string, std::string> settings;
-	const std::string filename = "settings.json";
+	const std::string filename = "settings.json"; //遊ぶ人の設定なので exe の隣に置く(プロジェクトには置かない)
+	std::filesystem::path path() const;
 	const std::map<std::string, std::string> defaults = {
 		{ "windowWidth", "800" },
 		{ "windowHeight", "600" },

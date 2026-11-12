@@ -1,8 +1,14 @@
 #include "SettingManager.h"
+#include "GameModule.h"
+
+std::filesystem::path SettingManager::path() const
+{
+	return GameModule::exeDir() / filename;
+}
 
 void SettingManager::loadSettings()
 {
-	std::ifstream file(filename);
+	std::ifstream file(path());
 	if (file.is_open())
 	{
 		try
@@ -23,7 +29,7 @@ void SettingManager::loadSettings()
 
 void SettingManager::saveSettings() const
 {
-	std::ofstream file(filename);
+	std::ofstream file(path());
 	if (file.is_open())
 	{
 		nlohmann::json j;

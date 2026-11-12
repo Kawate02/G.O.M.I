@@ -1,3 +1,4 @@
+#include "Project.h"
 #include "Game.h"
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
@@ -13,8 +14,9 @@ void Game::init()
 {
 	registerBuiltinComponents();
 	registerBuiltinSystems();
-	//ゲームのコードは exe の隣の GomiGame.dll(あれば)
+	//ゲームのコードは exe の隣の GomiGame.dll(書き出したゲーム)、無ければプロジェクトのビルドしたもの(あれば)
 	auto gameDll = GameModule::exeDir() / GameModule::DLL_NAME;
+	if (!std::filesystem::exists(gameDll)) gameDll = Project::getInstance().buildDir() / "bin" / GameModule::DLL_NAME;
 	if (std::filesystem::exists(gameDll))
 	{
 		std::string error;
