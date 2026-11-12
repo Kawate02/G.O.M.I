@@ -425,3 +425,6 @@ GomiEngine/Dx/
 
 # 動作確認スクリプト(tools/verify.sh)の撮影・ログ
 /verify/
+
+# 配布物(tools/release.sh)
+/dist/

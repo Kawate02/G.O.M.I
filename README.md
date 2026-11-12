@@ -36,6 +36,12 @@ Visual Studio で開く時は、フォルダを開く(CMake として読み込�
 
 `cmake --install build --config Debug --prefix <先>` で、エディタ・ゲームの exe・DLL と、プロジェクトのゲームのコードを作るための `sdk/`(`GomiEngine.cmake`・`game/CMakeLists.txt`・`include/`・`lib/GomiCore.lib`)が置かれる。バージョンごとの配布物はこの形。ゲームのコードはエンジンと同じ構成(Debug / Release)でしか作れない。cmake は PATH か、Visual Studio に付いてくるもの(vswhere で探す)を使う。
 
+### バージョンごとの配布物
+
+バージョン番号は `CMakeLists.txt` の `project(GomiEngine VERSION <番号>)` の1か所(エディタのタイトル・`--version`・sdk に出る)。プロジェクトの `project.json` の `engine` に使うバージョンを書き、エディタと違えば警告が出る。
+
+`tools/release.sh <番号>` で Release ビルドのインストールした形と見本のプロジェクト(`templates/Demo/`)を `dist/GOMI-<番号>-windows-x64.zip` にし、タグ `v<番号>` を付けて配布用の Private リポジトリ `Kawate02/G.O.M.I-releases` の Releases に上げる(`--no-upload` で zip まで)。番号を上げる時は先に `CMakeLists.txt` を直してコミットする。
+
 ## assets の中身
 
 アセットは `assets/` からの相対パス(`images/player.png` など)で指定する。
