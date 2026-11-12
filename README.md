@@ -47,8 +47,9 @@ Visual Studio で開く時は、フォルダを開く(CMake として読み込�
 Unity Hub のように、エンジンのバージョンとプロジェクトを1か所で扱う入口。`tools/install-launcher.sh` で Release ビルドを `%USERPROFILE%/GOMI/launcher/` に置く(エンジンのバージョンに依らない1本なので配布物の zip には入れない)。
 
 - 画面: 「バージョン」で Releases から入れる(gh を使う)か、落とした zip から入れる。「プロジェクト」で入れたバージョンのひな形(`templates/`)から作り、`project.json` の `engine` のエディタで開く。入っていない時は入れるか別のバージョンで開くかを選ぶ
+- 一覧の行の右クリックか「…」: 設定(名前=フォルダ名・使うバージョン・`startScene`・`pauseUI`。`project.json` のほかの項目は残す)・複製(`build/` を除く。既定の名前は `<名前>_copy`)・エクスプローラー/VS Code で開く・一覧から外す・ごみ箱へ移す。「バージョン」の「消す…」で入れた版を消す(使っているプロジェクトがあれば並べて確かめる。ごみ箱ではなく完全に消す)。エディタなどで開いたままだと名前の変更・ごみ箱・版を消すは断る
 - 置き場所: `%USERPROFILE%/GOMI/`(入れたバージョンは `editors/<番号>/`、プロジェクトの一覧は `launcher.json`)。`--home <dir>` で変えられる。`%LOCALAPPDATA%` は Claude デスクトップから動かすと書き込みが別の場所に振り替わるので使わない
-- コマンド: 画面と同じことを `--list-releases`・`--install <番号>`・`--install-zip <zip>`・`--new <dir> --engine <番号> [--template <名>]`・`--add <dir>`・`--list-projects`・`--open <dir> [--engine <番号>]`・`--gh-status` でできる(`--help` で一覧)。画面の確認用に `--frames`・`--screenshot <コマ>:<png>`・`--click <コマ>:<x>,<y>`・`--tab projects|versions|new`
+- コマンド: 画面と同じことを `--list-releases`・`--install <番号>`・`--install-zip <zip>`・`--new <dir> --engine <番号> [--template <名>]`・`--add <dir>`・`--list-projects`・`--open <dir> [--engine <番号>]`・`--show <dir>`・`--set <dir> <項目>=<値>`・`--set-engine <dir> <番号>`・`--rename <dir> <名前>`・`--duplicate <dir> [--name <名前>]`・`--remove <dir>`・`--trash <dir>`・`--reveal <dir>`・`--code <dir>`・`--uninstall <番号> [--force]`・`--gh-status` でできる(`--help` で一覧)。画面の確認用に `--frames`・`--screenshot <コマ>:<png>`・`--click <コマ>:<x>,<y>`・`--tab projects|versions|new`
 - gh が無い・ログインしていない時は、「バージョン」に理由と直し方(`winget install GitHub.cli` / `gh auth login`)が出る。zip からはいつでも入れられる
 - エディタ 0.1.0 は日本語などの入ったパスのプロジェクトを開けない(0.1.1 で直した)。新しいプロジェクトの画面で 0.1.0 を選ぶと注意が出る
 
