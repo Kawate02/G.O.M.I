@@ -467,10 +467,10 @@ namespace
 			std::filesystem::path dest = u8path(newParent) / u8path(newName);
 			ImGui::Spacing();
 			ImGui::TextColored(COLOR_DIM, "作る場所: %s", u8str(dest).c_str());
-			//エディタ 0.1.0 は起動オプションのパスを ANSI で読むので、日本語などの入ったパスのプロジェクトを開けない
+			//エディタ 0.1.0 は起動オプションのパスを ANSI で読むので、日本語などの入ったパスのプロジェクトを開けない(0.1.1 で直した)
 			std::string destText = u8str(dest);
-			if (std::any_of(destText.begin(), destText.end(), [](char c) { return static_cast<unsigned char>(c) >= 0x80; }))
-				ImGui::TextColored(COLOR_WARN, "パスに日本語などが入っています。エディタ 0.1.0 はこのプロジェクトを開けません(英数字のパスにしてください)");
+			if (newVersion == "0.1.0" && std::any_of(destText.begin(), destText.end(), [](char c) { return static_cast<unsigned char>(c) >= 0x80; }))
+				ImGui::TextColored(COLOR_WARN, "パスに日本語などが入っています。エディタ 0.1.0 はこのプロジェクトを開けません(英数字のパスにするか、0.1.1 以降を使ってください)");
 			if (!newError.empty()) ImGui::TextColored(COLOR_ERROR, "%s", newError.c_str());
 			ImGui::Spacing();
 
