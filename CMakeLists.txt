@@ -164,6 +164,20 @@ install(DIRECTORY GomiEngine/ DESTINATION sdk/include FILES_MATCHING PATTERN "*.
 install(FILES ${CMAKE_BINARY_DIR}/generated/GomiVersion.h DESTINATION sdk/include)
 install(DIRECTORY ${glm_SOURCE_DIR}/glm DESTINATION sdk/include FILES_MATCHING PATTERN "*.hpp" PATTERN "*.inl" PATTERN "*.h")
 
+# --- ランチャー(バージョンを入れる・プロジェクトを作る・開く) ---
+# バージョンに依らない1本の exe なので、配布物(install)には入れない。置くのは tools/install-launcher.sh
+add_library(LauncherCore STATIC Launcher/LauncherCore.cpp Launcher/LauncherCore.h)
+target_include_directories(LauncherCore PUBLIC Launcher GomiEngine/include)
+target_compile_definitions(LauncherCore PUBLIC NOMINMAX UNICODE _UNICODE)
+target_link_libraries(LauncherCore PUBLIC shell32 ole32)
+if (MSVC)
+    target_compile_options(LauncherCore PUBLIC /utf-8)
+endif()
+
+add_executable(LauncherTest tests/LauncherTest.cpp)
+target_link_libraries(LauncherTest PRIVATE LauncherCore)
+target_compile_definitions(LauncherTest PRIVATE GOMI_LAUNCHER_TEST_DIR="${CMAKE_BINARY_DIR}/launcher-test")
+
 # --- テスト(ctest で実行) ---
 enable_testing()
 foreach(test ComponentArrayTest ReflectionTest SceneTest CollisionTest ModelTest EditorTest ReplayTest GameModuleTest)
@@ -171,6 +185,8 @@ foreach(test ComponentArrayTest ReflectionTest SceneTest CollisionTest ModelTest
     target_link_libraries(${test} PRIVATE GomiCore)
     add_test(NAME ${test} COMMAND ${test})
 endforeach()
+
+add_test(NAME LauncherTest COMMAND LauncherTest)
 
 # GameModuleTest が読む見本のゲームのコード
 add_library(GameSampleModule SHARED GomiEngine/game_entry/GameEntry.cpp tests/game_sample/Sample.cpp)
