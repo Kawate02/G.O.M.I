@@ -21,6 +21,16 @@ static const char* USAGE =
 	"  --add <dir>                            既存のプロジェクトを一覧に足す\n"
 	"  --list-projects                        プロジェクトの一覧(engine と、入っているか)\n"
 	"  --open <dir> [--engine <番号>]          project.json の engine のエディタで開く\n"
+	"  --show <dir>                           project.json の設定と、選べるシーン・UI\n"
+	"  --set <dir> <項目>=<値>                 project.json の項目を直す(値が空なら消す。例: startScene=Title)\n"
+	"  --set-engine <dir> <番号>               使うバージョンを変える(入れた版だけ)\n"
+	"  --rename <dir> <新しい名前>             フォルダ名を変える\n"
+	"  --duplicate <dir> [--name <名前>]       build/ を除いて複製する(既定の名前は <名前>_copy)\n"
+	"  --remove <dir>                         一覧から外す(フォルダは残す)\n"
+	"  --trash <dir>                          ごみ箱へ移して一覧から外す\n"
+	"  --reveal <dir>                         エクスプローラーで開く\n"
+	"  --code <dir>                           VS Code で開く\n"
+	"  --uninstall <番号> [--force]            入れたバージョンを消す(使っているプロジェクトがあれば --force が要る)\n"
 	"  --gh-status                            gh が使えるか\n"
 	"  --version                              ランチャーのバージョン\n"
 	"画面の確認用: --frames <n>・--screenshot <コマ>:<png>・--click <コマ>:<x>,<y>・--tab projects|versions|new\n"
@@ -124,6 +134,83 @@ static int runCommand(LauncherCore& core, const LauncherOptions& o)
 			if (!missing.empty()) error += "(GomiLauncher --install " + missing + " で入れるか、--engine で別のバージョンを指定してください)";
 			return fail(error);
 		}
+		return 0;
+	}
+	fs::path dir = u8path(o.value);
+	if (o.command == "show")
+	{
+		if (!fs::exists(dir / "project.json")) return fail("project.json がありません: " + o.value);
+		for (const char* key : { "engine", "startScene", "pauseUI" })
+			std::cout << key << "\t" << LauncherCore::projectValue(dir, key) << "\n";
+		std::cout << "シーン:";
+		for (auto& s : LauncherCore::projectScenes(dir)) std::cout << " " << s;
+		std::cout << "\nUI:";
+		for (auto& s : LauncherCore::projectUIs(dir)) std::cout << " " << s;
+		std::cout << std::endl;
+		return 0;
+	}
+	if (o.command == "set")
+	{
+		auto eq = o.value2.find('=');
+		if (eq == std::string::npos || eq == 0) return fail("--set は <項目>=<値> です: " + o.value2);
+		if (!LauncherCore::setProjectValue(dir, o.value2.substr(0, eq), o.value2.substr(eq + 1), error)) return fail(error);
+		return 0;
+	}
+	if (o.command == "set-engine")
+	{
+		if (!core.isInstalled(o.value2)) return fail(o.value2 + " は入っていません(GomiLauncher --install " + o.value2 + " で入れてください)");
+		if (!LauncherCore::setProjectValue(dir, "engine", o.value2, error)) return fail(error);
+		return 0;
+	}
+	if (o.command == "rename")
+	{
+		fs::path renamed;
+		if (!core.renameProject(dir, o.value2, error, &renamed)) return fail(error);
+		std::cout << "変えました: " << u8str(renamed) << std::endl;
+		if (LauncherCore::hasNonAscii(u8str(renamed)))
+			std::cerr << "注意: パスに日本語などが入っています。エディタ 0.1.0 はこのプロジェクトを開けません" << std::endl;
+		return 0;
+	}
+	if (o.command == "duplicate")
+	{
+		std::string name = o.newName.empty() ? LauncherCore::duplicateName(dir) : o.newName;
+		fs::path dest = fs::absolute(dir).parent_path() / u8path(name);
+		if (!core.duplicateProject(dir, dest, error)) return fail(error);
+		std::cout << "複製しました: " << u8str(dest) << std::endl;
+		return 0;
+	}
+	if (o.command == "remove")
+	{
+		if (!core.removeProject(dir, error)) return fail(error);
+		return 0;
+	}
+	if (o.command == "trash")
+	{
+		if (!core.trashProject(dir, error)) return fail(error);
+		std::cout << "ごみ箱へ移しました: " << o.value << std::endl;
+		return 0;
+	}
+	if (o.command == "reveal")
+	{
+		if (!LauncherCore::revealInExplorer(dir, error)) return fail(error);
+		return 0;
+	}
+	if (o.command == "code")
+	{
+		if (!LauncherCore::openInVSCode(dir, error)) return fail(error);
+		return 0;
+	}
+	if (o.command == "uninstall")
+	{
+		auto users = core.projectsUsing(o.value);
+		if (!users.empty() && !o.force)
+		{
+			std::cerr << o.value << " を使っているプロジェクトがあります(消すと開く時に入れ直しか別の版を選ぶことになります):\n";
+			for (auto& p : users) std::cerr << "  " << p << "\n";
+			return fail("それでも消すなら --force を付けてください");
+		}
+		if (!core.uninstall(o.value, error)) return fail(error);
+		std::cout << o.value << " を消しました" << std::endl;
 		return 0;
 	}
 	return fail("不明なコマンド: " + o.command);
