@@ -76,7 +76,8 @@ EditorApp::EditorApp(const DebugOptions& options) : debug(options)
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_NavEnableKeyboard;
 	//操作を再現している時は前回の配置を読まない(毎回同じ画面にする)
-	static std::string iniPath = (std::filesystem::current_path() / "editor_layout.ini").string();
+	//窓の並びは使う人の設定なので、プロジェクトでなくエディタ(exe)の隣に置く
+	static std::string iniPath = (GameModule::exeDir() / "editor_layout.ini").string();
 	io.IniFilename = debug.maxFrames > 0 ? nullptr : iniPath.c_str();
 	const char* fonts[] = { "C:/Windows/Fonts/meiryo.ttc", "C:/Windows/Fonts/YuGothM.ttc", "C:/Windows/Fonts/msgothic.ttc" };
 	for (auto f : fonts)
