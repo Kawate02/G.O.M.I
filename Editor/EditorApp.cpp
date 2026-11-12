@@ -1,4 +1,5 @@
 #include "Project.h"
+#include "GomiVersion.h"
 #include "EditorApp.h"
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
@@ -65,7 +66,7 @@ EditorApp::EditorApp(const DebugOptions& options) : debug(options)
 	gameHeight = settings.getValue<int>("windowHeight");
 
 	window.setResizable(true);
-	window.init(1600, 900, "G.O.M.I Editor");
+	window.init(1600, 900, "G.O.M.I Editor " GOMI_VERSION);
 	drawer.init();
 	audioBackend.init();
 	gameTarget = drawer.createRenderTarget(gameWidth, gameHeight);
@@ -2252,7 +2253,7 @@ int EditorApp::run()
 		audioPlayer.play(audioBackend, audioQueue);
 		EventBus::getInstance().cleanup();
 
-		std::string title = "G.O.M.I Editor - " + (editor->getPath().empty() ? std::string("(新しいシーン)") : editor->getPath()) + (editor->isDirty() ? " *" : "");
+		std::string title = "G.O.M.I Editor " GOMI_VERSION " - " + (editor->getPath().empty() ? std::string("(新しいシーン)") : editor->getPath()) + (editor->isDirty() ? " *" : "");
 		window.setTitle(title);
 
 		if (debug.shouldQuit(frame)) break;

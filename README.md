@@ -122,6 +122,7 @@ Visual Studio で開く時は、フォルダを開く(CMake として読み込�
 GomiEngine.exe --world Field --fixed-dt 60 --key 10-60:D --screenshot 60:shot.png --frames 61
 GomiEngine.exe --world Field --save-scene 1:saved.json --frames 1   # 今の World をシーンとして保存
 GomiEngine.exe --world saved.json                                   # 保存したシーンを開く
+GomiEditor.exe --version                                            # エンジンのバージョンを出して終わる
 GomiEditor.exe --list-commands                                      # エディタのコマンドの一覧(ID・ショートカット・名前・引数をタブ区切り)
 GomiEditor.exe --world Field --command 30:entity.select=player --command 31:entity.duplicate --screenshot 40:shot.png --frames 41
 GomiEditor.exe --world Field --type "30:{CTRL+SHIFT+P}" --type "40:複製" --type "50:{ENTER}"   # キーも押せる

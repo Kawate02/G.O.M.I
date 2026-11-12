@@ -17,6 +17,7 @@
 ///   --drag <start>-<end>:<x1>,<y1>,<x2>,<y2>  左ボタンを押したまま動かす(エディタ用)
 ///   --type <frame>:<文字>          文字を入力したことにする(エディタの入力欄用)。{ENTER} {SELECTALL} や {CTRL+SHIFT+P} {DOWN} {ESC} のようにキーも押せる
 ///   --command <frame>:<ID>[=<引数>]  エディタのコマンドを実行する(例: 30:scene.open=Field、30:entity.select=player)
+///   --version                      エンジンのバージョン(例: 0.1.0)を出して終わる
 ///   --list-commands                エディタのコマンドの一覧(ID・ショートカット・名前・引数)を出して終わる
 ///   --select <番号>                エディタで最初に選んでおく Entity の並び順の番号
 ///   --record <path>                操作を記録し、終わる時に記録の JSON を書く(Δt は 1/60 に固定。--fixed-dt があればそれ)
@@ -72,6 +73,7 @@ public:
 	bool replayUpdate = false;
 	bool noWait = false;
 	bool listCommands = false;
+	bool printVersion = false;
 
 	/// <summary>
 	/// 解釈できない引数があれば説明を返す

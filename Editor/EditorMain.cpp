@@ -1,5 +1,6 @@
 #include "EditorApp.h"
 #include "Project.h"
+#include "GomiVersion.h"
 #include <iostream>
 
 // G.O.M.I エディタ。起動オプションはゲームと同じ(DebugOptions.h)。--world で最初に開くシーン
@@ -10,6 +11,11 @@ int main(int argc, char** argv)
     {
         std::cerr << *error << std::endl;
         return 1;
+    }
+    if (options.printVersion)
+    {
+        std::cout << GOMI_VERSION << std::endl;
+        return 0;
     }
     try
     {

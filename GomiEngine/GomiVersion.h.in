@@ -1,0 +1,6 @@
+#pragma once
+// CMakeLists.txt の project(GomiEngine VERSION ...) から作る。直接書き換えない
+#define GOMI_VERSION "@PROJECT_VERSION@"
+#define GOMI_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define GOMI_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define GOMI_VERSION_PATCH @PROJECT_VERSION_PATCH@

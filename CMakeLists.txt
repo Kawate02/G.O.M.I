@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
-project(GomiEngine LANGUAGES C CXX)
+# エンジンのバージョン。配布物(tools/release.sh)・タグ(v<番号>)・エディタの表示・sdk の GomiEngine.cmake はここから決まる
+project(GomiEngine VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -72,10 +73,14 @@ file(GLOB GOMI_SOURCES CONFIGURE_DEPENDS
     GomiEngine/*.h)
 list(REMOVE_ITEM GOMI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/GomiEngine/Gomi.cpp)
 
+# GOMI_VERSION(project の VERSION)を C++ から使うヘッダ
+configure_file(GomiEngine/GomiVersion.h.in ${CMAKE_BINARY_DIR}/generated/GomiVersion.h @ONLY)
+
 add_library(GomiCore SHARED ${GOMI_SOURCES})
 set_target_properties(GomiCore PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 target_include_directories(GomiCore PUBLIC
     GomiEngine
+    ${CMAKE_BINARY_DIR}/generated
     ${miniaudio_SOURCE_DIR}
     ${stb_SOURCE_DIR}
     ${cgltf_SOURCE_DIR})
@@ -156,6 +161,7 @@ install(FILES GomiEngine/settings.json DESTINATION .)
 install(FILES ${CMAKE_BINARY_DIR}/sdk-install/$<CONFIG>/GomiEngine.cmake DESTINATION sdk)
 install(FILES sdk/game/CMakeLists.txt GomiEngine/game_entry/GameEntry.cpp DESTINATION sdk/game)
 install(DIRECTORY GomiEngine/ DESTINATION sdk/include FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN "game_entry" EXCLUDE)
+install(FILES ${CMAKE_BINARY_DIR}/generated/GomiVersion.h DESTINATION sdk/include)
 install(DIRECTORY ${glm_SOURCE_DIR}/glm DESTINATION sdk/include FILES_MATCHING PATTERN "*.hpp" PATTERN "*.inl" PATTERN "*.h")
 
 # --- テスト(ctest で実行) ---

@@ -65,6 +65,7 @@ std::optional<std::string> DebugOptions::parse(const std::vector<std::string>& a
 		if (opt == "--replay-update") { replayUpdate = true; continue; }
 		if (opt == "--no-wait") { noWait = true; continue; }
 		if (opt == "--list-commands") { listCommands = true; continue; }
+		if (opt == "--version") { printVersion = true; continue; }
 		if (i + 1 >= argc) return "missing value for " + opt;
 		std::string value = argv[++i];
 		int start = 0, end = 0;

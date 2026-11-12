@@ -1,6 +1,7 @@
 #include <iostream>
 #include "Game.h"
 #include "Project.h"
+#include "GomiVersion.h"
 #include "GlfwWindow.h"
 #include "GlfwInput.h"
 #include "GlDrawer.h"
@@ -13,6 +14,11 @@ int main(int argc, char** argv)
     {
         std::cerr << *error << std::endl;
         return 1;
+    }
+    if (options.printVersion)
+    {
+        std::cout << GOMI_VERSION << std::endl;
+        return 0;
     }
 
     try
