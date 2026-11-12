@@ -68,6 +68,8 @@ public:
 	bool enabled() const;
 	/// <summary>起動時: ビルド済みの DLL があれば読む(まだ World が無い時に呼ぶ)</summary>
 	bool loadBuilt(std::string& error);
+	/// <summary>game/ にソースがあるのに、まだビルドした DLL が無い(作ったばかりのプロジェクトなど)</summary>
+	bool needsFirstBuild() const;
 	/// <summary>ビルド済みの DLL が、今読んでいるものと違う(ビルドで作り直された)</summary>
 	bool builtChanged() const;
 	/// <summary>毎フレーム呼ぶ。0.5 秒ごとに保存を見て、落ち着いたらビルドを始める</summary>

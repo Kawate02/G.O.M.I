@@ -104,14 +104,24 @@ EditorApp::EditorApp(const DebugOptions& options) : debug(options)
 		std::string error;
 		if (!gameCode->loadBuilt(error) && !error.empty()) log("ゲームのコードを読めませんでした: " + error, LogLevel::Error);
 		//閉じている間に足した・消したファイルもあるので、起動したら一度ビルドする(変わっていなければ差し替えない)
-		if (gameCode->enabled() && debug.maxFrames <= 0) gameCode->startBuild();
+		//台本の実行(--frames)では飛ばすが、まだ一度もビルドしていなければシーンを開くのに要るので作る
+		if (gameCode->enabled() && (debug.maxFrames <= 0 || gameCode->needsFirstBuild())) gameCode->startBuild();
 	}
 
 	editor = std::make_unique<SceneEditor>(inputState, renderQueue, audioQueue);
 	if (!debug.startWorld.empty())
 	{
 		std::string error;
-		if (!editor->open(debug.startWorld, error)) log("開けませんでした: " + error, LogLevel::Error);
+		if (!editor->open(debug.startWorld, error))
+		{
+			//プロジェクトを作ったばかり・build/ を消した時は、ゲームのコードの Component・System がまだ無くて開けない
+			if (gameCode->isBuilding())
+			{
+				openAfterCode = debug.startWorld;
+				log("ゲームのコードをビルドしてから開きます: " + debug.startWorld);
+			}
+			else log("開けませんでした: " + error, LogLevel::Error);
+		}
 	}
 	selected = debug.select;
 	registerCommands();
@@ -167,6 +177,13 @@ void EditorApp::updateGameCode()
 	{
 		log("ゲームのコードを読み直しました(Component " + std::to_string(ComponentRegistry::getInstance().size())
 			+ "・System " + std::to_string(SystemRegistry::getInstance().size()) + ")");
+		//起動時に開けなかったシーン(その間に別のシーンを開いたり編集したりしていなければ)
+		if (!openAfterCode.empty() && editor->getPath().empty() && !editor->isDirty())
+		{
+			std::string openError;
+			if (!editor->open(openAfterCode, openError)) log("開けませんでした: " + openError, LogLevel::Error);
+		}
+		openAfterCode.clear();
 	}
 	else
 	{

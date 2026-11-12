@@ -166,6 +166,12 @@ std::map<fs::path, fs::file_time_type> GameCodeHost::scan() const
 	return found;
 }
 
+bool GameCodeHost::needsFirstBuild() const
+{
+	std::error_code ec;
+	return enabled() && !stamps.empty() && !fs::exists(config.builtDll, ec);
+}
+
 bool GameCodeHost::builtChanged() const
 {
 	std::error_code ec;

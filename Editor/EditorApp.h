@@ -92,6 +92,7 @@ private:
 	std::unique_ptr<GameCodeHost> gameCode;
 	std::unique_ptr<SceneEditor> editor;
 	bool codeSwapPending = false;  //ビルドできた。止めている時に差し替える
+	std::string openAfterCode;     //ゲームのコードがまだ無くて開けなかったシーン(ビルドして読んだら開き直す)
 	int codeErrorCount = 0;        //最後のビルドのエラーの数
 	void updateGameCode();
 	//ひな形の名前を聞く
