@@ -98,3 +98,9 @@ void ResourceManager::unloadAll()
     sounds.clear();
     meshes.clear();
 }
+
+ResourceManager& ResourceManager::getInstance()
+{
+	static ResourceManager instance;
+	return instance;
+}

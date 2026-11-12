@@ -15,11 +15,8 @@ private:
 	std::vector<std::pair<std::string, std::function<std::unique_ptr<ISystem>()>>> factories;
 	SystemRegistry() = default;
 public:
-	static SystemRegistry& getInstance()
-	{
-		static SystemRegistry instance;
-		return instance;
-	}
+	// DLL をまたいで1つにするため、実体は .cpp に置く(ヘッダの inline だとモジュールごとに別物になる)
+	static SystemRegistry& getInstance();
 
 	template <typename T>
 	void add(const std::string& name)

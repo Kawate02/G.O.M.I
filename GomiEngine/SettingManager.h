@@ -18,11 +18,8 @@ private:
 		{ "fullscreen", "false" },
 	};
 public:
-	static SettingManager& getInstance()
-	{
-		static SettingManager instance;
-		return instance;
-	}
+	// DLL をまたいで1つにするため、実体は .cpp に置く(ヘッダの inline だとモジュールごとに別物になる)
+	static SettingManager& getInstance();
 
 	void loadSettings();
 	void saveSettings() const;

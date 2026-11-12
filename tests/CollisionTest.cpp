@@ -26,7 +26,7 @@ struct Env
 	bool hits(Entity self, Vec3 move = {})
 	{
 		world.col().createGrid(world);
-		return !world.col().queryAt(world, self, EntityTag::UNIT, ruleTable.at("unit_to_wall"), move).entities.empty();
+		return !world.col().queryAt(world, self, EntityTag::UNIT, collisionRules().at("unit_to_wall"), move).entities.empty();
 	}
 };
 

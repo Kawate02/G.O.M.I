@@ -70,7 +70,7 @@ void MoveResolveSystem::update(World& world, int frameCount, float deltaTime)
 		{
 			Vec3 step;
 			step[axis] = movec.result[axis];
-			auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), step);
+			auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, collisionRules().at("unit_to_wall"), step);
 			if (hitE.entities.size() > 0)
 			{
 				movec.result[axis] = 0;

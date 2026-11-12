@@ -106,3 +106,9 @@ void AssetDatabase::warnOnce(const AssetID& id, const std::string& message)
 {
 	if (warned.insert(id).second) std::cerr << message << ": " << id << std::endl;
 }
+
+AssetDatabase& AssetDatabase::getInstance()
+{
+	static AssetDatabase instance;
+	return instance;
+}

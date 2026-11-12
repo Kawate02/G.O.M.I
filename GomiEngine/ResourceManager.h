@@ -22,11 +22,8 @@ private:
 	std::map<AssetID, std::pair<glm::vec3, glm::vec3>> meshBounds;
 	std::map<AssetID, std::vector<unsigned char>> soundData; //音声バックエンドが参照し続けるので持っておく
 public:
-	static ResourceManager& getInstance()
-	{
-		static ResourceManager instance;
-		return instance;
-	}
+	// DLL をまたいで1つにするため、実体は .cpp に置く(ヘッダの inline だとモジュールごとに別物になる)
+	static ResourceManager& getInstance();
 	ImageResource loadImage(IDrawer& drawer, const AssetID& assetID);
 	SoundResource loadSound(IAudioBackend& backend, const AssetID& assetID);
 	/// <summary>

@@ -24,11 +24,8 @@ private:
 	std::unordered_set<AssetID> warned;
 	AssetDatabase() = default;
 public:
-	static AssetDatabase& getInstance()
-	{
-		static AssetDatabase instance;
-		return instance;
-	}
+	// DLL をまたいで1つにするため、実体は .cpp に置く(ヘッダの inline だとモジュールごとに別物になる)
+	static AssetDatabase& getInstance();
 
 	/// <summary>
 	/// 起動時の assets フォルダを決める。指定 > 実行ファイルの隣の assets > ソースの assets(開発中)

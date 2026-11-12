@@ -38,11 +38,8 @@ private:
 	std::unordered_map<std::string, std::vector<ListenerEntry>> listeners;
 	size_t nextId = 1;
 public:
-	static EventBus& getInstance()
-	{
-		static EventBus instance;
-		return instance;
-	}
+	// DLL をまたいで1つにするため、実体は .cpp に置く(ヘッダの inline だとモジュールごとに別物になる)
+	static EventBus& getInstance();
 
 	ListenerHandle subscribe(std::string eventName, Callback callback);
 	void unsubscribe(ListenerHandle handle);

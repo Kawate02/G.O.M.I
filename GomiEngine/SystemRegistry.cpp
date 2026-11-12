@@ -39,3 +39,9 @@ void registerBuiltinSystems()
 	r.add<BackGroundSystem>("BackGroundSystem");
 	r.add<MeshRendererSystem>("MeshRendererSystem");
 }
+
+SystemRegistry& SystemRegistry::getInstance()
+{
+	static SystemRegistry instance;
+	return instance;
+}

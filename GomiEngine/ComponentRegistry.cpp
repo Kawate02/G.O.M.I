@@ -26,3 +26,9 @@ const ComponentInfo* ComponentRegistry::find(std::type_index type) const
 	}
 	return nullptr;
 }
+
+ComponentRegistry& ComponentRegistry::getInstance()
+{
+	static ComponentRegistry instance;
+	return instance;
+}

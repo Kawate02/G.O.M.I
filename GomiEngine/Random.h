@@ -10,11 +10,8 @@
 class Random
 {
 private:
-    static std::mt19937& engine()
-    {
-        static std::mt19937 gen(std::random_device{}());
-        return gen;
-    }
+    // DLL をまたいで1つにするため、実体は Random.cpp に置く
+    static std::mt19937& engine();
 public:
     static void seed(uint32_t value)
     {

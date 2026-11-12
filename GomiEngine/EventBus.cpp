@@ -25,3 +25,9 @@ void EventBus::cleanup()
 		vec.erase(std::remove_if(vec.begin(), vec.end(), [](const ListenerEntry& entry) { return !entry.active; }), vec.end());
 	}
 }
+
+EventBus& EventBus::getInstance()
+{
+	static EventBus instance;
+	return instance;
+}

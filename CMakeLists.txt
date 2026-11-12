@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
+# exe・DLL を全部 build/<構成>/ に出す(GomiCore.dll・glfw3.dll を exe の隣に置くため)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
 # --- 外部ライブラリ(初回の構成時に自動で取得) ---
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -49,20 +52,28 @@ FetchContent_Declare(imguizmo
     GIT_TAG 18cef5e031d8c6973d80284c67f60549fafd78c1
     SOURCE_SUBDIR _no_cmake)
 
-FetchContent_MakeAvailable(glfw miniaudio stb glm cgltf imgui imguizmo)
+# glfw はエンジン(GomiCore.dll)とエディタの両方が呼ぶので DLL にして1つにする
+set(BUILD_SHARED_LIBS ON)
+FetchContent_MakeAvailable(glfw)
+set(BUILD_SHARED_LIBS OFF)
+FetchContent_MakeAvailable(miniaudio stb glm cgltf imgui imguizmo)
 
 # OpenGL 4.5 core のローダー(glad2 で生成済みのものを同梱)
-add_library(glad STATIC third_party/glad/src/gl.c)
+# エンジンとエディタの両方が GL を呼ぶので、関数ポインタを1つにするため DLL にする
+add_library(glad SHARED third_party/glad/src/gl.c)
 target_include_directories(glad PUBLIC third_party/glad/include)
+target_compile_definitions(glad PUBLIC GLAD_API_CALL_EXPORT PRIVATE GLAD_API_CALL_EXPORT_BUILD)
 
 # --- エンジン本体 ---
-# main 以外をライブラリにして、実行ファイルとテストで共有する
+# main 以外を DLL にして、実行ファイル・エディタ・テスト・ゲームのコード(GomiGame.dll)で共有する。
+# 静的ライブラリだと登録表などのシングルトンがモジュールごとに別物になる
 file(GLOB GOMI_SOURCES CONFIGURE_DEPENDS
     GomiEngine/*.cpp
     GomiEngine/*.h)
 list(REMOVE_ITEM GOMI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/GomiEngine/Gomi.cpp)
 
-add_library(GomiCore STATIC ${GOMI_SOURCES})
+add_library(GomiCore SHARED ${GOMI_SOURCES})
+set_target_properties(GomiCore PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 target_include_directories(GomiCore PUBLIC
     GomiEngine
     ${miniaudio_SOURCE_DIR}

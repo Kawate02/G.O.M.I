@@ -35,3 +35,9 @@ void SettingManager::saveSettings() const
 		file.close();
 	}
 }
+
+SettingManager& SettingManager::getInstance()
+{
+	static SettingManager instance;
+	return instance;
+}

@@ -91,11 +91,8 @@ private:
 	std::vector<ComponentInfo> components;
 	ComponentRegistry() = default;
 public:
-	static ComponentRegistry& getInstance()
-	{
-		static ComponentRegistry instance;
-		return instance;
-	}
+	// DLL をまたいで1つにするため、実体は .cpp に置く(ヘッダの inline だとモジュールごとに別物になる)
+	static ComponentRegistry& getInstance();
 
 	template <typename C>
 	class Builder

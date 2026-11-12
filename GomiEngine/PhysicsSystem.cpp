@@ -57,7 +57,7 @@ void PhysicsSystem::update(World& world, int frameCount, float deltaTime)
 		{
 			Vec3 step;
 			step[axis] = movec.physVel[axis] * deltaTime;
-			auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, ruleTable.at("unit_to_wall"), step);
+			auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, collisionRules().at("unit_to_wall"), step);
 			if (hitE.entities.size() > 0)
 			{
 				if (down[axis] != 0 && movec.physVel[axis] * down[axis] >= 0 && physc.gravity > 0)

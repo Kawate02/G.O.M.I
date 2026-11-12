@@ -25,4 +25,5 @@ struct CollisionRule
 	inline const EntityTag getPair(EntityTag self) { return a == self ? b : a; }
 };
 
-const extern std::unordered_map<RuleID, CollisionRule> ruleTable;
+// 当たり判定のルールの表(DLL をまたいで使えるよう、変数でなく関数にしている)
+const std::unordered_map<RuleID, CollisionRule>& collisionRules();
