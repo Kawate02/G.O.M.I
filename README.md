@@ -42,6 +42,16 @@ Visual Studio で開く時は、フォルダを開く(CMake として読み込�
 
 `tools/release.sh <番号>` で Release ビルドのインストールした形と見本のプロジェクト(`templates/Demo/`)を `dist/GOMI-<番号>-windows-x64.zip` にし、タグ `v<番号>` を付けて配布用の Private リポジトリ `Kawate02/G.O.M.I-releases` の Releases に上げる(`--no-upload` で zip まで)。番号を上げる時は先に `CMakeLists.txt` を直してコミットする。
 
+### ランチャー(GomiLauncher)
+
+Unity Hub のように、エンジンのバージョンとプロジェクトを1か所で扱う入口。`tools/install-launcher.sh` で Release ビルドを `%USERPROFILE%/GOMI/launcher/` に置く(エンジンのバージョンに依らない1本なので配布物の zip には入れない)。
+
+- 画面: 「バージョン」で Releases から入れる(gh を使う)か、落とした zip から入れる。「プロジェクト」で入れたバージョンのひな形(`templates/`)から作り、`project.json` の `engine` のエディタで開く。入っていない時は入れるか別のバージョンで開くかを選ぶ
+- 置き場所: `%USERPROFILE%/GOMI/`(入れたバージョンは `editors/<番号>/`、プロジェクトの一覧は `launcher.json`)。`--home <dir>` で変えられる。`%LOCALAPPDATA%` は Claude デスクトップから動かすと書き込みが別の場所に振り替わるので使わない
+- コマンド: 画面と同じことを `--list-releases`・`--install <番号>`・`--install-zip <zip>`・`--new <dir> --engine <番号> [--template <名>]`・`--add <dir>`・`--list-projects`・`--open <dir> [--engine <番号>]`・`--gh-status` でできる(`--help` で一覧)。画面の確認用に `--frames`・`--screenshot <コマ>:<png>`・`--click <コマ>:<x>,<y>`・`--tab projects|versions|new`
+- gh が無い・ログインしていない時は、「バージョン」に理由と直し方(`winget install GitHub.cli` / `gh auth login`)が出る。zip からはいつでも入れられる
+- エディタ 0.1.0 は日本語などの入ったパスのプロジェクトを開けない(起動オプションを ANSI で読む)。新しいプロジェクトの画面で注意が出る
+
 ## assets の中身
 
 アセットは `assets/` からの相対パス(`images/player.png` など)で指定する。
