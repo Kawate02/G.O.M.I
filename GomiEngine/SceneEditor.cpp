@@ -698,6 +698,43 @@ void SceneEditor::stop()
 	rebuild(playSnapshot);
 }
 
+bool SceneEditor::swapCode(const std::function<bool(std::string& error)>& swap, const std::function<void()>& revert, std::string& error)
+{
+	if (playing)
+	{
+		error = "cannot swap the game code while playing";
+		return false;
+	}
+	Json scene = snapshot();
+	//DLL の型の配列・System を持つものを先に全部消す(関数の実体が DLL の中にある)
+	currentWorld->release();
+	currentWorld.reset();
+	prefabCache.clear();
+	if (swap(error))
+	{
+		try
+		{
+			rebuild(scene);
+			return true;
+		}
+		catch (const std::exception& e)
+		{
+			error = e.what();
+			if (currentWorld) currentWorld->release();
+			currentWorld.reset();
+			prefabCache.clear();
+		}
+	}
+	revert();
+	try { rebuild(scene); }
+	catch (const std::exception& e)
+	{
+		error += std::string(" / cannot restore the scene: ") + e.what();
+		newScene();
+	}
+	return false;
+}
+
 Json SceneEditor::playState()
 {
 	return { { "world", SceneLoader::save(*currentWorld) }, { "scene", playScene }, { "frame", playFrame }, { "run", currentWorld->runState() } };

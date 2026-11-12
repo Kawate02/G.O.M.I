@@ -6,6 +6,7 @@
 #include "Renderer.h"
 #include "AudioPlayer.h"
 #include "SceneEditor.h"
+#include "GameCodeHost.h"
 #include "DebugOptions.h"
 #include "EditorCamera.h"
 #include "Replay.h"
@@ -87,7 +88,12 @@ private:
 	Renderer renderer;
 	AudioPlayer audioPlayer;
 	EventRequest<AudioCommand> audioRequest{ Event::Audio_Play };
+	//ゲームのコード(game/ → GomiGame.dll)。editor の World より後に消えるよう先に置く
+	std::unique_ptr<GameCodeHost> gameCode;
 	std::unique_ptr<SceneEditor> editor;
+	bool codeSwapPending = false;  //ビルドできた。止めている時に差し替える
+	int codeErrorCount = 0;        //最後のビルドのエラーの数
+	void updateGameCode();
 
 	int gameTarget = -1;
 	int gameWidth = 800;

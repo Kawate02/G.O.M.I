@@ -1,5 +1,6 @@
 #pragma once
 #include "World.h"
+#include <functional>
 #include "SceneLoader.h"
 #include "EventRequest.h"
 #include "SceneDiff.h"
@@ -191,6 +192,11 @@ public:
 	// ---- 再生
 	void play();
 	void stop();
+	/// <summary>
+	/// ゲームのコード(DLL)を差し替える。今の World を JSON にして消し → swap → 同じ JSON で作り直す。
+	/// swap が失敗するか新しいコードでシーンが読めなければ、revert で前のコードに戻して作り直し、false と理由を返す。止めている時だけ
+	/// </summary>
+	bool swapCode(const std::function<bool(std::string& error)>& swap, const std::function<void()>& revert, std::string& error);
 	inline bool isPlaying() const { return playing; }
 	/// <summary>
 	/// 再生中に一時停止する/再開する(止めている時は何もしない)

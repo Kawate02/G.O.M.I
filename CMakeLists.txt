@@ -116,6 +116,13 @@ target_link_libraries(imgui PUBLIC glfw)
 file(GLOB EDITOR_SOURCES CONFIGURE_DEPENDS Editor/*.cpp Editor/*.h)
 add_executable(GomiEditor ${EDITOR_SOURCES})
 target_link_libraries(GomiEditor PRIVATE GomiCore imgui)
+# ゲームのコード(game/)を見張ってビルドするための場所とコマンド
+target_compile_definitions(GomiEditor PRIVATE
+    GOMI_GAME_DIR="${CMAKE_CURRENT_SOURCE_DIR}/game"
+    GOMI_CMAKE_COMMAND="${CMAKE_COMMAND}"
+    GOMI_BUILD_DIR="${CMAKE_BINARY_DIR}"
+    GOMI_BUILD_CONFIG="$<CONFIG>")
+add_dependencies(GomiEditor GomiGame)
 if (MSVC)
     set_property(TARGET GomiEditor PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:GomiEditor>")
 endif()

@@ -96,6 +96,21 @@ EditorApp::EditorApp(const DebugOptions& options) : debug(options)
 	});
 	std::cerr.rdbuf(cerrCapture.get());
 
+	GameCodeHost::Config codeConfig;
+	codeConfig.sourceDir = std::filesystem::u8path(GOMI_GAME_DIR);
+	codeConfig.cmake = std::filesystem::u8path(GOMI_CMAKE_COMMAND);
+	codeConfig.buildDir = std::filesystem::u8path(GOMI_BUILD_DIR);
+	codeConfig.buildConfig = GOMI_BUILD_CONFIG;
+	codeConfig.builtDll = GameModule::exeDir() / GameModule::DLL_NAME;
+	codeConfig.liveDir = GameModule::exeDir() / "game-live";
+	gameCode = std::make_unique<GameCodeHost>(codeConfig);
+	{
+		std::string error;
+		if (!gameCode->loadBuilt(error) && !error.empty()) log("ゲームのコードを読めませんでした: " + error, LogLevel::Error);
+		//閉じている間に足した・消したファイルもあるので、起動したら一度ビルドする(変わっていなければ差し替えない)
+		if (gameCode->enabled() && debug.maxFrames <= 0) gameCode->startBuild();
+	}
+
 	editor = std::make_unique<SceneEditor>(inputState, renderQueue, audioQueue);
 	if (!debug.startWorld.empty())
 	{
@@ -127,6 +142,43 @@ void EditorApp::log(const std::string& message, LogLevel level)
 		problemSeen = false;
 	}
 	std::cout << message << std::endl;
+}
+
+void EditorApp::updateGameCode()
+{
+	if (!gameCode) return;
+	gameCode->poll(ImGui::GetTime());
+	if (auto result = gameCode->takeResult())
+	{
+		if (result->ok)
+		{
+			codeErrorCount = 0;
+			if (gameCode->builtChanged()) codeSwapPending = true;
+		}
+		else
+		{
+			codeErrorCount = static_cast<int>(result->errors.size());
+			codeSwapPending = false;
+			log("ゲームのコードのビルドに失敗しました(エラー " + std::to_string(codeErrorCount) + " 件)", LogLevel::Error);
+			for (auto& line : result->errors) log("  " + line, LogLevel::Error);
+		}
+	}
+	//差し替えは止めている時だけ(再生中・記録の再生中・記録中は止めた後)
+	if (!codeSwapPending || gameCode->isBuilding() || editor->isPlaying() || replayRun || recorder) return;
+	codeSwapPending = false;
+	std::string error;
+	if (editor->swapCode([this](std::string& e) { return gameCode->swapToBuilt(e); }, [this]() { gameCode->revert(); }, error))
+	{
+		log("ゲームのコードを読み直しました(Component " + std::to_string(ComponentRegistry::getInstance().size())
+			+ "・System " + std::to_string(SystemRegistry::getInstance().size()) + ")");
+	}
+	else
+	{
+		codeErrorCount = 1; //状態バーを赤くしてログへ誘う
+		log("ゲームのコードを差し替えられなかったので、前のコードに戻しました: " + error, LogLevel::Error);
+	}
+	int count = static_cast<int>(editor->entities().size());
+	if (selected >= count) selected = -1;
 }
 
 void EditorApp::refreshAssets(bool force)
@@ -426,6 +478,22 @@ void EditorApp::drawStatusBar()
 	ImGui::SameLine(0, 20);
 	ImGui::Text("%.0f FPS", ImGui::GetIO().Framerate);
 	ImGui::SameLine(0, 20);
+	if (gameCode && gameCode->enabled())
+	{
+		if (gameCode->isBuilding()) ImGui::TextColored(COLOR_WARNING, "コード: ビルド中…");
+		else if (codeErrorCount > 0)
+		{
+			std::string text = "コード: エラー " + std::to_string(codeErrorCount) + " 件";
+			ImGui::PushStyleColor(ImGuiCol_Text, COLOR_ERROR);
+			if (ImGui::Selectable(text.c_str(), false, 0, ImVec2(ImGui::CalcTextSize(text.c_str()).x, 0))) focusLog = true;
+			ImGui::PopStyleColor();
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("押すとログを開く");
+		}
+		else if (codeSwapPending) ImGui::TextColored(COLOR_WARNING, "コード: 停止すると読み直す");
+		else if (gameCode->module().isLoaded()) ImGui::TextDisabled("コード: 最新");
+		else ImGui::TextDisabled("コード: なし");
+		ImGui::SameLine(0, 20);
+	}
 	ImGui::Text("選択: %s", selected >= 0 ? editor->displayName(selectedEntity()).c_str() : "なし");
 	ImGui::SameLine(0, 20);
 	if (editor->isDirty())
@@ -1956,6 +2024,7 @@ int EditorApp::run()
 			window.cancelClose();
 			request(Pending::Quit);
 		}
+		updateGameCode();
 		frame++;
 		auto now = clock::now();
 		float dt = std::chrono::duration<float>(now - lastTime).count();
@@ -2317,6 +2386,37 @@ void EditorApp::registerCommands()
 		});
 		c.choices = [this] { return assetsIn("prefabs", { ".json" }); };
 		c.argName = "プレハブ(prefabs/X.json)";
+	}
+	{
+		auto& c = add("component.add", "選んだ物にコンポーネントを足す", "", 0, hasSelection, [this](const std::string& a) {
+			if (!editor->addComponent(selectedEntity(), a)) log("コンポーネントを足せませんでした: " + a, LogLevel::Error);
+		});
+		//インスペクタの「コンポーネントを追加」と同じ候補(ゲームのコードを読み直すと増える)
+		c.choices = [this] {
+			std::vector<std::string> names;
+			auto& cm = editor->world().getComponentManager();
+			Entity e = selectedEntity();
+			for (auto& info : ComponentRegistry::getInstance().all())
+			{
+				if (selected < 0 || !info.has(cm, e)) names.push_back(info.name);
+			}
+			return names;
+		};
+		c.argName = "コンポーネントの名前";
+	}
+	{
+		auto& c = add("system.add", "System を足す(最後に)", "", 0, stopped, [this](const std::string& a) {
+			if (!SystemRegistry::getInstance().contains(a))
+			{
+				log("知らない System です: " + a, LogLevel::Error);
+				return;
+			}
+			auto names = editor->systems();
+			names.push_back(a);
+			editor->setSystems(names);
+		});
+		c.choices = [] { return SystemRegistry::getInstance().names(); };
+		c.argName = "System の名前(System タブの「System を追加」と同じ候補)";
 	}
 	add("entity.duplicate", "複製", "Ctrl+D", ImGuiMod_Ctrl | ImGuiKey_D, hasSelection, [this, lastSelected](const std::string&) {
 		editor->duplicate(selectedEntity());
