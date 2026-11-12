@@ -144,6 +144,35 @@ add_custom_command(TARGET GomiEngine POST_BUILD
         ${CMAKE_CURRENT_SOURCE_DIR}/GomiEngine/settings.json
         $<TARGET_FILE_DIR:GomiEngine>/settings.json)
 
+# --- ゲームのコードを作るための sdk と、インストールした形 ---
+# エディタは exe の隣の sdk/game/CMakeLists.txt で、プロジェクトの game/ を <プロジェクト>/build に作る。
+# 開発中のビルド: build/<構成>/sdk/(GomiCore はソースのヘッダとビルドの .lib を指す)
+# インストールした形(cmake --install build --config <構成> --prefix <先>。B の配布物と同じ):
+#   <先>/GomiEditor.exe・GomiEngine.exe・*.dll・settings.json
+#   <先>/sdk/GomiEngine.cmake・game/(CMakeLists.txt・GameEntry.cpp)・include/(エンジンと glm のヘッダ)・lib/GomiCore.lib
+set(GOMI_SDK_CONFIG "$<CONFIG>")
+set(GOMI_SDK_GAME_ENTRY "${CMAKE_CURRENT_SOURCE_DIR}/GomiEngine/game_entry/GameEntry.cpp")
+set(GOMI_SDK_CORE_LIB "$<TARGET_LINKER_FILE:GomiCore>")
+set(GOMI_SDK_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/GomiEngine;${glm_SOURCE_DIR}")
+configure_file(sdk/GomiEngine.cmake.in ${CMAKE_BINARY_DIR}/sdk-build/GomiEngine.cmake.in @ONLY)
+file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/$<CONFIG>/sdk/GomiEngine.cmake INPUT ${CMAKE_BINARY_DIR}/sdk-build/GomiEngine.cmake.in)
+file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/$<CONFIG>/sdk/game/CMakeLists.txt INPUT ${CMAKE_CURRENT_SOURCE_DIR}/sdk/game/CMakeLists.txt)
+
+# インストールした形では sdk の中の相対パスにする(${CMAKE_CURRENT_LIST_DIR} は読む時に決まる)
+set(GOMI_SDK_GAME_ENTRY "\${CMAKE_CURRENT_LIST_DIR}/game/GameEntry.cpp")
+set(GOMI_SDK_CORE_LIB "\${CMAKE_CURRENT_LIST_DIR}/lib/GomiCore.lib")
+set(GOMI_SDK_INCLUDE_DIRS "\${CMAKE_CURRENT_LIST_DIR}/include")
+configure_file(sdk/GomiEngine.cmake.in ${CMAKE_BINARY_DIR}/sdk-install/GomiEngine.cmake.in @ONLY)
+file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/sdk-install/$<CONFIG>/GomiEngine.cmake INPUT ${CMAKE_BINARY_DIR}/sdk-install/GomiEngine.cmake.in)
+
+install(TARGETS GomiEngine GomiEditor glfw glad RUNTIME DESTINATION .)
+install(TARGETS GomiCore RUNTIME DESTINATION . ARCHIVE DESTINATION sdk/lib)
+install(FILES GomiEngine/settings.json DESTINATION .)
+install(FILES ${CMAKE_BINARY_DIR}/sdk-install/$<CONFIG>/GomiEngine.cmake DESTINATION sdk)
+install(FILES sdk/game/CMakeLists.txt GomiEngine/game_entry/GameEntry.cpp DESTINATION sdk/game)
+install(DIRECTORY GomiEngine/ DESTINATION sdk/include FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN "game_entry" EXCLUDE)
+install(DIRECTORY ${glm_SOURCE_DIR}/glm DESTINATION sdk/include FILES_MATCHING PATTERN "*.hpp" PATTERN "*.inl" PATTERN "*.h")
+
 # --- テスト(ctest で実行) ---
 enable_testing()
 foreach(test ComponentArrayTest ReflectionTest SceneTest CollisionTest ModelTest EditorTest ReplayTest GameModuleTest)

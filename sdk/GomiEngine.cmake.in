@@ -1,0 +1,11 @@
+# エンジン(GomiCore)の場所。sdk/game/CMakeLists.txt が読む。CMakeLists.txt の configure_file と file(GENERATE) で作る
+set(GOMI_ENGINE_CONFIG "@GOMI_SDK_CONFIG@")
+set(GOMI_GAME_ENTRY "@GOMI_SDK_GAME_ENTRY@")
+if (NOT TARGET GomiCore)
+    add_library(GomiCore UNKNOWN IMPORTED)
+    set_target_properties(GomiCore PROPERTIES
+        IMPORTED_LOCATION "@GOMI_SDK_CORE_LIB@"
+        INTERFACE_INCLUDE_DIRECTORIES "@GOMI_SDK_INCLUDE_DIRS@"
+        INTERFACE_COMPILE_DEFINITIONS "NOMINMAX;_CRT_SECURE_NO_WARNINGS;GLM_ENABLE_EXPERIMENTAL"
+        INTERFACE_COMPILE_OPTIONS "/utf-8")
+endif()
