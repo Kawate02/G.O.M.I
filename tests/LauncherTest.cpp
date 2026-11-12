@@ -1,5 +1,6 @@
 // ランチャーの中身(LauncherCore)のテスト。gh は使わず、作った zip から入れる。失敗したら行番号を出して 1 を返す
 #include "LauncherCore.h"
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 
@@ -101,6 +102,97 @@ int main()
 	missing = "x";
 	CHECK(!core.openProject(project, error, "", &missing) && missing.empty());
 	CHECK(!core.openProject(work / "none", error));
+
+	// ---- 一覧からの編集
+	fs::path game = work / "edit" / "Game";
+	CHECK(core.createProject(game, "9.9.9", "Demo", error));
+	writeFile(game / "assets" / "scenes" / "sub" / "Stage1.json", "{}");
+	writeFile(game / "assets" / "ui" / "pause.json", "{}");
+	writeFile(game / "assets" / "ui" / "hud" / "life.json", "{}");
+	writeFile(game / "assets" / "ui" / "memo.txt", "x");
+	CHECK((LauncherCore::projectScenes(game) == std::vector<std::string>{ "Title", "sub/Stage1" }));
+	CHECK((LauncherCore::projectUIs(game) == std::vector<std::string>{ "ui/hud/life.json", "ui/pause.json" }));
+
+	// 設定: 項目を書き換え・足し・消す。知らない項目と並びは残す
+	writeFile(game / "project.json", "{\n  \"engine\": \"9.9.9\",\n  \"custom\": [1, 2],\n  \"startScene\": \"Title\"\n}\n");
+	CHECK(LauncherCore::setProjectValue(game, "engine", "0.10.0", error));
+	CHECK(LauncherCore::setProjectValue(game, "pauseUI", "ui/pause.json", error));
+	CHECK(LauncherCore::setProjectValue(game, "startScene", "sub/Stage1", error));
+	CHECK(LauncherCore::projectEngine(game) == "0.10.0");
+	CHECK(LauncherCore::projectValue(game, "pauseUI") == "ui/pause.json");
+	{
+		std::string text = readFile(game / "project.json");
+		CHECK(text.find("\"custom\"") != std::string::npos);
+		CHECK(text.find("\"engine\"") < text.find("\"custom\"") && text.find("\"custom\"") < text.find("\"startScene\""));
+	}
+	CHECK(LauncherCore::setProjectValue(game, "pauseUI", "", error));
+	CHECK(readFile(game / "project.json").find("pauseUI") == std::string::npos);
+	CHECK(!LauncherCore::setProjectValue(work / "none", "engine", "1", error));
+	writeFile(work / "broken" / "project.json", "{ not json");
+	CHECK(!LauncherCore::setProjectValue(work / "broken", "engine", "1", error));
+	CHECK(readFile(work / "broken" / "project.json") == "{ not json"); //壊れたものは書き換えない
+
+	// 名前に使える・日本語など
+	CHECK(LauncherCore::validFolderName("My Game_2"));
+	CHECK(!LauncherCore::validFolderName("a/b") && !LauncherCore::validFolderName("a:b") && !LauncherCore::validFolderName("") && !LauncherCore::validFolderName("x."));
+	CHECK(LauncherCore::hasNonAscii(u8str(u8path("ゲーム"))) && !LauncherCore::hasNonAscii("Game"));
+
+	// 名前を変える: フォルダと一覧の場所が変わる。同じ名前があれば断る
+	size_t before = core.projects().size();
+	fs::path renamed;
+	CHECK(core.renameProject(game, "Renamed", error, &renamed));
+	CHECK(!fs::exists(game) && fs::exists(work / "edit" / "Renamed" / "project.json"));
+	CHECK(core.projects().size() == before);
+	CHECK(std::any_of(core.projects().begin(), core.projects().end(), [&](auto& p) { return fs::equivalent(u8path(p.path), renamed); }));
+	fs::create_directories(work / "edit" / "Taken");
+	CHECK(!core.renameProject(renamed, "Taken", error));
+	CHECK(!core.renameProject(renamed, "a?b", error));
+	game = renamed;
+
+	// 複製: build/ を除き、名前は _copy、_copy2 と増える
+	writeFile(game / "build" / "x.obj", "x");
+	CHECK(LauncherCore::duplicateName(game) == "Renamed_copy");
+	CHECK(core.duplicateProject(game, game.parent_path() / "Renamed_copy", error));
+	CHECK(fs::exists(game.parent_path() / "Renamed_copy" / "assets" / "ui" / "hud" / "life.json"));
+	CHECK(!fs::exists(game.parent_path() / "Renamed_copy" / "build"));
+	CHECK(LauncherCore::duplicateName(game) == "Renamed_copy2");
+	CHECK(core.projects().size() == before + 1);
+	CHECK(!core.duplicateProject(game, game.parent_path() / "Renamed_copy", error)); //空でない
+	CHECK(!core.duplicateProject(game, game / "inner", error));                      //自分の中
+
+	// 一覧から外す(フォルダは残る)
+	CHECK(core.removeProject(game.parent_path() / "Renamed_copy", error));
+	CHECK(core.projects().size() == before && fs::exists(game.parent_path() / "Renamed_copy"));
+	CHECK(!core.removeProject(game.parent_path() / "Renamed_copy", error));
+	CHECK(LauncherCore(home).projects().size() == before);
+
+	// ごみ箱: project.json の無いフォルダは消さない(本当にごみ箱へ移すのは手で確かめる)
+	fs::create_directories(work / "notproject");
+	CHECK(!core.trashProject(work / "notproject", error) && fs::exists(work / "notproject"));
+	// フォルダがもう無ければ一覧から外すだけ
+	fs::path gone = work / "edit" / "Gone";
+	CHECK(core.duplicateProject(game, gone, error));
+	fs::remove_all(gone);
+	CHECK(core.trashProject(gone, error) && core.projects().size() == before);
+
+	// エクスプローラー・VS Code: 無いフォルダは断る
+	CHECK(!LauncherCore::revealInExplorer(work / "none", error));
+	CHECK(!LauncherCore::openInVSCode(work / "none", error));
+
+	// ---- バージョンを消す: 使っているプロジェクトが分かる。消すと一覧から消える
+	CHECK(LauncherCore::setProjectValue(game, "engine", "0.10.0", error));
+	{
+		auto using010 = core.projectsUsing("0.10.0");
+		CHECK(using010.size() == 1 && fs::equivalent(u8path(using010[0]), game));
+	}
+	CHECK(core.uninstall("0.10.0", error));
+	CHECK((core.installedVersions() == std::vector<std::string>{ "9.9.9" }));
+	CHECK(!fs::exists(core.editorDir("0.10.0")));
+	CHECK(!core.uninstall("0.10.0", error));
+	for (auto& entry : fs::directory_iterator(core.editorsDir())) CHECK(u8str(entry.path().filename())[0] != '.');
+	// 使っている版を開こうとすると入っていないと出る
+	std::string missing2;
+	CHECK(!core.openProject(game, error, "", &missing2) && missing2 == "0.10.0");
 
 	if (failures == 0) std::cout << "LauncherTest: all passed" << std::endl;
 	return failures == 0 ? 0 : 1;

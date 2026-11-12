@@ -90,6 +90,37 @@ namespace launcher
 		// 入っていない時は false で、missingVersion にその番号
 		bool openProject(const fs::path& dir, std::string& error, const std::string& engineOverride = {}, std::string* missingVersion = nullptr);
 
+		// ---- プロジェクトの編集(一覧の行から)
+		// project.json の key を value にする(value が空なら項目を消す)。ほかの項目と並びはそのまま
+		static bool setProjectValue(const fs::path& dir, const std::string& key, const std::string& value, std::string& error);
+		static std::string projectValue(const fs::path& dir, const std::string& key);
+		// 選べるシーン(assets/scenes/ の .json、拡張子無し)と UI(assets/ の下の ui/ の .json、"ui/pause.json" の形)
+		static std::vector<std::string> projectScenes(const fs::path& dir);
+		static std::vector<std::string> projectUIs(const fs::path& dir);
+		// 名前に使えない文字・日本語など(エディタ 0.1.0 が開けない)の判定
+		static bool validFolderName(const std::string& name);
+		static bool hasNonAscii(const std::string& s);
+		// フォルダ名を変える。一覧の場所も直す。newDir に変えた後のフォルダ
+		bool renameProject(const fs::path& dir, const std::string& newName, std::string& error, fs::path* newDir = nullptr);
+		// 一覧から外す(フォルダはそのまま)
+		bool removeProject(const fs::path& dir, std::string& error);
+		// ごみ箱へ移して一覧から外す
+		bool trashProject(const fs::path& dir, std::string& error);
+		// 複製の既定の名前(<名前>_copy、有れば _copy2 …)
+		static std::string duplicateName(const fs::path& dir);
+		// build/ を除いてコピーし、一覧に足す。dest は無いか空のフォルダ
+		bool duplicateProject(const fs::path& dir, const fs::path& dest, std::string& error);
+		// エクスプローラー・VS Code で開く
+		static bool revealInExplorer(const fs::path& dir, std::string& error);
+		static fs::path findVSCode(); // 見つからなければ空
+		static bool openInVSCode(const fs::path& dir, std::string& error);
+
+		// ---- 入れたバージョンを消す
+		// 一覧のプロジェクトのうち、project.json の engine が version のもの
+		std::vector<std::string> projectsUsing(const std::string& version) const;
+		// 完全に消す(Releases から入れ直せるのでごみ箱には入れない)。そのエディタを開いたままだと消せない
+		bool uninstall(const std::string& version, std::string& error);
+
 		// launcher.json を読み直す・書く
 		void load();
 		bool save(std::string& error) const;

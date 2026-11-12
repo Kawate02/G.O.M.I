@@ -390,6 +390,20 @@ namespace launcher
 		}
 	}
 
+	// build/(ゲームのコードのビルド結果)を除いてコピーする。開いた時にそのバージョンの sdk で作り直す
+	static bool copyWithoutBuild(const fs::path& source, const fs::path& dest, std::string& error)
+	{
+		std::error_code ec;
+		for (auto& entry : fs::directory_iterator(source, ec))
+		{
+			if (entry.path().filename() == "build") continue;
+			fs::copy(entry.path(), dest / entry.path().filename(), fs::copy_options::recursive, ec);
+			if (ec) { error = "コピーできませんでした: " + u8str(entry.path()) + " (" + ec.message() + ")"; return false; }
+		}
+		if (ec) { error = "読めませんでした: " + u8str(source) + " (" + ec.message() + ")"; return false; }
+		return true;
+	}
+
 	bool LauncherCore::createProject(const fs::path& dir, const std::string& version, const std::string& templateName, std::string& error)
 	{
 		if (!isInstalled(version)) { error = version + " は入っていません"; return false; }
@@ -409,13 +423,7 @@ namespace launcher
 		fs::create_directories(dest, ec);
 		if (ec) { error = "フォルダを作れませんでした: " + u8str(dest); return false; }
 
-		//build/(ゲームのコードのビルド結果)はコピーしない。開いた時にそのバージョンの sdk で作り直す
-		for (auto& entry : fs::directory_iterator(source, ec))
-		{
-			if (entry.path().filename() == "build") continue;
-			fs::copy(entry.path(), dest / entry.path().filename(), fs::copy_options::recursive, ec);
-			if (ec) { error = "コピーできませんでした: " + u8str(entry.path()) + " (" + ec.message() + ")"; return false; }
-		}
+		if (!copyWithoutBuild(source, dest, error)) return false;
 
 		//使うバージョンを選んだものにする(ひな形の engine は配布した時の番号)
 		fs::path projectJson = dest / "project.json";
@@ -473,6 +481,237 @@ namespace launcher
 		}
 		entry->lastOpened = nowText();
 		return save(error);
+	}
+
+	// ------------------------------------------------------------ プロジェクトの編集
+
+	static bool readProjectJson(const fs::path& dir, json& j, std::string& error)
+	{
+		std::ifstream in(dir / "project.json");
+		if (!in) { error = "project.json がありません: " + u8str(dir); return false; }
+		try { j = json::parse(in); }
+		catch (const std::exception& e) { error = "project.json を読めませんでした: " + std::string(e.what()); return false; }
+		if (!j.is_object()) { error = "project.json が { } の形ではありません"; return false; }
+		return true;
+	}
+
+	std::string LauncherCore::projectValue(const fs::path& dir, const std::string& key)
+	{
+		json j;
+		std::string error;
+		if (!readProjectJson(dir, j, error) || !j.contains(key) || !j[key].is_string()) return {};
+		return j[key].get<std::string>();
+	}
+
+	bool LauncherCore::setProjectValue(const fs::path& dir, const std::string& key, const std::string& value, std::string& error)
+	{
+		if (key.empty()) { error = "項目の名前がありません"; return false; }
+		json j;
+		if (!readProjectJson(dir, j, error)) return false;
+		if (value.empty()) j.erase(key);
+		else j[key] = value;
+		fs::path tmp = dir / "project.json.tmp";
+		{
+			std::ofstream out(tmp, std::ios::binary);
+			if (!out) { error = "書けませんでした: " + u8str(tmp); return false; }
+			out << j.dump(2) << "\n";
+		}
+		std::error_code ec;
+		fs::rename(tmp, dir / "project.json", ec);
+		if (ec) { error = "書けませんでした: " + u8str(dir / "project.json") + " (" + ec.message() + ")"; return false; }
+		return true;
+	}
+
+	// folder の下の .json を、base からの "/" 区切りのパスで並べる
+	static std::vector<std::string> listJson(const fs::path& folder, const fs::path& base, bool stripExtension)
+	{
+		std::vector<std::string> out;
+		std::error_code ec;
+		for (auto it = fs::recursive_directory_iterator(folder, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec))
+		{
+			if (!it->is_regular_file() || it->path().extension() != ".json") continue;
+			fs::path rel = fs::relative(it->path(), base, ec);
+			if (stripExtension) rel.replace_extension();
+			std::string s = u8str(rel);
+			std::replace(s.begin(), s.end(), '\\', '/');
+			out.push_back(s);
+		}
+		std::sort(out.begin(), out.end());
+		return out;
+	}
+
+	std::vector<std::string> LauncherCore::projectScenes(const fs::path& dir)
+	{
+		return listJson(dir / "assets" / "scenes", dir / "assets" / "scenes", true);
+	}
+
+	std::vector<std::string> LauncherCore::projectUIs(const fs::path& dir)
+	{
+		return listJson(dir / "assets" / "ui", dir / "assets", false);
+	}
+
+	bool LauncherCore::validFolderName(const std::string& name)
+	{
+		if (name.empty() || name == "." || name == "..") return false;
+		if (name.find_first_of("\\/:*?\"<>|") != std::string::npos) return false;
+		return name.back() != ' ' && name.back() != '.';
+	}
+
+	bool LauncherCore::hasNonAscii(const std::string& s)
+	{
+		return std::any_of(s.begin(), s.end(), [](char c) { return static_cast<unsigned char>(c) >= 0x80; });
+	}
+
+	bool LauncherCore::renameProject(const fs::path& dir, const std::string& newName, std::string& error, fs::path* newDir)
+	{
+		if (!validFolderName(newName)) { error = "フォルダ名に使えない名前です: " + newName; return false; }
+		std::error_code ec;
+		fs::path abs = fs::weakly_canonical(fs::absolute(dir, ec), ec);
+		if (!fs::exists(abs / "project.json")) { error = "project.json がありません: " + u8str(abs); return false; }
+		fs::path dest = abs.parent_path() / u8path(newName);
+		if (newDir) *newDir = dest;
+		if (u8str(abs.filename()) == newName) return true;
+		//大文字と小文字だけの違いは同じフォルダ(Windows)なので、そのまま変えてよい
+		if (fs::exists(dest) && !samePath(dest, abs)) { error = "同じ名前のフォルダがもうあります: " + u8str(dest); return false; }
+		ProjectEntry* entry = findProject(abs);
+		fs::rename(abs, dest, ec);
+		if (ec)
+		{
+			error = "名前を変えられませんでした: " + u8str(abs) + "(エディタ・エクスプローラー・VS Code などで開いていると変えられません。閉じてからもう一度)";
+			return false;
+		}
+		if (entry) entry->path = u8str(dest);
+		else projectList.insert(projectList.begin(), { u8str(dest), "" });
+		return save(error);
+	}
+
+	bool LauncherCore::removeProject(const fs::path& dir, std::string& error)
+	{
+		auto it = std::find_if(projectList.begin(), projectList.end(), [&](auto& p) { return samePath(u8path(p.path), dir); });
+		if (it == projectList.end()) { error = "一覧にありません: " + u8str(dir); return false; }
+		projectList.erase(it);
+		return save(error);
+	}
+
+	bool LauncherCore::trashProject(const fs::path& dir, std::string& error)
+	{
+		std::error_code ec;
+		fs::path abs = fs::weakly_canonical(fs::absolute(dir, ec), ec);
+		auto it = std::find_if(projectList.begin(), projectList.end(), [&](auto& p) { return samePath(u8path(p.path), abs); });
+		if (fs::exists(abs))
+		{
+			if (!fs::exists(abs / "project.json")) { error = "G.O.M.I のプロジェクト(project.json のあるフォルダ)ではないので消しません: " + u8str(abs); return false; }
+			//SHFileOperation の pFrom は 0 が2つで終わる
+			std::wstring from = abs.wstring();
+			from.push_back(L'\0');
+			SHFILEOPSTRUCTW op{};
+			op.wFunc = FO_DELETE;
+			op.pFrom = from.c_str();
+			//ごみ箱が無いドライブでは、完全に消す前に確認を出す(FOF_WANTNUKEWARNING)
+			op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT | FOF_WANTNUKEWARNING;
+			int r = SHFileOperationW(&op);
+			if (r != 0 || op.fAnyOperationsAborted || fs::exists(abs))
+			{
+				error = "ごみ箱へ移せませんでした: " + u8str(abs) + "(エディタなどで開いていると移せません。閉じてからもう一度)";
+				return false;
+			}
+		}
+		if (it != projectList.end()) projectList.erase(it);
+		return save(error);
+	}
+
+	std::string LauncherCore::duplicateName(const fs::path& dir)
+	{
+		std::error_code ec;
+		fs::path abs = fs::weakly_canonical(fs::absolute(dir, ec), ec);
+		std::string base = u8str(abs.filename()) + "_copy";
+		std::string name = base;
+		for (int n = 2; fs::exists(abs.parent_path() / u8path(name)); n++) name = base + std::to_string(n);
+		return name;
+	}
+
+	bool LauncherCore::duplicateProject(const fs::path& dir, const fs::path& dest, std::string& error)
+	{
+		std::error_code ec;
+		fs::path source = fs::weakly_canonical(fs::absolute(dir, ec), ec);
+		if (!fs::exists(source / "project.json")) { error = "project.json がありません: " + u8str(source); return false; }
+		fs::path target = fs::weakly_canonical(fs::absolute(dest, ec), ec);
+		if (!validFolderName(u8str(target.filename()))) { error = "フォルダ名に使えない名前です: " + u8str(target.filename()); return false; }
+		if (fs::exists(target) && !fs::is_empty(target, ec)) { error = "フォルダが空ではありません: " + u8str(target); return false; }
+		//自分の中へのコピーは終わらない
+		std::wstring s = source.wstring() + L"\\", t = target.wstring() + L"\\";
+		if (_wcsnicmp(t.c_str(), s.c_str(), s.size()) == 0) { error = "プロジェクトの中には複製できません"; return false; }
+		fs::create_directories(target, ec);
+		if (ec) { error = "フォルダを作れませんでした: " + u8str(target); return false; }
+		if (!copyWithoutBuild(source, target, error)) return false;
+		if (!findProject(target)) projectList.insert(projectList.begin(), { u8str(target), "" });
+		return save(error);
+	}
+
+	bool LauncherCore::revealInExplorer(const fs::path& dir, std::string& error)
+	{
+		if (!fs::is_directory(dir)) { error = "フォルダがありません: " + u8str(dir); return false; }
+		auto r = reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", dir.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+		if (r <= 32) { error = "エクスプローラーで開けませんでした: " + u8str(dir); return false; }
+		return true;
+	}
+
+	fs::path LauncherCore::findVSCode()
+	{
+		//PATH の code(<入れた所>/bin/code.cmd)→ ユーザー用の既定の場所 → 全員用の既定の場所
+		wchar_t buffer[MAX_PATH];
+		if (SearchPathW(nullptr, L"code.cmd", nullptr, MAX_PATH, buffer, nullptr) > 0)
+		{
+			fs::path exe = fs::path(buffer).parent_path().parent_path() / "Code.exe";
+			if (fs::exists(exe)) return exe;
+		}
+		for (auto id : { FOLDERID_UserProgramFiles, FOLDERID_ProgramFiles })
+		{
+			fs::path folder = knownFolder(id);
+			if (!folder.empty() && fs::exists(folder / "Microsoft VS Code" / "Code.exe")) return folder / "Microsoft VS Code" / "Code.exe";
+		}
+		return {};
+	}
+
+	bool LauncherCore::openInVSCode(const fs::path& dir, std::string& error)
+	{
+		if (!fs::is_directory(dir)) { error = "フォルダがありません: " + u8str(dir); return false; }
+		fs::path exe = findVSCode();
+		if (exe.empty())
+		{
+			error = "VS Code が見つかりません。入れるには、コマンドで winget install Microsoft.VisualStudioCode を実行して、ランチャーを開き直してください。";
+			return false;
+		}
+		return startDetached(exe, { u8str(dir) }, dir, error);
+	}
+
+	// ------------------------------------------------------------ バージョンを消す
+
+	std::vector<std::string> LauncherCore::projectsUsing(const std::string& version) const
+	{
+		std::vector<std::string> out;
+		for (auto& p : projectList)
+		{
+			if (projectEngine(u8path(p.path)) == version) out.push_back(p.path);
+		}
+		return out;
+	}
+
+	bool LauncherCore::uninstall(const std::string& version, std::string& error)
+	{
+		if (!isInstalled(version)) { error = version + " は入っていません"; return false; }
+		//先に作業中の名前へ移す。エディタが動いていると exe が使われていて移せないので、途中まで消えて壊れることが無い
+		fs::path removing = editorsDir() / u8path(".remove-" + version);
+		std::error_code ec;
+		fs::remove_all(removing, ec);
+		fs::rename(editorDir(version), removing, ec);
+		if (ec)
+		{
+			error = "消せませんでした: " + u8str(editorDir(version)) + "(エディタ " + version + " を開いていると消せません。閉じてからもう一度)";
+			return false;
+		}
+		fs::remove_all(removing, ec); //残っても .remove-* は一覧に出ず、次に同じ版を消す時に消える
+		return true;
 	}
 
 	// ------------------------------------------------------------
