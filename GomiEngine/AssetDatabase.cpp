@@ -5,35 +5,6 @@
 #include <stdexcept>
 #include <stb_image.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
-namespace
-{
-	std::filesystem::path executableDir()
-	{
-#ifdef _WIN32
-		wchar_t buf[MAX_PATH];
-		DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
-		if (n > 0 && n < MAX_PATH) return std::filesystem::path(buf).parent_path();
-#endif
-		return std::filesystem::current_path();
-	}
-}
-
-std::filesystem::path AssetDatabase::findRoot(const std::string& requested)
-{
-	if (!requested.empty()) return std::filesystem::absolute(requested);
-	auto besideExe = executableDir() / "assets";
-	if (std::filesystem::is_directory(besideExe)) return besideExe;
-#ifdef GOMI_DEFAULT_ASSET_DIR
-	return std::filesystem::path(GOMI_DEFAULT_ASSET_DIR);
-#else
-	return std::filesystem::current_path() / "assets";
-#endif
-}
-
 void AssetDatabase::setRoot(const std::filesystem::path& path)
 {
 	root = path;

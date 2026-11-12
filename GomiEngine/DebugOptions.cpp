@@ -71,7 +71,7 @@ std::optional<std::string> DebugOptions::parse(const std::vector<std::string>& a
 		std::string rest;
 
 		if (opt == "--world") startWorld = value;
-		else if (opt == "--assets") assetDir = value;
+		else if (opt == "--project") projectDir = value;
 		else if (opt == "--record") recordPath = value;
 		else if (opt == "--replay") replayPath = value;
 		else if (opt == "--replay-out") replayOut = value;

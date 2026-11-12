@@ -6,7 +6,7 @@
 
 /// <summary>
 /// 動作確認用の起動オプション。人が触らなくても画面遷移や操作を再現してスクリーンショットを残せる
-///   --assets <フォルダ>            assets フォルダ(省略時は exe の隣、無ければソースの assets)
+///   --project <フォルダ>           開くプロジェクト(project.json のあるフォルダ。省略時は exe の隣、無ければ見本のプロジェクト)
 ///   --world <名前>                 最初に開く World(省略時は最初に登録したもの)
 ///   --frames <n>                   n フレーム目で終了
 ///   --fixed-dt <fps>               deltaTime を 1/fps 秒に固定する(実行のたびに同じ画面になる)
@@ -62,7 +62,7 @@ private:
 	void pressAt(InputState& state, InputKey key, int frame, int start, int end) const;
 public:
 	std::string startWorld;
-	std::string assetDir;
+	std::string projectDir;
 	int select = -1;
 	int maxFrames = 0;
 	float fixedDeltaTime = 0.0f; //0 なら実時間

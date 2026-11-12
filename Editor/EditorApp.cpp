@@ -1,3 +1,4 @@
+#include "Project.h"
 #include "EditorApp.h"
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
@@ -1696,8 +1697,8 @@ void EditorApp::applyScriptedInput(int frame)
 
 std::filesystem::path EditorApp::replayDir() const
 {
-	//assets の隣の tests/replays(ctest もここを流す)
-	return AssetDatabase::getInstance().getRoot().parent_path() / "tests" / "replays";
+	//プロジェクトの tests/replays(ctest もここを流す)
+	return Project::getInstance().replaysDir();
 }
 
 void EditorApp::refreshReplays(bool force)
@@ -1789,8 +1790,7 @@ void EditorApp::startReplay(const std::string& name, ReplayCheck::Mode mode, boo
 	std::string scene = run.replay.scene;
 	if (scene.empty())
 	{
-		auto& db = AssetDatabase::getInstance();
-		if (db.exists("project.json")) scene = db.readJson("project.json").value("startScene", std::string());
+		scene = Project::getInstance().read().value("startScene", std::string());
 	}
 	std::string error;
 	if (!editor->open(SceneLoader::scenePath(scene), error))

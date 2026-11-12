@@ -1,3 +1,4 @@
+#include "Project.h"
 #include "SceneEditor.h"
 #include "ComponentRegistry.h"
 
@@ -15,7 +16,7 @@ SceneEditor::SceneEditor(InputState& input, RenderQueue& render, AudioQueue& aud
 	: inputState(input), renderQueue(render), audioQueue(audio)
 {
 	auto& db = AssetDatabase::getInstance();
-	project = db.exists("project.json") ? db.readJson("project.json") : Json::object();
+	project = Project::getInstance().read();
 	newScene();
 }
 
@@ -460,6 +461,15 @@ std::map<AssetID, SceneEditor::FileStamp> SceneEditor::scanFiles() const
 		s.size = it->file_size(ec);
 		stamps[fs::relative(it->path(), root, ec).generic_string()] = s;
 	}
+	//project.json は assets の外(プロジェクト直下)にある
+	auto projectFile = Project::getInstance().file();
+	if (fs::is_regular_file(projectFile, ec))
+	{
+		FileStamp s;
+		s.time = fs::last_write_time(projectFile, ec);
+		s.size = fs::file_size(projectFile, ec);
+		stamps[std::string("../") + Project::FILE_NAME] = s;
+	}
 	return stamps;
 }
 
@@ -515,7 +525,7 @@ SceneEditor::FileCheck SceneEditor::checkFiles()
 		prefabCache.clear();
 		try
 		{
-			project = db.exists("project.json") ? db.readJson("project.json") : Json::object();
+			project = Project::getInstance().read();
 			rebuild(scene);
 			result.refreshed = true;
 		}

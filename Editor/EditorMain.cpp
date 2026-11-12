@@ -1,5 +1,5 @@
 #include "EditorApp.h"
-#include "AssetDatabase.h"
+#include "Project.h"
 #include <iostream>
 
 // G.O.M.I エディタ。起動オプションはゲームと同じ(DebugOptions.h)。--world で最初に開くシーン
@@ -13,7 +13,7 @@ int main(int argc, char** argv)
     }
     try
     {
-        AssetDatabase::getInstance().setRoot(AssetDatabase::findRoot(options.assetDir));
+        Project::getInstance().open(Project::findRoot(options.projectDir));
         EditorApp app(options);
         return app.run();
     }

@@ -1,4 +1,5 @@
 // エディタの中身(SceneEditor)のテスト。失敗したら行番号を出して 1 を返す
+#include "Project.h"
 #include "SceneEditor.h"
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
@@ -14,7 +15,7 @@ int main()
 	registerBuiltinComponents();
 	registerBuiltinSystems();
 	auto& db = AssetDatabase::getInstance();
-	db.setRoot(AssetDatabase::findRoot(""));
+	Project::getInstance().open(Project::findRoot(""));
 	std::string tmp = (std::filesystem::temp_directory_path() / "gomi_editor_test.json").generic_string();
 
 	InputState input;
@@ -328,7 +329,7 @@ int main()
 		CHECK(w.open("Field", error) && !w.isPrefabMode());
 		CHECK(w.getField(w.entities().back(), "MeshRenderer", "color")[2].get<float>() > 0.29f); // シーンの配置に反映
 
-		db.setRoot(AssetDatabase::findRoot(""));
+		Project::getInstance().open(Project::findRoot(""));
 		fs::remove_all(copy);
 	}
 

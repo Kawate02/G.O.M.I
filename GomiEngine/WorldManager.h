@@ -11,7 +11,7 @@ private:
 	EventRequest<std::string> worldChangeRequest{Event::World_Change};
 	std::unique_ptr<World> currentWorld;
 	std::string currentScene;
-	Json project; // assets/project.json
+	Json project; // プロジェクトの project.json
 
 	InputState& inputState;
 	RenderQueue& renderQueue;

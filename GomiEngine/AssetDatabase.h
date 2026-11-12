@@ -28,10 +28,8 @@ public:
 	static AssetDatabase& getInstance();
 
 	/// <summary>
-	/// 起動時の assets フォルダを決める。指定 > 実行ファイルの隣の assets > ソースの assets(開発中)
+	/// assets フォルダを決める。ふつうは Project::open が呼ぶ
 	/// </summary>
-	static std::filesystem::path findRoot(const std::string& requested);
-
 	void setRoot(const std::filesystem::path& path);
 	inline const std::filesystem::path& getRoot() const { return root; }
 	std::filesystem::path resolve(const AssetID& id) const;

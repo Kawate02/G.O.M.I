@@ -1,4 +1,5 @@
 // シーンの読み込み・保存のテスト(assets フォルダの実ファイルを使う)。失敗したら行番号を出して 1 を返す
+#include "Project.h"
 #include "SceneLoader.h"
 #include "World.h"
 #include "ComponentRegistry.h"
@@ -33,7 +34,7 @@ int main()
 	registerBuiltinComponents();
 	registerBuiltinSystems();
 	auto& db = AssetDatabase::getInstance();
-	db.setRoot(AssetDatabase::findRoot(""));
+	Project::getInstance().open(Project::findRoot(""));
 
 	// 全シーン: 読む → 保存 → 保存したものを読む → 保存、が一致する
 	for (auto name : { "Title", "Field", "Result" })

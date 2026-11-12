@@ -53,17 +53,17 @@ if [ $DO_BUILD -eq 1 ]; then
 fi
 
 # ---- 場面の定義 ----
-# 各場面は <exe> と起動オプション。撮影先は {D}(場面の出力フォルダ)、assets のコピーは {A}
+# 各場面は <exe> と起動オプション。撮影先は {D}(場面の出力フォルダ)、見本のプロジェクトのコピーは {P}
 scene_args() {
   case "$1" in
     game) # タイトル→フィールド→移動→ポーズ→再開→タイトルの一巡
-      echo GomiEngine.exe --fixed-dt 60 \
+      echo GomiEngine.exe --project "{P}" --fixed-dt 60 \
         --screenshot "30:{D}/1.png" --click "40:400,400" --screenshot "70:{D}/2.png" \
         --key "80-140:D" --screenshot "140:{D}/3.png" --key "150:ESCAPE" --screenshot "160:{D}/4.png" \
         --click "170:400,300" --screenshot "180:{D}/5.png" --key "190:ESCAPE" --click "200:400,400" \
         --screenshot "230:{D}/6.png" --frames 240 ;;
     editor) # Demo3D を開いて数値欄をドラッグ・入力
-      echo GomiEditor.exe --assets "{A}" --world Demo3D --fixed-dt 60 --select 0 \
+      echo GomiEditor.exe --project "{P}" --world Demo3D --fixed-dt 60 --select 0 \
         --click 20:750,440 --drag 40-60:782,430,900,430 --type "26:{SELECTALL}" --type 27:300 \
         --type "28:{ENTER}" --screenshot "70:{D}/1.png" --frames 71 ;;
   esac
@@ -75,12 +75,13 @@ SCENES="game editor"
 for s in $SCENES; do
   cur="$OUT/current/$s"; base="$OUT/baseline/$s"
   rm -rf "$cur"; mkdir -p "$cur"
-  assets="$OUT/assets-copy"
-  rm -rf "$assets"; cp -r "$ROOT/assets" "$assets"
-  D=$(cygpath -m "$cur"); A=$(cygpath -m "$assets")
+  project="$OUT/project-copy"
+  rm -rf "$project"; mkdir -p "$project"
+  cp -r "$ROOT/samples/Demo/project.json" "$ROOT/samples/Demo/assets" "$ROOT/samples/Demo/game" "$project/"
+  D=$(cygpath -m "$cur"); P=$(cygpath -m "$project")
   args=$(scene_args "$s")
   [ -z "$args" ] && { echo "$s: 不明な場面"; FAIL=1; continue; }
-  args=${args//\{D\}/$D}; args=${args//\{A\}/$A}
+  args=${args//\{D\}/$D}; args=${args//\{P\}/$P}
   # shellcheck disable=SC2086
   eval "set -- $args"
   exe="$1"; shift
@@ -109,7 +110,7 @@ for s in $SCENES; do
     echo "  今回: $cur/  基準: $base/"; FAIL=1
   fi
 done
-rm -rf "$OUT/assets-copy"
+rm -rf "$OUT/project-copy"
 
 # ---- ctest ----
 if [ $DO_CTEST -eq 1 ]; then

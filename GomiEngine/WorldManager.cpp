@@ -1,3 +1,4 @@
+#include "Project.h"
 #include "WorldManager.h"
 #include "SceneLoader.h"
 
@@ -16,7 +17,7 @@ std::unique_ptr<World> WorldManager::createWorld(const std::string& scene)
 void WorldManager::initialize(const std::string& startScene)
 {
 	auto& db = AssetDatabase::getInstance();
-	project = db.exists("project.json") ? db.readJson("project.json") : Json::object();
+	project = Project::getInstance().read();
 	std::string first = startScene.empty() ? project.value("startScene", std::string()) : startScene;
 	if (first.empty()) throw std::runtime_error("no start scene: set \"startScene\" in project.json");
 	currentWorld = createWorld(first);

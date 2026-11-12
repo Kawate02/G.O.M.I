@@ -81,8 +81,9 @@ target_include_directories(GomiCore PUBLIC
     ${cgltf_SOURCE_DIR})
 target_link_libraries(GomiCore PUBLIC glfw glad glm::glm)
 target_compile_definitions(GomiCore PUBLIC NOMINMAX _CRT_SECURE_NO_WARNINGS GLM_ENABLE_EXPERIMENTAL)
-# 開発中は exe の隣に assets が無ければソースの assets を直接読む(編集がすぐ反映される)
-target_compile_definitions(GomiCore PRIVATE GOMI_DEFAULT_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+# 開発中は --project が無く exe の隣に project.json も無ければ、見本のプロジェクトを直接開く(編集がすぐ反映される)
+set(GOMI_SAMPLE_PROJECT ${CMAKE_CURRENT_SOURCE_DIR}/samples/Demo)
+target_compile_definitions(GomiCore PRIVATE GOMI_DEFAULT_PROJECT_DIR="${GOMI_SAMPLE_PROJECT}")
 if (WIN32)
     target_link_libraries(GomiCore PUBLIC winmm)
 endif()
@@ -118,7 +119,7 @@ add_executable(GomiEditor ${EDITOR_SOURCES})
 target_link_libraries(GomiEditor PRIVATE GomiCore imgui)
 # ゲームのコード(game/)を見張ってビルドするための場所とコマンド
 target_compile_definitions(GomiEditor PRIVATE
-    GOMI_GAME_DIR="${CMAKE_CURRENT_SOURCE_DIR}/game"
+    GOMI_GAME_DIR="${GOMI_SAMPLE_PROJECT}/game"
     GOMI_CMAKE_COMMAND="${CMAKE_COMMAND}"
     GOMI_BUILD_DIR="${CMAKE_BINARY_DIR}"
     GOMI_BUILD_CONFIG="$<CONFIG>")
@@ -129,9 +130,9 @@ endif()
 
 # --- ゲームのコード(game/*.cpp → GomiGame.dll) ---
 # エディタは game/ の保存を見てこれだけをビルドし、開いたまま読み直す。ゲームの exe は起動時に隣の DLL を読む
-file(GLOB GAME_SOURCES CONFIGURE_DEPENDS game/*.cpp game/*.h)
+file(GLOB GAME_SOURCES CONFIGURE_DEPENDS ${GOMI_SAMPLE_PROJECT}/game/*.cpp ${GOMI_SAMPLE_PROJECT}/game/*.h)
 add_library(GomiGame SHARED GomiEngine/game_entry/GameEntry.cpp ${GAME_SOURCES})
-target_include_directories(GomiGame PRIVATE game)
+target_include_directories(GomiGame PRIVATE ${GOMI_SAMPLE_PROJECT}/game)
 target_link_libraries(GomiGame PRIVATE GomiCore)
 if (MSVC)
     target_compile_options(GomiGame PRIVATE /W3)
@@ -156,11 +157,11 @@ add_library(GameSampleModule SHARED GomiEngine/game_entry/GameEntry.cpp tests/ga
 target_link_libraries(GameSampleModule PRIVATE GomiCore)
 add_dependencies(GameModuleTest GameSampleModule)
 
-# 操作の記録(tests/replays/*.json)を流し、確認点の画面と状態を基準と比べる。基準を作り直す時は
-#   GomiEngine --replay tests/replays/<名前>.json --replay-update
-file(GLOB GOMI_REPLAYS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/replays/*.json)
+# 見本のプロジェクトの操作の記録(samples/Demo/tests/replays/*.json)を流し、確認点の画面と状態を基準と比べる。基準を作り直す時は
+#   GomiEngine --project samples/Demo --replay samples/Demo/tests/replays/<名前>.json --replay-update
+file(GLOB GOMI_REPLAYS CONFIGURE_DEPENDS ${GOMI_SAMPLE_PROJECT}/tests/replays/*.json)
 foreach(replay ${GOMI_REPLAYS})
     get_filename_component(name ${replay} NAME_WE)
-    add_test(NAME Replay.${name} COMMAND GomiEngine --replay ${replay} --no-wait
+    add_test(NAME Replay.${name} COMMAND GomiEngine --project ${GOMI_SAMPLE_PROJECT} --replay ${replay} --no-wait
         WORKING_DIRECTORY $<TARGET_FILE_DIR:GomiEngine>)
 endforeach()

@@ -1,4 +1,5 @@
 // 基本形メッシュと glTF 読み込みのテスト。失敗したら行番号を出して 1 を返す
+#include "Project.h"
 #include "ModelLoader.h"
 #include "MeshFactory.h"
 #include "AssetDatabase.h"
@@ -62,7 +63,7 @@ int main()
 	// glTF: 子ノードの位置が足され、法線が作られる
 	{
 		auto& db = AssetDatabase::getInstance();
-		db.setRoot(AssetDatabase::findRoot(""));
+		Project::getInstance().open(Project::findRoot(""));
 		std::string error;
 		auto tree = ModelLoader::loadGltf(db.resolve("models/tree.gltf"), error);
 		CHECK(tree.has_value());
