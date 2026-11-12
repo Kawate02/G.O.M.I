@@ -50,7 +50,7 @@ Unity Hub のように、エンジンのバージョンとプロジェクトを1
 - 置き場所: `%USERPROFILE%/GOMI/`(入れたバージョンは `editors/<番号>/`、プロジェクトの一覧は `launcher.json`)。`--home <dir>` で変えられる。`%LOCALAPPDATA%` は Claude デスクトップから動かすと書き込みが別の場所に振り替わるので使わない
 - コマンド: 画面と同じことを `--list-releases`・`--install <番号>`・`--install-zip <zip>`・`--new <dir> --engine <番号> [--template <名>]`・`--add <dir>`・`--list-projects`・`--open <dir> [--engine <番号>]`・`--gh-status` でできる(`--help` で一覧)。画面の確認用に `--frames`・`--screenshot <コマ>:<png>`・`--click <コマ>:<x>,<y>`・`--tab projects|versions|new`
 - gh が無い・ログインしていない時は、「バージョン」に理由と直し方(`winget install GitHub.cli` / `gh auth login`)が出る。zip からはいつでも入れられる
-- エディタ 0.1.0 は日本語などの入ったパスのプロジェクトを開けない(起動オプションを ANSI で読む)。新しいプロジェクトの画面で注意が出る
+- エディタ 0.1.0 は日本語などの入ったパスのプロジェクトを開けない(0.1.1 で直した)。新しいプロジェクトの画面で 0.1.0 を選ぶと注意が出る
 
 ## assets の中身
 

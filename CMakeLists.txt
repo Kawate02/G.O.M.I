@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 # エンジンのバージョン。配布物(tools/release.sh)・タグ(v<番号>)・エディタの表示・sdk の GomiEngine.cmake はここから決まる
-project(GomiEngine VERSION 0.1.0 LANGUAGES C CXX)
+project(GomiEngine VERSION 0.1.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
