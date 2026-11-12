@@ -1,7 +1,7 @@
 **決してゴミのようなエンジンという訳ではない。**
 
 C++20 の ECS ゲームエンジン。2D と 3D の両方を描ける。描画は OpenGL 4.5(GLFW)、音声は miniaudio、3D モデルは glTF。
-ゲームの中身(シーン・プレハブ・UI・画像・音)は `assets/` のファイルに書き、エンジンを作り直さなくても変えられる。
+ゲームはエンジンと別の「プロジェクトのフォルダ」に置く。中身(シーン・プレハブ・UI・画像・音)は `assets/` のファイル、ゲームごとの Component・System は `game/` の C++ に書き、エンジンを作り直さなくても変えられる。見本は `samples/Demo/`。
 シーンはエディタ(`GomiEditor`)で組み立てて保存できる。
 
 ## ビルド
@@ -18,7 +18,23 @@ build/Debug/GomiEngine.exe
 エディタは `build/Debug/GomiEditor.exe`(`--world Field` で最初に開くシーンを指定)。
 
 Visual Studio で開く時は、フォルダを開く(CMake として読み込まれる)か `build/GomiEngine.sln` を開く。
-開発中は exe の隣に `assets` が無ければリポジトリの `assets/` を直接読むので、JSON を書き換えて起動し直すだけで反映される。
+開くプロジェクトは `--project <フォルダ>` で渡す。無ければ exe の隣に `project.json` があるとそこ(書き出したゲーム)、それも無ければ開発中のビルドは見本の `samples/Demo/` を直接開く(JSON を書き換えて起動し直すだけで反映される)。
+
+## プロジェクトのフォルダ
+
+| 場所 | 中身 |
+|---|---|
+| `project.json` | 最初に開くシーン(`startScene`)、ESC で出すポーズ画面(`pauseUI`) |
+| `assets/` | シーン・プレハブ・UI・画像・音(下の「assets の中身」) |
+| `game/` | ゲームのコード(`*.cpp` / `*.h`)。CMakeLists は置かない。エディタがエンジンの `sdk/game/CMakeLists.txt` で `build/bin/GomiGame.dll` に作る |
+| `tests/replays/` | 再現テスト(操作の記録と、同じ名前の基準のフォルダ) |
+| `build/` | game/ のビルドの出力(コミットしない) |
+
+ゲームの exe は exe の隣の `GomiGame.dll`、無ければプロジェクトの `build/bin/GomiGame.dll` を読む。`settings.json`(窓の大きさ・全画面)は遊ぶ人の設定なので exe の隣に置く。
+
+### エンジンをインストールした形
+
+`cmake --install build --config Debug --prefix <先>` で、エディタ・ゲームの exe・DLL と、プロジェクトのゲームのコードを作るための `sdk/`(`GomiEngine.cmake`・`game/CMakeLists.txt`・`include/`・`lib/GomiCore.lib`)が置かれる。バージョンごとの配布物はこの形。ゲームのコードはエンジンと同じ構成(Debug / Release)でしか作れない。cmake は PATH か、Visual Studio に付いてくるもの(vswhere で探す)を使う。
 
 ## assets の中身
 
@@ -26,7 +42,6 @@ Visual Studio で開く時は、フォルダを開く(CMake として読み込�
 
 | ファイル | 中身 |
 |---|---|
-| `project.json` | 最初に開くシーン(`startScene`)、ESC で出すポーズ画面(`pauseUI`) |
 | `scenes/<名前>.json` | 動かす System の並び(この順に毎フレーム呼ぶ)、置く Entity、出す UI |
 | `prefabs/*.json` | Entity の雛形(コンポーネントとその値) |
 | `ui/*.json` | UI の部品(Text / Image / Button)。ボタンは押した時に出すイベントを書く |
@@ -90,7 +105,7 @@ Visual Studio で開く時は、フォルダを開く(CMake として読み込�
 | `PlayerControl` | `plane: "XZ"` で上下キーが奥・手前になる。`jumpSpeed` |
 | `Physics` | `gravityDirection: [0, -1, 0]` で 3D の下向き |
 
-3D のシーンでは `MeshRendererSystem` を、カメラを追従させるなら `CameraSystem` も並べる。例は `assets/scenes/Demo3D.json`(タイトルの「3D DEMO」から開く)。
+3D のシーンでは `MeshRendererSystem` を、カメラを追従させるなら `CameraSystem` も並べる。例は `samples/Demo/assets/scenes/Demo3D.json`(タイトルの「3D DEMO」から開く)。
 
 ## コンポーネント・System を足す
 
@@ -119,9 +134,9 @@ GomiEditor.exe --world Field --type "30:{CTRL+SHIFT+P}" --type "40:複製" --typ
 操作を記録した JSON を流し、確認点のフレームで画面(png)と状態(World を保存した JSON)を基準と比べる。同じ入力・固定のΔt・同じ乱数の種なので毎回同じになり、違えば終了コード 1 と、違う項目・差分の画像(違う画素が赤)を出す。
 
 ```
-GomiEngine.exe --record tests/replays/walk.json                  # 遊んで操作を記録(Δt 1/60 固定)。閉じると保存
-GomiEngine.exe --replay tests/replays/walk.json --replay-update   # 今の動きを基準にする(tests/replays/walk/ に保存)
-GomiEngine.exe --replay tests/replays/walk.json --no-wait        # 流して比べる(ctest は Replay.walk として流す)
+GomiEngine.exe --project P --record P/tests/replays/walk.json                  # 遊んで操作を記録(Δt 1/60 固定)。閉じると保存
+GomiEngine.exe --project P --replay P/tests/replays/walk.json --replay-update   # 今の動きを基準にする(P/tests/replays/walk/ に保存)
+GomiEngine.exe --project P --replay P/tests/replays/walk.json --no-wait        # 流して比べる(ctest は見本の記録を Replay.walk として流す)
 ```
 
 - 記録の JSON は1フレーム1行で、手で直してよい(`checkpoints` に確認点のフレームを足す、など)
