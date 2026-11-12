@@ -174,6 +174,10 @@ if (MSVC)
     target_compile_options(LauncherCore PUBLIC /utf-8)
 endif()
 
+add_executable(GomiLauncher Launcher/LauncherMain.cpp Launcher/LauncherApp.cpp Launcher/LauncherOptions.h)
+target_link_libraries(GomiLauncher PRIVATE LauncherCore imgui opengl32)
+target_include_directories(GomiLauncher PRIVATE ${stb_SOURCE_DIR})
+
 add_executable(LauncherTest tests/LauncherTest.cpp)
 target_link_libraries(LauncherTest PRIVATE LauncherCore)
 target_compile_definitions(LauncherTest PRIVATE GOMI_LAUNCHER_TEST_DIR="${CMAKE_BINARY_DIR}/launcher-test")

@@ -150,6 +150,7 @@ namespace launcher
 
 	LauncherCore::LauncherCore(fs::path home) : homeDir(std::move(home))
 	{
+		homeDir.make_preferred();
 		load();
 	}
 
