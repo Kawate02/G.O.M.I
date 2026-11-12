@@ -99,6 +99,13 @@ EditorApp::EditorApp(const DebugOptions& options) : debug(options)
 	});
 	std::cerr.rdbuf(cerrCapture.get());
 
+	//どのバージョンで開くかはランチャーが決める。違うバージョンで開いた時は知らせるだけで、project.json は書き換えない
+	{
+		std::string want = Project::getInstance().engineVersion();
+		if (!want.empty() && want != GOMI_VERSION)
+			log("このプロジェクトはエンジン " + want + " 用です(このエディタは " GOMI_VERSION ")", LogLevel::Warning);
+	}
+
 	//プロジェクトの game/ を、エンジン(このエディタの隣の sdk)で <プロジェクト>/build に作る
 	auto codeConfig = GameCodeHost::Config::forProject(Project::getInstance().getRoot(), GameModule::exeDir() / "sdk", GOMI_BUILD_CONFIG);
 	gameCode = std::make_unique<GameCodeHost>(codeConfig);

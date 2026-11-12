@@ -6,7 +6,7 @@
 
 /// <summary>
 /// 開いているプロジェクトのフォルダ。形は
-///   project.json   名前・使うエンジン・startScene・pauseUI
+///   project.json   名前・使うエンジン(engine。例: "0.1.0")・startScene・pauseUI
 ///   assets/        シーン・プレハブ・UI・画像・音(アセット ID はここからの相対パス)
 ///   game/          ゲームのコード(*.cpp / *.h → GomiGame.dll)
 ///   tests/replays/ 再現テスト(記録の JSON と同名の基準フォルダ)
@@ -45,4 +45,9 @@ public:
 	/// project.json の中身。無ければ空のオブジェクト、壊れていればファイル名入りの例外
 	/// </summary>
 	Json read() const;
+
+	/// <summary>
+	/// project.json の engine(このプロジェクトを開くエンジンのバージョン、例: "0.1.0")。無ければ空
+	/// </summary>
+	std::string engineVersion() const;
 };

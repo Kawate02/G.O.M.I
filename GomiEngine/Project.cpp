@@ -50,3 +50,13 @@ Json Project::read() const
 		throw std::runtime_error(std::string(FILE_NAME) + ": " + e.what());
 	}
 }
+
+std::string Project::engineVersion() const
+{
+	//壊れた project.json は startScene を読む所で知らせるので、ここでは無いのと同じに扱う
+	Json json;
+	try { json = read(); }
+	catch (const std::exception&) { return {}; }
+	auto it = json.find("engine");
+	return it != json.end() && it->is_string() ? it->get<std::string>() : std::string();
+}
