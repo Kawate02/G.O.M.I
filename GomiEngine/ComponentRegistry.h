@@ -142,6 +142,7 @@ public:
 	template <typename C>
 	Builder<C> add(const std::string& name)
 	{
+		if (find(name)) throw std::runtime_error("component \"" + name + "\" is already registered");
 		ComponentInfo info;
 		info.name = name;
 		info.type = typeid(C);
@@ -180,6 +181,10 @@ public:
 	const ComponentInfo* find(std::string_view name) const;
 	const ComponentInfo* find(std::type_index type) const;
 	inline const std::vector<ComponentInfo>& all() const { return components; }
+	/// <summary>登録した数。ゲームのコード(DLL)を外す時に、読む前の数まで戻すのに使う</summary>
+	inline size_t size() const { return components.size(); }
+	/// <summary>count 番目より後の登録を消す(ゲームの DLL を外す前に呼ぶ。その型の関数が DLL の中にあるため)</summary>
+	void truncate(size_t count);
 };
 
 /// <summary>

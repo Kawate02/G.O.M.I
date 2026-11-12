@@ -17,12 +17,15 @@
 #include "EventRequest.h"
 #include "DebugOptions.h"
 #include "Replay.h"
+#include "GameModule.h"
 
 #include <optional>
 
 class Game
 {
 private:
+	//ゲームのコード(GomiGame.dll)。World より後に消えるよう先に置く
+	GameModule gameModule;
     EventRequest<int> quitRequest{Event::Game_Quit};
     EventRequest<AudioCommand> audioRequest{Event::Audio_Play};
 	GameSettings settings;

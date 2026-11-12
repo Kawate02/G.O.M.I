@@ -120,6 +120,16 @@ if (MSVC)
     set_property(TARGET GomiEditor PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:GomiEditor>")
 endif()
 
+# --- ゲームのコード(game/*.cpp → GomiGame.dll) ---
+# エディタは game/ の保存を見てこれだけをビルドし、開いたまま読み直す。ゲームの exe は起動時に隣の DLL を読む
+file(GLOB GAME_SOURCES CONFIGURE_DEPENDS game/*.cpp game/*.h)
+add_library(GomiGame SHARED GomiEngine/game_entry/GameEntry.cpp ${GAME_SOURCES})
+target_include_directories(GomiGame PRIVATE game)
+target_link_libraries(GomiGame PRIVATE GomiCore)
+if (MSVC)
+    target_compile_options(GomiGame PRIVATE /W3)
+endif()
+
 # 設定ファイルを実行ファイルの隣に置く
 add_custom_command(TARGET GomiEngine POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -128,11 +138,16 @@ add_custom_command(TARGET GomiEngine POST_BUILD
 
 # --- テスト(ctest で実行) ---
 enable_testing()
-foreach(test ComponentArrayTest ReflectionTest SceneTest CollisionTest ModelTest EditorTest ReplayTest)
+foreach(test ComponentArrayTest ReflectionTest SceneTest CollisionTest ModelTest EditorTest ReplayTest GameModuleTest)
     add_executable(${test} tests/${test}.cpp)
     target_link_libraries(${test} PRIVATE GomiCore)
     add_test(NAME ${test} COMMAND ${test})
 endforeach()
+
+# GameModuleTest が読む見本のゲームのコード
+add_library(GameSampleModule SHARED GomiEngine/game_entry/GameEntry.cpp tests/game_sample/Sample.cpp)
+target_link_libraries(GameSampleModule PRIVATE GomiCore)
+add_dependencies(GameModuleTest GameSampleModule)
 
 # 操作の記録(tests/replays/*.json)を流し、確認点の画面と状態を基準と比べる。基準を作り直す時は
 #   GomiEngine --replay tests/replays/<名前>.json --replay-update

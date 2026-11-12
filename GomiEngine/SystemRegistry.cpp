@@ -12,6 +12,20 @@ std::unique_ptr<ISystem> SystemRegistry::create(const std::string& name) const
 	throw std::runtime_error("unknown system \"" + name + "\"");
 }
 
+bool SystemRegistry::contains(const std::string& name) const
+{
+	for (auto& [n, factory] : factories)
+	{
+		if (n == name) return true;
+	}
+	return false;
+}
+
+void SystemRegistry::truncate(size_t count)
+{
+	if (count < factories.size()) factories.erase(factories.begin() + count, factories.end());
+}
+
 std::vector<std::string> SystemRegistry::names() const
 {
 	std::vector<std::string> result;

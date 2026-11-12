@@ -6,12 +6,20 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <iostream>
 #include <thread>
 
 void Game::init()
 {
 	registerBuiltinComponents();
 	registerBuiltinSystems();
+	//ゲームのコードは exe の隣の GomiGame.dll(あれば)
+	auto gameDll = GameModule::exeDir() / GameModule::DLL_NAME;
+	if (std::filesystem::exists(gameDll))
+	{
+		std::string error;
+		if (!gameModule.load(gameDll, error)) std::cerr << "game code: " << error << std::endl;
+	}
 	auto& sm = SettingManager::getInstance();
 	window->init(sm.getValue<int>("windowWidth"), sm.getValue<int>("windowHeight"), "Gomi", sm.getValue<bool>("fullscreen"));
 	drawer->init();

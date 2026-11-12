@@ -9,6 +9,11 @@ const FieldInfo* ComponentInfo::findField(std::string_view fieldName) const
 	return nullptr;
 }
 
+void ComponentRegistry::truncate(size_t count)
+{
+	if (count < components.size()) components.erase(components.begin() + count, components.end());
+}
+
 const ComponentInfo* ComponentRegistry::find(std::string_view name) const
 {
 	for (auto& c : components)
