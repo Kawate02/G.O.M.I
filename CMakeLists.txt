@@ -117,25 +117,10 @@ target_link_libraries(imgui PUBLIC glfw)
 file(GLOB EDITOR_SOURCES CONFIGURE_DEPENDS Editor/*.cpp Editor/*.h)
 add_executable(GomiEditor ${EDITOR_SOURCES})
 target_link_libraries(GomiEditor PRIVATE GomiCore imgui)
-# ゲームのコード(game/)を見張ってビルドするための場所とコマンド
-target_compile_definitions(GomiEditor PRIVATE
-    GOMI_GAME_DIR="${GOMI_SAMPLE_PROJECT}/game"
-    GOMI_CMAKE_COMMAND="${CMAKE_COMMAND}"
-    GOMI_BUILD_DIR="${CMAKE_BINARY_DIR}"
-    GOMI_BUILD_CONFIG="$<CONFIG>")
-add_dependencies(GomiEditor GomiGame)
+# プロジェクトのゲームのコードは、エディタ自身と同じ構成で作る(Debug と Release の実行時ライブラリは混ぜられない)
+target_compile_definitions(GomiEditor PRIVATE GOMI_BUILD_CONFIG="$<CONFIG>")
 if (MSVC)
     set_property(TARGET GomiEditor PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:GomiEditor>")
-endif()
-
-# --- ゲームのコード(game/*.cpp → GomiGame.dll) ---
-# エディタは game/ の保存を見てこれだけをビルドし、開いたまま読み直す。ゲームの exe は起動時に隣の DLL を読む
-file(GLOB GAME_SOURCES CONFIGURE_DEPENDS ${GOMI_SAMPLE_PROJECT}/game/*.cpp ${GOMI_SAMPLE_PROJECT}/game/*.h)
-add_library(GomiGame SHARED GomiEngine/game_entry/GameEntry.cpp ${GAME_SOURCES})
-target_include_directories(GomiGame PRIVATE ${GOMI_SAMPLE_PROJECT}/game)
-target_link_libraries(GomiGame PRIVATE GomiCore)
-if (MSVC)
-    target_compile_options(GomiGame PRIVATE /W3)
 endif()
 
 # 設定ファイルを実行ファイルの隣に置く

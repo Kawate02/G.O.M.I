@@ -36,6 +36,7 @@ namespace
 
 	std::wstring quote(const std::wstring& s) { return L"\"" + s + L"\""; }
 	std::wstring widen(const std::string& s) { return fs::path(s).wstring(); }
+	fs::path fromUtf8(const std::string& s) { return fs::path(std::u8string(s.begin(), s.end())); }
 
 	/// <summary>コマンドを窓を出さずに動かし、標準出力とエラー出力をまとめて返す</summary>
 	bool runProcess(const std::wstring& commandLine, std::string& output, DWORD& exitCode)
@@ -96,6 +97,39 @@ namespace
 	}
 }
 
+GameCodeHost::Config GameCodeHost::Config::forProject(const fs::path& projectDir, const fs::path& sdkDir, const std::string& buildConfig)
+{
+	Config c;
+	c.projectDir = projectDir;
+	c.sourceDir = projectDir / "game";
+	c.sdkDir = sdkDir;
+	c.buildDir = projectDir / "build";
+	c.buildConfig = buildConfig;
+	c.builtDll = c.buildDir / "bin" / GameModule::DLL_NAME;
+	c.liveDir = c.buildDir / "live";
+	return c;
+}
+
+fs::path GameCodeHost::findCMake()
+{
+	wchar_t found[MAX_PATH];
+	if (SearchPathW(nullptr, L"cmake.exe", nullptr, MAX_PATH, found, nullptr) > 0) return fs::path(found);
+	//Visual Studio の場所は vswhere(VS のインストーラが置く)で引く
+	wchar_t programFiles[MAX_PATH];
+	DWORD n = GetEnvironmentVariableW(L"ProgramFiles(x86)", programFiles, MAX_PATH);
+	if (n == 0 || n >= MAX_PATH) return {};
+	fs::path vswhere = fs::path(programFiles) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe";
+	std::error_code ec;
+	if (!fs::exists(vswhere, ec)) return {};
+	std::string output;
+	DWORD exitCode = 0;
+	if (!runProcess(quote(vswhere.wstring()) + L" -latest -products * -requires Microsoft.VisualStudio.Component.VC.CMake.Project -property installationPath", output, exitCode) || exitCode != 0) return {};
+	while (!output.empty() && (output.back() == '\n' || output.back() == '\r' || output.back() == ' ')) output.pop_back();
+	if (output.empty()) return {};
+	fs::path cmake = fromUtf8(output) / "Common7" / "IDE" / "CommonExtensions" / "Microsoft" / "CMake" / "CMake" / "bin" / "cmake.exe";
+	return fs::exists(cmake, ec) ? cmake : fs::path();
+}
+
 GameCodeHost::GameCodeHost(Config config) : config(std::move(config))
 {
 	if (!enabled()) return;
@@ -116,7 +150,8 @@ GameCodeHost::~GameCodeHost()
 bool GameCodeHost::enabled() const
 {
 	std::error_code ec;
-	return !config.sourceDir.empty() && fs::is_directory(config.sourceDir, ec);
+	return !config.sourceDir.empty() && fs::is_directory(config.sourceDir, ec)
+		&& fs::is_regular_file(config.sdkDir / "game" / "CMakeLists.txt", ec);
 }
 
 std::map<fs::path, fs::file_time_type> GameCodeHost::scan() const
@@ -183,21 +218,53 @@ void GameCodeHost::startBuild()
 	if (worker.joinable()) worker.join();
 	building = true;
 	buildAgain = false;
-	auto command = [this](const std::string& target) {
-		return quote(config.cmake.wstring()) + L" --build " + quote(config.buildDir.wstring())
-			+ L" --config " + widen(config.buildConfig) + L" --target " + widen(target);
-	};
-	std::vector<std::wstring> commands;
-	//Visual Studio の構成では、ファイルを足した時の作り直し(ZERO_CHECK)を先に別に回す。
-	//同じビルドの中だと、MSBuild が作り直す前のプロジェクトを読んでいて、足したファイルが入らない
-	std::error_code ec;
-	if (fs::exists(config.buildDir / "ZERO_CHECK.vcxproj", ec)) commands.push_back(command("ZERO_CHECK"));
-	commands.push_back(command(config.target));
-	worker = std::thread([this, commands]() {
+	worker = std::thread([this]() {
 		auto begin = std::chrono::steady_clock::now();
 		BuildResult r;
 		DWORD exitCode = 0;
 		bool started = true;
+		std::vector<std::wstring> commands;
+		if (config.cmake.empty()) config.cmake = findCMake();
+		if (config.cmake.empty())
+		{
+			r.errors.push_back("cmake が見つかりません(PATH にも Visual Studio にもありません。Visual Studio の「C++ によるデスクトップ開発」を入れてください)");
+			r.output = r.errors.back();
+			std::lock_guard lock(resultMutex);
+			result = std::move(r);
+			building = false;
+			return;
+		}
+		std::error_code ec;
+		//別のエンジン(sdk)で作ったビルドのフォルダは作り直す(cmake は元と違う -S を受け付けない)
+		auto cache = config.buildDir / "CMakeCache.txt";
+		if (fs::exists(cache, ec))
+		{
+			std::ifstream in(cache);
+			std::string line, home;
+			while (std::getline(in, line))
+			{
+				if (line.rfind("CMAKE_HOME_DIRECTORY:INTERNAL=", 0) == 0) { home = line.substr(30); break; }
+			}
+			in.close();
+			if (!fs::equivalent(fromUtf8(home), config.sdkDir / "game", ec))
+			{
+				fs::remove(cache, ec);
+				fs::remove_all(config.buildDir / "CMakeFiles", ec);
+			}
+		}
+		if (!fs::exists(cache, ec))
+		{
+			commands.push_back(quote(config.cmake.wstring()) + L" -S " + quote((config.sdkDir / "game").wstring())
+				+ L" -B " + quote(config.buildDir.wstring()) + L" -DGOMI_PROJECT=" + quote(config.projectDir.generic_wstring()));
+		}
+		auto command = [this](const std::string& target) {
+			return quote(config.cmake.wstring()) + L" --build " + quote(config.buildDir.wstring())
+				+ L" --config " + widen(config.buildConfig) + L" --target " + widen(target);
+		};
+		//Visual Studio の構成では、ファイルを足した時の作り直し(ZERO_CHECK)を先に別に回す。
+		//同じビルドの中だと、MSBuild が作り直す前のプロジェクトを読んでいて、足したファイルが入らない
+		if (commands.empty() && fs::exists(config.buildDir / "ZERO_CHECK.vcxproj", ec)) commands.push_back(command("ZERO_CHECK"));
+		commands.push_back(command(config.target));
 		for (auto& cmd : commands)
 		{
 			std::string output;

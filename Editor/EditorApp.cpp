@@ -97,13 +97,8 @@ EditorApp::EditorApp(const DebugOptions& options) : debug(options)
 	});
 	std::cerr.rdbuf(cerrCapture.get());
 
-	GameCodeHost::Config codeConfig;
-	codeConfig.sourceDir = std::filesystem::u8path(GOMI_GAME_DIR);
-	codeConfig.cmake = std::filesystem::u8path(GOMI_CMAKE_COMMAND);
-	codeConfig.buildDir = std::filesystem::u8path(GOMI_BUILD_DIR);
-	codeConfig.buildConfig = GOMI_BUILD_CONFIG;
-	codeConfig.builtDll = GameModule::exeDir() / GameModule::DLL_NAME;
-	codeConfig.liveDir = GameModule::exeDir() / "game-live";
+	//プロジェクトの game/ を、エンジン(このエディタの隣の sdk)で <プロジェクト>/build に作る
+	auto codeConfig = GameCodeHost::Config::forProject(Project::getInstance().getRoot(), GameModule::exeDir() / "sdk", GOMI_BUILD_CONFIG);
 	gameCode = std::make_unique<GameCodeHost>(codeConfig);
 	{
 		std::string error;

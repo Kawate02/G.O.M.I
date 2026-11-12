@@ -11,7 +11,7 @@
 #include <vector>
 
 /// <summary>
-/// エディタ用: ゲームのコード(game/)の保存を見張って GomiGame.dll を裏でビルドし、
+/// エディタ用: プロジェクトのゲームのコード(game/)の保存を見張って GomiGame.dll を裏でビルドし、
 /// 使用中で上書きできないよう連番のコピーにして読む。差し替え自体(World の作り直し)は SceneEditor::swapCode
 /// </summary>
 class GameCodeHost
@@ -19,13 +19,18 @@ class GameCodeHost
 public:
 	struct Config
 	{
-		std::filesystem::path sourceDir; //game/
-		std::filesystem::path cmake;     //cmake.exe
-		std::filesystem::path buildDir;  //cmake --build に渡すフォルダ
-		std::string buildConfig;         //Debug など
+		std::filesystem::path projectDir; //プロジェクトのフォルダ(cmake に GOMI_PROJECT で渡す)
+		std::filesystem::path sourceDir;  //<プロジェクト>/game
+		std::filesystem::path sdkDir;     //エンジンの sdk(sdk/game/CMakeLists.txt を cmake -S に渡す)
+		std::filesystem::path cmake;      //cmake.exe。空なら findCMake で探す
+		std::filesystem::path buildDir;   //<プロジェクト>/build(cmake -B / --build に渡す)
+		std::string buildConfig;          //Debug など(エンジンと同じ構成)
 		std::string target = "GomiGame";
-		std::filesystem::path builtDll;  //ビルドで出来る DLL
-		std::filesystem::path liveDir;   //読むためのコピーの置き場
+		std::filesystem::path builtDll;   //ビルドで出来る DLL(<build>/bin/GomiGame.dll)
+		std::filesystem::path liveDir;    //読むためのコピーの置き場
+
+		/// <summary>プロジェクトのフォルダとエンジンの sdk から、上の場所を全部決める</summary>
+		static Config forProject(const std::filesystem::path& projectDir, const std::filesystem::path& sdkDir, const std::string& buildConfig);
 	};
 	struct BuildResult
 	{
@@ -87,4 +92,9 @@ public:
 	/// <summary>VS Code でフォルダを開き、file があればそのファイルも開く。VS Code が無ければ既定のアプリで開く</summary>
 	static bool openInCodeEditor(const std::filesystem::path& folder, const std::filesystem::path& file, std::string& error);
 	inline const Config& settings() const { return config; }
+
+	/// <summary>
+	/// cmake.exe を探す。PATH > Visual Studio に付いてくるもの(vswhere で場所を引く)。無ければ空
+	/// </summary>
+	static std::filesystem::path findCMake();
 };

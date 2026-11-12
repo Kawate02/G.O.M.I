@@ -16,12 +16,13 @@ Project& Project::getInstance()
 
 fs::path Project::findRoot(const std::string& requested)
 {
-	if (!requested.empty()) return fs::absolute(fs::u8path(requested));
+	if (!requested.empty()) return fs::absolute(fs::path(requested)); //起動オプションは ANSI のまま来る
 	std::error_code ec;
 	auto besideExe = GameModule::exeDir();
 	if (fs::is_regular_file(besideExe / FILE_NAME, ec)) return besideExe;
 #ifdef GOMI_DEFAULT_PROJECT_DIR
-	return fs::u8path(GOMI_DEFAULT_PROJECT_DIR);
+	const std::string dir = GOMI_DEFAULT_PROJECT_DIR; //UTF-8(/utf-8 で作る)
+	return fs::path(std::u8string(dir.begin(), dir.end()));
 #else
 	return fs::current_path();
 #endif
