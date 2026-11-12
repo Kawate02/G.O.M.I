@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- プロセスの ANSI コードページを UTF-8 にする(Windows 10 1903 以降)。
+     これで argv・std::filesystem::path と std::string の変換・fopen(cgltf・stb)が UTF-8 になり、
+     日本語などの入ったパスのプロジェクトを開ける。 -->
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

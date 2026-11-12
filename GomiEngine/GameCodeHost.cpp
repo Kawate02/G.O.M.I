@@ -20,14 +20,23 @@ namespace
 		return ext == ".cpp" || ext == ".h" || ext == ".hpp" || ext == ".inl";
 	}
 
+	/// <summary>システムの ANSI コードページ(日本語の Windows なら 932)。この実行ファイルはマニフェストで CP_ACP が UTF-8 になっているので、子のプロセス(CMake・MSBuild)の ANSI はこちらで引く</summary>
+	UINT systemAnsiCodePage()
+	{
+		DWORD cp = 0;
+		if (GetLocaleInfoEx(LOCALE_NAME_SYSTEM_DEFAULT, LOCALE_IDEFAULTANSICODEPAGE | LOCALE_RETURN_NUMBER, reinterpret_cast<LPWSTR>(&cp), sizeof(cp) / sizeof(WCHAR)) == 0 || cp == 0) return CP_ACP;
+		return cp;
+	}
+
 	//ビルドの出力は UTF-8 のことも ANSI(CP932)のこともあるので、UTF-8 として読めなければ ANSI とみなす
 	std::string toUtf8(const std::string& bytes)
 	{
 		if (bytes.empty()) return bytes;
 		if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, bytes.data(), (int)bytes.size(), nullptr, 0) > 0) return bytes;
-		int wn = MultiByteToWideChar(CP_ACP, 0, bytes.data(), (int)bytes.size(), nullptr, 0);
+		UINT ansi = systemAnsiCodePage();
+		int wn = MultiByteToWideChar(ansi, 0, bytes.data(), (int)bytes.size(), nullptr, 0);
 		std::wstring w(wn, L'\0');
-		MultiByteToWideChar(CP_ACP, 0, bytes.data(), (int)bytes.size(), w.data(), wn);
+		MultiByteToWideChar(ansi, 0, bytes.data(), (int)bytes.size(), w.data(), wn);
 		int n = WideCharToMultiByte(CP_UTF8, 0, w.data(), wn, nullptr, 0, nullptr, nullptr);
 		std::string out(n, '\0');
 		WideCharToMultiByte(CP_UTF8, 0, w.data(), wn, out.data(), n, nullptr, nullptr);

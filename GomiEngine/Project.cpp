@@ -16,7 +16,7 @@ Project& Project::getInstance()
 
 fs::path Project::findRoot(const std::string& requested)
 {
-	if (!requested.empty()) return fs::absolute(fs::path(requested)); //起動オプションは ANSI のまま来る
+	if (!requested.empty()) return fs::absolute(fs::path(std::u8string(requested.begin(), requested.end()))); //起動オプションは UTF-8(DebugOptions が読み直す)
 	std::error_code ec;
 	auto besideExe = GameModule::exeDir();
 	if (fs::is_regular_file(besideExe / FILE_NAME, ec)) return besideExe;

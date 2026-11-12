@@ -97,7 +97,7 @@ if (MSVC)
     target_compile_options(GomiCore PRIVATE /W3)
 endif()
 
-add_executable(GomiEngine GomiEngine/Gomi.cpp)
+add_executable(GomiEngine GomiEngine/Gomi.cpp GomiEngine/utf8.manifest)
 target_link_libraries(GomiEngine PRIVATE GomiCore)
 
 if (MSVC)
@@ -120,7 +120,7 @@ target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/
 target_link_libraries(imgui PUBLIC glfw)
 
 file(GLOB EDITOR_SOURCES CONFIGURE_DEPENDS Editor/*.cpp Editor/*.h)
-add_executable(GomiEditor ${EDITOR_SOURCES})
+add_executable(GomiEditor ${EDITOR_SOURCES} GomiEngine/utf8.manifest)
 target_link_libraries(GomiEditor PRIVATE GomiCore imgui)
 # プロジェクトのゲームのコードは、エディタ自身と同じ構成で作る(Debug と Release の実行時ライブラリは混ぜられない)
 target_compile_definitions(GomiEditor PRIVATE GOMI_BUILD_CONFIG="$<CONFIG>")
@@ -185,7 +185,7 @@ target_compile_definitions(LauncherTest PRIVATE GOMI_LAUNCHER_TEST_DIR="${CMAKE_
 # --- テスト(ctest で実行) ---
 enable_testing()
 foreach(test ComponentArrayTest ReflectionTest SceneTest CollisionTest ModelTest EditorTest ReplayTest GameModuleTest)
-    add_executable(${test} tests/${test}.cpp)
+    add_executable(${test} tests/${test}.cpp GomiEngine/utf8.manifest)
     target_link_libraries(${test} PRIVATE GomiCore)
     add_test(NAME ${test} COMMAND ${test})
 endforeach()
