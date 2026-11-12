@@ -94,6 +94,12 @@ private:
 	bool codeSwapPending = false;  //ビルドできた。止めている時に差し替える
 	int codeErrorCount = 0;        //最後のビルドのエラーの数
 	void updateGameCode();
+	//ひな形の名前を聞く
+	bool openNewCode = false;
+	GameCodeHost::TemplateKind newCodeKind = GameCodeHost::TemplateKind::Component;
+	std::string newCodeName;
+	void createCode(GameCodeHost::TemplateKind kind, const std::string& name);
+	void openCode(const std::filesystem::path& file);
 
 	int gameTarget = -1;
 	int gameWidth = 800;

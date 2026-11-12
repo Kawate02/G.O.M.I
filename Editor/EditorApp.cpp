@@ -181,6 +181,38 @@ void EditorApp::updateGameCode()
 	if (selected >= count) selected = -1;
 }
 
+void EditorApp::openCode(const std::filesystem::path& file)
+{
+	if (!gameCode || !gameCode->enabled())
+	{
+		log("ゲームのコードのフォルダ(game/)がありません", LogLevel::Error);
+		return;
+	}
+	if (debug.maxFrames > 0) return; //操作の再現中は VS Code を開かない
+	std::string error;
+	if (!GameCodeHost::openInCodeEditor(gameCode->settings().sourceDir, file, error)) log("コードを開けませんでした: " + error, LogLevel::Error);
+}
+
+void EditorApp::createCode(GameCodeHost::TemplateKind kind, const std::string& name)
+{
+	if (!gameCode || !gameCode->enabled())
+	{
+		log("ゲームのコードのフォルダ(game/)がありません", LogLevel::Error);
+		return;
+	}
+	std::string error;
+	auto made = gameCode->createTemplate(kind, name, error);
+	if (made.empty())
+	{
+		log("ひな形を作れませんでした: " + error, LogLevel::Error);
+		return;
+	}
+	std::string names;
+	for (auto& p : made) names += (names.empty() ? "" : "・") + p.filename().string();
+	log("ひな形を作りました: game/" + names + "(保存するとビルドして読み直します)");
+	openCode(made.front());
+}
+
 void EditorApp::refreshAssets(bool force)
 {
 	double now = ImGui::GetCurrentContext() ? ImGui::GetTime() : 0.0;
@@ -318,6 +350,15 @@ void EditorApp::drawMenuBar()
 		menuItem("entity.paste");
 		menuItem("entity.duplicate");
 		menuItem("entity.delete");
+		ImGui::EndMenu();
+	}
+	if (ImGui::BeginMenu("コード"))
+	{
+		menuItem("code.open");
+		menuItem("code.newComponent");
+		menuItem("code.newSystem");
+		ImGui::Separator();
+		menuItem("code.build");
 		ImGui::EndMenu();
 	}
 	if (ImGui::BeginMenu("再生"))
@@ -1459,6 +1500,31 @@ void EditorApp::drawPopups()
 		ImGui::EndPopup();
 	}
 
+	if (openNewCode)
+	{
+		ImGui::OpenPopup("ひな形を作る");
+		openNewCode = false;
+	}
+	if (ImGui::BeginPopupModal("ひな形を作る", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		bool component = newCodeKind == GameCodeHost::TemplateKind::Component;
+		ImGui::TextUnformatted(component ? "新しい Component の名前(Hp なら game/HpComponent.h と .cpp を作る)" : "新しい System の名前(Damage なら game/DamageSystem.cpp を作る)");
+		ImGui::TextDisabled("英字で始まる英数字と _ だけ。作ったら VS Code で開く");
+		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+		ImGui::SetNextItemWidth(360);
+		bool enter = ImGui::InputText("##codeName", &newCodeName, ImGuiInputTextFlags_EnterReturnsTrue);
+		ImGui::BeginDisabled(newCodeName.empty());
+		if (ImGui::Button("作る") || (enter && !newCodeName.empty()))
+		{
+			createCode(newCodeKind, newCodeName);
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		if (ImGui::Button("やめる")) ImGui::CloseCurrentPopup();
+		ImGui::EndPopup();
+	}
+
 	if (openRecordSave)
 	{
 		ImGui::OpenPopup("記録を保存");
@@ -2386,6 +2452,27 @@ void EditorApp::registerCommands()
 		});
 		c.choices = [this] { return assetsIn("prefabs", { ".json" }); };
 		c.argName = "プレハブ(prefabs/X.json)";
+	}
+	{
+		auto hasCode = [this] { return gameCode && gameCode->enabled(); };
+		add("code.open", "ゲームのコードを開く(VS Code)", "", 0, hasCode, [this](const std::string& a) {
+			openCode(a.empty() ? std::filesystem::path() : gameCode->settings().sourceDir / std::filesystem::u8path(a));
+		}).argName = "(省略可)game/ からのファイル名";
+		add("code.newComponent", "新しい Component のひな形を作る", "", 0, hasCode, [this](const std::string& a) {
+			if (!a.empty()) return createCode(GameCodeHost::TemplateKind::Component, a);
+			newCodeKind = GameCodeHost::TemplateKind::Component;
+			newCodeName.clear();
+			openNewCode = true;
+		}).argName = "(省略可)名前(Hp なら HpComponent.h/.cpp)。省略すると名前を聞く";
+		add("code.newSystem", "新しい System のひな形を作る", "", 0, hasCode, [this](const std::string& a) {
+			if (!a.empty()) return createCode(GameCodeHost::TemplateKind::System, a);
+			newCodeKind = GameCodeHost::TemplateKind::System;
+			newCodeName.clear();
+			openNewCode = true;
+		}).argName = "(省略可)名前(Damage なら DamageSystem.cpp)。省略すると名前を聞く";
+		add("code.build", "ゲームのコードをビルドし直す", "", 0, [this, hasCode] { return hasCode() && !gameCode->isBuilding(); }, [this](const std::string&) {
+			gameCode->startBuild();
+		});
 	}
 	{
 		auto& c = add("component.add", "選んだ物にコンポーネントを足す", "", 0, hasSelection, [this](const std::string& a) {

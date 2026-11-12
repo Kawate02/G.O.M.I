@@ -77,5 +77,14 @@ public:
 	/// <summary>前に読んでいたものに戻す(SceneEditor::swapCode の revert に渡す)</summary>
 	void revert();
 	inline const GameModule& module() const { return gameModule; }
+
+	enum class TemplateKind { Component, System };
+	/// <summary>
+	/// game/ にひな形を作る。Component は X.h(型)と X.cpp(登録)、System は X.cpp。
+	/// name は "Hp" のような名前(後ろの Component / System は付けても付けなくてもよい)。作ったファイルを返す(最初が開く物)
+	/// </summary>
+	std::vector<std::filesystem::path> createTemplate(TemplateKind kind, const std::string& name, std::string& error) const;
+	/// <summary>VS Code でフォルダを開き、file があればそのファイルも開く。VS Code が無ければ既定のアプリで開く</summary>
+	static bool openInCodeEditor(const std::filesystem::path& folder, const std::filesystem::path& file, std::string& error);
 	inline const Config& settings() const { return config; }
 };

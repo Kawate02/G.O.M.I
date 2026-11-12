@@ -3,7 +3,11 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#include <shellapi.h>
+
+#include <cctype>
 #include <chrono>
+#include <fstream>
 #include <set>
 
 namespace fs = std::filesystem;
@@ -233,6 +237,146 @@ std::optional<GameCodeHost::BuildResult> GameCodeHost::takeResult()
 		r.swap(result);
 	}
 	return r;
+}
+
+namespace
+{
+	bool isIdentifier(const std::string& s)
+	{
+		if (s.empty() || std::isdigit(static_cast<unsigned char>(s[0]))) return false;
+		for (char c : s)
+		{
+			if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_')) return false;
+		}
+		return true;
+	}
+
+	std::string replaceAll(std::string text, const std::string& from, const std::string& to)
+	{
+		for (size_t pos = text.find(from); pos != std::string::npos; pos = text.find(from, pos + to.size())) text.replace(pos, from.size(), to);
+		return text;
+	}
+
+	const char* COMPONENT_HEADER = R"(#pragma once
+// @Name@ コンポーネント: (何を表すかを書く)
+// 項目を足したら @Name@Component.cpp の GOMI_REGISTER にも .field で並べる(エディタのインスペクタ・シーンファイルに出る)
+#include "Vec3.h"
+
+struct @Name@Component
+{
+	float value = 0;
+};
+)";
+
+	const char* COMPONENT_SOURCE = R"(#include "GameCode.h"
+#include "@Name@Component.h"
+
+GOMI_REGISTER
+{
+	// .field は作る時に決める値、.runtime はゲーム中に System が変える値(エディタでは読むだけ)
+	components.add<@Name@Component>("@Name@")
+		.field("value", &@Name@Component::value);
+}
+)";
+
+	const char* SYSTEM_SOURCE = R"(// @Name@System: (何をするかを書く)
+// シーンの System タブの「System を追加」で並べると、上から順に毎フレーム動く
+#include "GameCode.h"
+#include "TransformComponent.h"
+
+class @Name@System : public ISystem
+{
+public:
+	void initialize(World& world) override {}
+
+	void update(World& world, int frameCount, float deltaTime) override
+	{
+		auto& cm = world.getComponentManager();
+		// 例: Transform を持つ Entity を全部回す。自分の Component は "XxxComponent.h" を include して each<XxxComponent, ...>
+		cm.each<TransformComponent>([&](Entity e) {
+			TransformComponent& transform = cm.getComponentArray<TransformComponent>().getComponent(e);
+			(void)transform;
+		});
+	}
+};
+
+GOMI_REGISTER
+{
+	systems.add<@Name@System>("@Name@System");
+}
+)";
+}
+
+std::vector<fs::path> GameCodeHost::createTemplate(TemplateKind kind, const std::string& rawName, std::string& error) const
+{
+	std::string name = rawName;
+	const std::string suffix = kind == TemplateKind::Component ? "Component" : "System";
+	if (name.size() > suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0) name.erase(name.size() - suffix.size());
+	if (!isIdentifier(name))
+	{
+		error = "\"" + rawName + "\" は名前に使えません(英字で始まる英数字と _ だけ)";
+		return {};
+	}
+	std::vector<std::pair<fs::path, const char*>> files;
+	if (kind == TemplateKind::Component)
+	{
+		files.push_back({ config.sourceDir / (name + "Component.h"), COMPONENT_HEADER });
+		files.push_back({ config.sourceDir / (name + "Component.cpp"), COMPONENT_SOURCE });
+	}
+	else files.push_back({ config.sourceDir / (name + "System.cpp"), SYSTEM_SOURCE });
+	std::error_code ec;
+	for (auto& [path, text] : files)
+	{
+		if (fs::exists(path, ec))
+		{
+			error = path.filename().string() + " はもうあります";
+			return {};
+		}
+	}
+	fs::create_directories(config.sourceDir, ec);
+	std::vector<fs::path> made;
+	for (auto& [path, text] : files)
+	{
+		std::ofstream out(path, std::ios::binary);
+		out << replaceAll(text, "@Name@", name);
+		if (!out)
+		{
+			error = "cannot write " + path.string();
+			return {};
+		}
+		made.push_back(path);
+	}
+	//Component は登録の .cpp より型の .h を先に開く
+	return made;
+}
+
+bool GameCodeHost::openInCodeEditor(const fs::path& folder, const fs::path& file, std::string& error)
+{
+	wchar_t found[MAX_PATH];
+	if (SearchPathW(nullptr, L"code.cmd", nullptr, MAX_PATH, found, nullptr) > 0)
+	{
+		std::wstring cmd = L"cmd.exe /c \"" + quote(found) + L" " + quote(folder.wstring());
+		if (!file.empty()) cmd += L" -g " + quote(file.wstring());
+		cmd += L"\"";
+		STARTUPINFOW si{};
+		si.cb = sizeof(si);
+		PROCESS_INFORMATION pi{};
+		if (CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+		{
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+			return true;
+		}
+	}
+	//VS Code が無い: ファイルなら既定のアプリ、無ければフォルダをエクスプローラーで開く
+	const fs::path& target = file.empty() ? folder : file;
+	auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", target.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+	if (result <= 32)
+	{
+		error = "cannot open " + target.string();
+		return false;
+	}
+	return true;
 }
 
 bool GameCodeHost::swapToBuilt(std::string& error)
