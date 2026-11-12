@@ -89,6 +89,7 @@ namespace
 			if (options.tab == "versions") tab = Tab::Versions;
 			openNewOnStart = options.tab == "new";
 			refreshInstalled();
+			vscode = LauncherCore::findVSCode();
 			checkGhAsync();
 		}
 
@@ -121,6 +122,10 @@ namespace
 			drawStatus();
 			drawNewProject();
 			drawMissingEngine();
+			drawSettings();
+			drawDuplicate();
+			drawTrash();
+			drawUninstall();
 			ImGui::End();
 		}
 
@@ -166,6 +171,18 @@ namespace
 		std::string missingVersion;
 		std::string otherVersion;
 		bool missingOpenRequest = false;
+
+		// ---- 一覧の行の編集(開くのはそれぞれの draw の中、BeginPopupModal の直前)
+		std::filesystem::path vscode; // 見つからなければ空
+		std::string editProject;      // 編集しているプロジェクトのフォルダ
+		bool settingsRequest = false, duplicateRequest = false, trashRequest = false;
+		std::string setName, setEngine, setScene, setPauseUI, setError;
+		std::string dupName, dupError;
+		std::string trashError;
+		// ---- バージョンを消す
+		bool uninstallRequest = false;
+		std::string uninstallVersion;
+		std::vector<std::string> uninstallUsers;
 
 		void setStatus(const std::string& text, ImVec4 color)
 		{
@@ -285,7 +302,7 @@ namespace
 			ImGui::TableSetupColumn("エンジン", ImGuiTableColumnFlags_WidthFixed, 150);
 			ImGui::TableSetupColumn("最後に開いた", ImGuiTableColumnFlags_WidthFixed, 140);
 			ImGui::TableSetupColumn("場所", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60);
+			ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 80);
 			ImGui::TableHeadersRow();
 			for (size_t i = 0; i < list.size(); i++)
 			{
@@ -301,6 +318,7 @@ namespace
 				if (ImGui::Selectable(name.c_str(), false, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap | ImGuiSelectableFlags_AllowDoubleClick)
 					&& ImGui::IsMouseDoubleClicked(0) && exists)
 					openProject(p.path, "");
+				if (ImGui::BeginPopupContextItem("row")) { drawRowMenu(p.path, exists); ImGui::EndPopup(); }
 				ImGui::TableNextColumn();
 				if (!exists) ImGui::TextColored(COLOR_ERROR, "フォルダがありません");
 				else if (engine.empty()) ImGui::TextColored(COLOR_WARN, "(engine 無し)");
@@ -314,9 +332,266 @@ namespace
 				ImGui::BeginDisabled(!exists);
 				if (ImGui::SmallButton("開く")) openProject(p.path, "");
 				ImGui::EndDisabled();
+				ImGui::SameLine();
+				if (ImGui::SmallButton("…")) ImGui::OpenPopup("menu");
+				if (ImGui::BeginPopup("menu")) { drawRowMenu(p.path, exists); ImGui::EndPopup(); }
 				ImGui::PopID();
 			}
 			ImGui::EndTable();
+		}
+
+		// 右クリックと「…」で出す、行の操作
+		void drawRowMenu(const std::string& path, bool exists)
+		{
+			std::filesystem::path dir = u8path(path);
+			std::string error;
+			ImGui::TextDisabled("%s", u8str(dir.filename()).c_str());
+			ImGui::Separator();
+			ImGui::BeginDisabled(!exists);
+			if (ImGui::MenuItem("設定…"))
+			{
+				editProject = path;
+				setName = u8str(dir.filename());
+				setEngine = LauncherCore::projectEngine(dir);
+				setScene = LauncherCore::projectValue(dir, "startScene");
+				setPauseUI = LauncherCore::projectValue(dir, "pauseUI");
+				setError.clear();
+				settingsRequest = true;
+			}
+			if (ImGui::MenuItem("複製…"))
+			{
+				editProject = path;
+				dupName = LauncherCore::duplicateName(dir);
+				dupError.clear();
+				duplicateRequest = true;
+			}
+			ImGui::Separator();
+			if (ImGui::MenuItem("エクスプローラーで開く") && !LauncherCore::revealInExplorer(dir, error)) setStatus(error, COLOR_ERROR);
+			ImGui::BeginDisabled(vscode.empty());
+			if (ImGui::MenuItem("VS Code で開く"))
+			{
+				if (LauncherCore::openInVSCode(dir, error)) setStatus("VS Code で開きました: " + path, COLOR_OK);
+				else setStatus(error, COLOR_ERROR);
+			}
+			ImGui::EndDisabled();
+			if (vscode.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+				ImGui::SetTooltip("VS Code が見つかりません。\nコマンドで winget install Microsoft.VisualStudioCode を実行して、ランチャーを開き直してください");
+			ImGui::EndDisabled();
+			ImGui::Separator();
+			if (ImGui::MenuItem("一覧から外す"))
+			{
+				if (core.removeProject(dir, error)) setStatus("一覧から外しました(フォルダは残っています): " + path, COLOR_OK);
+				else setStatus(error, COLOR_ERROR);
+			}
+			ImGui::BeginDisabled(!exists);
+			if (ImGui::MenuItem("ごみ箱へ移す…"))
+			{
+				editProject = path;
+				trashError.clear();
+				trashRequest = true;
+			}
+			ImGui::EndDisabled();
+		}
+
+		// 選択肢から選ぶ。noneLabel を渡すと「無し(空)」も選べる。今の値が選択肢に無ければそう出す
+		static void comboOf(const char* id, std::string& value, const std::vector<std::string>& items, const char* noneLabel = nullptr)
+		{
+			bool known = value.empty() || std::find(items.begin(), items.end(), value) != items.end();
+			std::string preview = value.empty() ? (noneLabel ? noneLabel : "") : value;
+			if (!known) preview += "(見つかりません)";
+			if (!ImGui::BeginCombo(id, preview.c_str())) return;
+			if (noneLabel && ImGui::Selectable(noneLabel, value.empty())) value.clear();
+			for (auto& item : items)
+				if (ImGui::Selectable(item.c_str(), item == value)) value = item;
+			ImGui::EndCombo();
+		}
+
+		void showError(const std::string& error)
+		{
+			if (error.empty()) return;
+			ImGui::PushStyleColor(ImGuiCol_Text, COLOR_ERROR);
+			ImGui::TextWrapped("%s", error.c_str());
+			ImGui::PopStyleColor();
+		}
+
+		void drawSettings()
+		{
+			if (settingsRequest)
+			{
+				ImGui::OpenPopup("設定");
+				settingsRequest = false;
+			}
+			ImGui::SetNextWindowSize(ImVec2(640, 0));
+			if (!ImGui::BeginPopupModal("設定", nullptr, ImGuiWindowFlags_NoResize)) return;
+			std::filesystem::path dir = u8path(editProject);
+			const float labelWidth = 150;
+			auto label = [&](const char* text) {
+				ImGui::AlignTextToFramePadding();
+				ImGui::TextUnformatted(text);
+				ImGui::SameLine(labelWidth);
+			};
+			ImGui::TextColored(COLOR_DIM, "%s", editProject.c_str());
+			ImGui::Spacing();
+
+			label("名前(フォルダ名)");
+			ImGui::SetNextItemWidth(-1);
+			ImGui::InputText("##name", &setName);
+
+			label("エンジン");
+			ImGui::SetNextItemWidth(200);
+			comboOf("##engine", setEngine, installed);
+
+			label("startScene");
+			ImGui::SetNextItemWidth(-1);
+			comboOf("##scene", setScene, LauncherCore::projectScenes(dir));
+
+			label("pauseUI");
+			ImGui::SetNextItemWidth(-1);
+			comboOf("##pause", setPauseUI, LauncherCore::projectUIs(dir), "(なし)");
+
+			ImGui::Spacing();
+			ImGui::TextDisabled("project.json のほかの項目はそのまま残します。直接直すなら「VS Code で開く」");
+			bool validName = LauncherCore::validFolderName(setName);
+			if (!validName) ImGui::TextColored(COLOR_ERROR, "フォルダ名に使えない名前です(\\ / : * ? \" < > | と、終わりの空白・点は使えません)");
+			else if (setEngine == "0.1.0" && LauncherCore::hasNonAscii(u8str(dir.parent_path() / u8path(setName))))
+				ImGui::TextColored(COLOR_WARN, "パスに日本語などが入っています。エディタ 0.1.0 はこのプロジェクトを開けません(英数字のパスにするか、0.1.1 以降を使ってください)");
+			showError(setError);
+			ImGui::Spacing();
+
+			ImGui::BeginDisabled(!validName);
+			if (ImGui::Button("保存"))
+			{
+				//project.json を先に直し、名前(フォルダ名)は最後に変える。名前を変えられなくても設定は残る
+				std::string error;
+				bool ok = true;
+				const std::pair<const char*, const std::string*> fields[] = { { "engine", &setEngine }, { "startScene", &setScene }, { "pauseUI", &setPauseUI } };
+				for (auto& [key, value] : fields)
+				{
+					if (ok && LauncherCore::projectValue(dir, key) != *value) ok = LauncherCore::setProjectValue(dir, key, *value, error);
+				}
+				std::filesystem::path renamed = dir;
+				if (ok) ok = core.renameProject(dir, setName, error, &renamed);
+				if (ok)
+				{
+					setStatus("保存しました: " + u8str(renamed), COLOR_OK);
+					ImGui::CloseCurrentPopup();
+				}
+				else setError = error;
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			if (ImGui::Button("キャンセル")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+
+		void drawDuplicate()
+		{
+			if (duplicateRequest)
+			{
+				ImGui::OpenPopup("複製");
+				duplicateRequest = false;
+			}
+			ImGui::SetNextWindowSize(ImVec2(640, 0));
+			if (!ImGui::BeginPopupModal("複製", nullptr, ImGuiWindowFlags_NoResize)) return;
+			std::filesystem::path dir = u8path(editProject);
+			ImGui::TextColored(COLOR_DIM, "%s", editProject.c_str());
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextUnformatted("新しい名前");
+			ImGui::SameLine(110);
+			ImGui::SetNextItemWidth(-1);
+			ImGui::InputText("##dupname", &dupName);
+			std::filesystem::path dest = dir.parent_path() / u8path(dupName);
+			ImGui::TextColored(COLOR_DIM, "作る場所: %s", u8str(dest).c_str());
+			ImGui::TextDisabled("build/(ゲームのコードのビルド結果)はコピーしません。開いた時に作り直します");
+			if (LauncherCore::projectEngine(dir) == "0.1.0" && LauncherCore::hasNonAscii(u8str(dest)))
+				ImGui::TextColored(COLOR_WARN, "パスに日本語などが入っています。エディタ 0.1.0 はこのプロジェクトを開けません");
+			showError(dupError);
+			ImGui::Spacing();
+			ImGui::BeginDisabled(!LauncherCore::validFolderName(dupName));
+			if (ImGui::Button("複製する"))
+			{
+				std::string error;
+				if (core.duplicateProject(dir, dest, error))
+				{
+					setStatus("複製しました: " + u8str(dest), COLOR_OK);
+					ImGui::CloseCurrentPopup();
+				}
+				else dupError = error;
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			if (ImGui::Button("キャンセル")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+
+		void drawTrash()
+		{
+			if (trashRequest)
+			{
+				ImGui::OpenPopup("ごみ箱へ移す");
+				trashRequest = false;
+			}
+			ImGui::SetNextWindowSize(ImVec2(560, 0));
+			if (!ImGui::BeginPopupModal("ごみ箱へ移す", nullptr, ImGuiWindowFlags_NoResize)) return;
+			ImGui::TextWrapped("このプロジェクトのフォルダをごみ箱へ移し、一覧から外します。ごみ箱から元に戻せます。");
+			ImGui::TextColored(COLOR_DIM, "%s", editProject.c_str());
+			showError(trashError);
+			ImGui::Spacing();
+			if (ImGui::Button("ごみ箱へ移す"))
+			{
+				std::string error;
+				if (core.trashProject(u8path(editProject), error))
+				{
+					setStatus("ごみ箱へ移しました: " + editProject, COLOR_OK);
+					ImGui::CloseCurrentPopup();
+				}
+				else trashError = error;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("キャンセル")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+
+		void drawUninstall()
+		{
+			if (uninstallRequest)
+			{
+				ImGui::OpenPopup("バージョンを消す");
+				uninstallRequest = false;
+			}
+			ImGui::SetNextWindowSize(ImVec2(600, 0));
+			if (!ImGui::BeginPopupModal("バージョンを消す", nullptr, ImGuiWindowFlags_NoResize)) return;
+			ImGui::TextWrapped("エンジン %s を消します(%s)。Releases か zip からいつでも入れ直せます。", uninstallVersion.c_str(), u8str(core.editorDir(uninstallVersion)).c_str());
+			if (!uninstallUsers.empty())
+			{
+				ImGui::Spacing();
+				ImGui::PushStyleColor(ImGuiCol_Text, COLOR_WARN);
+				ImGui::TextWrapped("このバージョンを使っているプロジェクトがあります。開く時に、入れ直すか別のバージョンを選ぶことになります。");
+				ImGui::PopStyleColor();
+				for (auto& p : uninstallUsers)
+				{
+					ImGui::Bullet();
+					ImGui::TextUnformatted(p.c_str());
+				}
+			}
+			ImGui::Spacing();
+			ImGui::BeginDisabled(busy());
+			if (ImGui::Button("消す"))
+			{
+				std::string version = uninstallVersion;
+				startJob([this, version](std::string& message, const LauncherCore::Progress& progress) {
+					progress(version + " を消しています…");
+					std::string error;
+					if (!core.uninstall(version, error)) { message = error; return false; }
+					message = version + " を消しました";
+					return true;
+				});
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			if (ImGui::Button("キャンセル")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
 		}
 
 		void openProject(const std::string& path, const std::string& engineOverride)
@@ -504,10 +779,22 @@ namespace
 			if (installed.empty()) ImGui::TextDisabled("まだありません。下の Releases か zip から入れてください。");
 			for (auto& v : installed)
 			{
+				ImGui::PushID(v.c_str());
+				ImGui::AlignTextToFramePadding();
 				ImGui::Bullet();
 				ImGui::TextUnformatted(v.c_str());
 				ImGui::SameLine(160);
+				ImGui::BeginDisabled(busy());
+				if (ImGui::SmallButton("消す…"))
+				{
+					uninstallVersion = v;
+					uninstallUsers = core.projectsUsing(v);
+					uninstallRequest = true;
+				}
+				ImGui::EndDisabled();
+				ImGui::SameLine();
 				ImGui::TextColored(COLOR_DIM, "%s", u8str(core.editorDir(v)).c_str());
+				ImGui::PopID();
 			}
 
 			ImGui::Spacing();
