@@ -105,7 +105,8 @@ public:
 	inline bool alive(Entity e) const { return e.id < generations.size() && e.generation == generations[e.id]; }
 	inline WorldEventBus& event() { return eventBus; }
 	inline CollisionContext& col() { return collision; }
-	inline const std::vector<Entity>& getEntities() { return entities; }
+	/// <summary>生きている Entity だけを ID 順に詰めて返す(毎回コピー。毎フレームの処理では ComponentManager::each を使う)</summary>
+	std::vector<Entity> getEntities() const;
 	inline InputState& getInputState() { return inputState; }
 	inline RenderQueue& getRenderQueue() { return renderQueue; }
 	inline AudioQueue& getAudioQueue() { return audioQueue; }

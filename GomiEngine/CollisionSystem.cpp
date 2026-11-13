@@ -7,7 +7,6 @@ void CollisionSystem::initialize(World& world)
 
 void CollisionSystem::update(World& world, int frameCount, float deltaTime)
 {
-	auto& entities = world.getEntities();
 	auto& collisions = world.getComponentManager().getComponentArray<CollisionComponent>();
 	auto& tf = world.getComponentManager().getComponentArray<TransformComponent>();
 	auto& tag = world.getComponentManager().getComponentArray<EntityTagComponent>();

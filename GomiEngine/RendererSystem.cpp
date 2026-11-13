@@ -8,7 +8,6 @@ void RendererSystem::initialize(World& world)
 
 void RendererSystem::update(World& world, int frameCount, float deltaTime)
 {
-	auto& entities = world.getEntities();
 	auto& renderer = world.getComponentManager().getComponentArray<RendererComponent>();
 	auto& tf = world.getComponentManager().getComponentArray<TransformComponent>();
 

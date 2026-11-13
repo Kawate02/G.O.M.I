@@ -102,6 +102,16 @@ void World::destroyEntity(Entity e)
 	pendingDestroy.push_back(e);
 }
 
+std::vector<Entity> World::getEntities() const
+{
+	std::vector<Entity> result;
+	for (auto& e : entities)
+	{
+		if (alive(e)) result.push_back(e);
+	}
+	return result;
+}
+
 void World::flushDestroyed()
 {
 	for (auto& e : pendingDestroy)

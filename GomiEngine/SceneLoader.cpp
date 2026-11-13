@@ -261,7 +261,7 @@ std::vector<Entity> SceneLoader::instantiate(World& world, const AssetID& prefab
 	//新しく作った Entity(空き番号の再利用もあるので、つながりで探す)
 	for (auto& e : world.getEntities())
 	{
-		const PrefabLink* link = world.alive(e) ? world.getPrefabLink(e) : nullptr;
+		const PrefabLink* link = world.getPrefabLink(e);
 		if (link && link->prefab == prefabId) created.push_back(e);
 	}
 	int newest = 0;
@@ -313,7 +313,6 @@ Json SceneLoader::save(World& world, const std::function<std::vector<Json>(const
 	std::unordered_map<int, std::vector<Entity>> instances;
 	for (auto& e : world.getEntities())
 	{
-		if (!world.alive(e)) continue;
 		if (const PrefabLink* link = world.getPrefabLink(e)) instances[link->instance].push_back(e);
 	}
 
@@ -321,7 +320,6 @@ Json SceneLoader::save(World& world, const std::function<std::vector<Json>(const
 	std::unordered_map<int, bool> written;
 	for (auto& e : world.getEntities())
 	{
-		if (!world.alive(e)) continue;
 		const PrefabLink* link = world.getPrefabLink(e);
 		if (!link)
 		{

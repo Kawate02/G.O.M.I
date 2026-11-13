@@ -4,6 +4,7 @@
 #include "World.h"
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
+#include <algorithm>
 #include <iostream>
 
 static int failures = 0;
@@ -108,6 +109,30 @@ int main()
 		CHECK(countEntities(s) == 4); // プレイヤー + 背景の残り3枚(仲間が欠けたので展開)
 		CHECK(s["entities"][0].contains("prefab"));
 		CHECK(s["entities"][1].contains("components"));
+	}
+
+	// getEntities は生きている Entity だけを返す
+	{
+		Env env;
+		World world(env.input, env.render, env.audio);
+		world.initialize(db.readJson("scenes/Field.json"), "Field");
+		auto has = [&](Entity x) {
+			auto v = world.getEntities();
+			return std::find_if(v.begin(), v.end(), [&](const Entity& y) { return y.id == x.id && y.generation == x.generation; }) != v.end();
+		};
+		CHECK(world.getEntities().size() == 5);
+		Entity dead = world.getEntities()[1];
+		world.destroyEntity(dead);
+		CHECK(world.getEntities().size() == 4);
+		CHECK(!has(dead));
+		world.update(0.0f, false);
+		CHECK(world.getEntities().size() == 4);
+		Entity reused = world.createEntity();
+		CHECK(reused.id == dead.id);
+		CHECK(reused.generation != dead.generation);
+		CHECK(world.getEntities().size() == 5);
+		CHECK(has(reused));
+		CHECK(!has(dead));
 	}
 
 	// merge: オブジェクトは中まで重ね、それ以外は置き換え

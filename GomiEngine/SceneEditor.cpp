@@ -30,7 +30,7 @@ void SceneEditor::rebuild(const Json& scene)
 	//作った時のプレハブの中身を覚える(外でプレハブが変わっても、overrides を自分の変更だけにする)
 	for (auto& e : currentWorld->getEntities())
 	{
-		if (const PrefabLink* link = currentWorld->alive(e) ? currentWorld->getPrefabLink(e) : nullptr) prefabDefs(link->prefab);
+		if (const PrefabLink* link = currentWorld->getPrefabLink(e)) prefabDefs(link->prefab);
 	}
 }
 
@@ -174,12 +174,7 @@ bool SceneEditor::saveAs(const AssetID& id, std::string& error)
 
 std::vector<Entity> SceneEditor::entities()
 {
-	std::vector<Entity> result;
-	for (auto& e : currentWorld->getEntities())
-	{
-		if (currentWorld->alive(e)) result.push_back(e);
-	}
-	return result;
+	return currentWorld->getEntities();
 }
 
 std::vector<std::string> SceneEditor::displayNames()
