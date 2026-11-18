@@ -12,13 +12,13 @@ struct Vec3
 
 	inline Vec3 normalize() const
 	{
-		float length = sqrt(x * x + y * y + z * z);
+		float length = static_cast<float>(sqrt(x * x + y * y + z * z));
 		if (length == 0) return Vec3(0, 0, 0);
 		return Vec3(x / length, y / length, z / length);
 	}
 	inline float length() const
 	{
-		return sqrt(x * x + y * y + z * z);
+		return static_cast<float>(sqrt(x * x + y * y + z * z));
 	}
 	inline float lengthSq() const
 	{

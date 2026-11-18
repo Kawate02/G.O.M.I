@@ -11,14 +11,14 @@ struct Vec2
 
 	inline Vec2 normalize()
 	{
-		float length = sqrt(x * x + y * y);
+		float length = static_cast<float>(sqrt(x * x + y * y));
 		if (length == 0) return Vec2(0, 0);
 		return Vec2(x / length, y / length);
 	}
 
 	inline float length()
 	{
-		return sqrt(x * x + y * y);
+		return static_cast<float>(sqrt(x * x + y * y));
 	}
 	inline float lengthSq()
 	{
@@ -32,7 +32,7 @@ struct Vec2
 
 	inline Vec2 fromAngle(float angle)
 	{
-		return Vec2(cos(angle), sin(angle));
+		return Vec2(static_cast<float>(cos(angle)), static_cast<float>(sin(angle)));
 	}
 
 	inline Vec2 operator+(const Vec2& other) const

@@ -1,15 +1,16 @@
 #include "GlfwWindow.h"
 
+// windows.h を GLFW より先に読む(後だと APIENTRY の再定義の警告 C4005 が出る)
+#ifdef _WIN32
+#include <windows.h>
+#include <timeapi.h>
+#endif
+
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <stdexcept>
 #include <cmath>
 #include <iostream>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <timeapi.h>
-#endif
 
 GlfwWindow::~GlfwWindow()
 {

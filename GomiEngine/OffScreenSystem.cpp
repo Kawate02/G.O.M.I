@@ -27,7 +27,7 @@ void OffScreenSystem::clamp(World& world, Entity e)
 	}
 	if (tf.position.x < cameraRect.left)
 	{
-		tf.position.x = cameraRect.left;
+		tf.position.x = static_cast<float>(cameraRect.left);
 		move.physVel.x = 0;
 	}
 	if (tf.position.y + size.y > cameraRect.bottom)
@@ -37,7 +37,7 @@ void OffScreenSystem::clamp(World& world, Entity e)
 	}
 	if (tf.position.y < cameraRect.top)
 	{
-		tf.position.y = cameraRect.top;
+		tf.position.y = static_cast<float>(cameraRect.top);
 		move.physVel.y = 0;
 	}
 }

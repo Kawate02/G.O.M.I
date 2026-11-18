@@ -6,8 +6,8 @@
 
 float ForwardMoveSystem::WrapPi(float angle)
 {
-	if (angle > PI) return angle - 2 * PI;
-	if (angle < -PI) return angle + 2 * PI;
+	if (angle > PI) return static_cast<float>(angle - 2 * PI);
+	if (angle < -PI) return static_cast<float>(angle + 2 * PI);
 	return angle;
 }
 
