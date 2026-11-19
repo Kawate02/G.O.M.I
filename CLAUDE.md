@@ -2,20 +2,28 @@ CLAUDE.mdに追記・修正する時の基準は `D:/claude/knowledge/notes/CLAU
 
 # G.O.M.I
 
-ユーザーの過去作の、C++製のECSゲームエンジン(`GomiEngine/`)。2Dと3Dを描け、ImGuiのエディタ(`Editor/`、`GomiEditor`)でシーンを組み立てられる(2026-11-08 に3D・エディタ対応が完了)。描画は OpenGL 4.5(GLFW)、音声は miniaudio、ビルドは CMake(2026-11-07 に DxLib から移行)。`portfolio/` はポートフォリオ用のページ。
+ユーザーの過去作の、C++製のECSゲームエンジン(`GomiEngine/`)とImGuiのエディタ(`Editor/`)。OpenGL 4.5(GLFW)・miniaudio・CMake。`portfolio/` はポートフォリオ用のページ。使い方・仕様は下の表の仕様ノート(`kb.py -p G.O.M.I -k 参照 仕様` で一覧)。
 
-- コードを変えたら `tools/verify.sh` を流す(下の確認を1コマンドで行い要約だけ出す。変更前にも一度流して基準を撮る)。中身は、Debug ビルドし、`--fixed-dt 60` 付きの起動オプションで操作を再現して撮った画面を、変更前の画面と比べて確認する。`ctest` も通す(操作の記録を流して基準の画面・状態と比べる再現テスト `Replay.*` を含む。見た目や動きを意図して変えた時は、画面を確かめてから `--replay-update` で基準を更新する)。エディタも同じ起動オプション(`--click`・`--drag`・`--type`、コマンドを ID で呼ぶ `--command`。一覧は `GomiEditor --list-commands`)で操作を再現して撮る。エディタで保存を試す時は見本のプロジェクトのコピーを `--project` で渡す(コピーは `%TEMP%` や `AppData\Local` の下に置かない。理由は下の表のビルドのノート)
-- エディタの中身(編集・元に戻す・再生/停止・保存)は `SceneEditor`(画面無し・テストあり)、画面は `Editor/EditorApp.cpp`。編集の処理は SceneEditor 側に書く。エディタの操作を足す時は `registerCommands()` にコマンドとして足す(メニュー・ショートカット・パレット・`--command` に同じ ID で出る)
-- ゲームはエンジンと別のプロジェクトのフォルダ(`project.json`・`assets/`・`game/`・`tests/replays/`、見本は `samples/Demo/`、開くのは `--project`)に置く。中身(シーン・プレハブ・UI・画像・音)は `assets/` の JSON とファイルで、C++ に静的に書かない。ゲームごとの Component・System は `game/`(GomiGame.dll、書き方は `samples/Demo/game/README.md`)に書き、エディタを開いたまま試す。エンジン組み込みのものだけ登録ファイル(`ComponentRegistration.cpp` / `SystemRegistry.cpp`)に足す
+## 守ること
+- コードを変えたら `tools/verify.sh` を流す(変更前にも一度流して基準を撮る)。`ctest` も通す。見た目や動きを意図して変えた時は、画面を確かめてから `--replay-update` で基準を更新する
+- エディタの中身は `SceneEditor`(画面無し・テストあり)に書き、画面は `Editor/EditorApp.cpp`。操作を足す時は `registerCommands()` にコマンドとして足す
+- ゲームの中身(シーン・プレハブ・UI・画像・音)は `assets/` のJSONとファイルに置き、C++に静的に書かない。ゲームごとのComponent・Systemは `game/` に書く。エンジン組み込みのものだけ `ComponentRegistration.cpp` / `SystemRegistry.cpp` に足す
 - ソースは UTF-8(MSVC に `/utf-8` を付けている)。Shift-JIS で保存しない
 - `build/` はコミットしない。外部ライブラリは CMake の FetchContent で取り、リポジトリに入れるのは生成済みの glad だけ
+- エディタの動作確認で保存を試す時は見本のプロジェクトのコピーを `--project` で渡す(コピーは `%TEMP%` や `AppData\Local` の下に置かない)
 
 ## 必要な時に読むノート(`D:/claude/knowledge/notes/`)
 
 | こんな時 | 読むノート |
 |---|---|
+| ビルドする・動作確認する・変更後に確かめる | `G.O.M.Iを変えたらtools-verify-shでビルドと画面と再現テストを確かめる.md` |
+| ゲームのプロジェクト(assets・project.json・見本)を作る・直す | `G.O.M.Iでゲームを作るにはプロジェクトのフォルダにassetsのJSONとgameのコードを置く.md` |
+| ゲームのコード(game/・GomiGame.dll)を書く・試す | `G.O.M.Iのゲームのコードはプロジェクトのgame-に書きエディタを開いたまま試す.md` |
+| エディタを使う・操作を足す | `G.O.M.Iのエディタを使うには--projectでプロジェクトを渡し操作は全部コマンドのIDで呼ぶ.md` |
+| 操作を記録して再現テストにする | `G.O.M.Iの操作の記録はGomiEngineの--recordと--replayで流して基準と比べる.md` |
+| ランチャー(版・プロジェクト管理) | `G.O.M.Iのエンジンの版とプロジェクトを扱うにはGomiLauncherを使う.md` |
+| 配布物を作って上げる | `G.O.M.Iの配布物はtools-release-shで作りPrivateのReleasesに上げる.md` |
 | エディタの UI・機能を足す・直す(コンセプト・優先度・配置) | `G.O.M.I/docs/editor-design.md`(リポジトリ内) |
-| ビルドする・動作確認する | `G.O.M.Iのビルドと動作確認の手順.md` |
 | 構造を思い出す・どこを触るか決める | `G.O.M.Iの全体構造(ECS・World・描画の流れ).md` |
 | シーン・プレハブ・アセットの形式を変える | `G.O.M.Iのデータ形式はパスID・厳格チェック・項目単位の上書きにした.md` |
 | エディタを触る | `G.O.M.Iのエディタは画面無しの中身とImGuiの画面に分けた.md` |
