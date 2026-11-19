@@ -101,6 +101,13 @@ Json Replay::toJson() const
 	return j;
 }
 
+Json checkpointState(const std::string& scene, int frame, const Json& world, const Json& resources)
+{
+	Json state = { { "scene", scene }, { "frame", frame }, { "world", world } };
+	if (!resources.empty()) state["resources"] = resources;
+	return state;
+}
+
 Replay Replay::fromJson(const Json& j)
 {
 	if (!j.is_object()) throw std::runtime_error("replay: expected an object");

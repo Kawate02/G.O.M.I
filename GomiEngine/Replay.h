@@ -13,6 +13,11 @@
 /// 操作の記録(テキストの JSON)。始めるシーン・Δt・乱数の種と、フレームごとの入力の変化を持つ。
 /// 同じ記録を流せば毎回同じ画面・同じ状態になるので、そのまま再現テストになる
 /// </summary>
+/// <summary>
+/// 確認点で基準と比べる状態の JSON。resources は Resource が1つも登録されていなければ(空のオブジェクトなら)書かない
+/// </summary>
+Json checkpointState(const std::string& scene, int frame, const Json& world, const Json& resources);
+
 class Replay
 {
 public:

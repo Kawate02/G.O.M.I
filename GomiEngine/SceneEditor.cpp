@@ -676,6 +676,7 @@ void SceneEditor::play()
 {
 	if (playing || isPrefabMode()) return; //プレハブはシーンに置いてから動かす
 	playSnapshot = snapshot();
+	playResources = resources.save();
 	playing = true;
 	paused = false;
 	stepRequested = false;
@@ -701,6 +702,7 @@ void SceneEditor::stop()
 	stepRequested = false;
 	playFrame = 0;
 	rebuild(playSnapshot);
+	resources.restore(playResources);
 }
 
 bool SceneEditor::swapCode(const std::function<bool(std::string& error)>& swap, const std::function<void()>& revert, std::string& error)
@@ -747,7 +749,7 @@ bool SceneEditor::swapCode(const std::function<bool(std::string& error)>& swap, 
 
 Json SceneEditor::playState()
 {
-	return { { "world", SceneLoader::save(*currentWorld) }, { "scene", playScene }, { "frame", playFrame }, { "run", currentWorld->runState() } };
+	return { { "world", SceneLoader::save(*currentWorld) }, { "resources", resources.save() }, { "scene", playScene }, { "frame", playFrame }, { "run", currentWorld->runState() } };
 }
 
 bool SceneEditor::restorePlayState(const Json& state, std::string& error)
@@ -759,6 +761,7 @@ bool SceneEditor::restorePlayState(const Json& state, std::string& error)
 	}
 	try
 	{
+		if (state.contains("resources")) resources.reset(state.at("resources"), "play state");
 		rebuild(state.at("world"));
 		currentWorld->restoreRunState(state.value("run", Json::object()));
 	}

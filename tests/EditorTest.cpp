@@ -3,9 +3,15 @@
 #include "SceneEditor.h"
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
+#include "ResourceRegistry.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+
+struct TestStatus
+{
+	int hp = 10;
+};
 
 static int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { std::cerr << "FAIL line " << __LINE__ << ": " #cond << std::endl; failures++; } } while (0)
@@ -331,6 +337,26 @@ int main()
 
 		Project::getInstance().open(Project::findRoot(""));
 		fs::remove_all(copy);
+	}
+
+	// ---- Resource: 再生中に変えても止めたら戻る。巻き戻しの状態に入る
+	{
+		ResourceRegistry::getInstance().add<TestStatus>("TestStatus").field("hp", &TestStatus::hp);
+		auto& status = editor.getResources().get<TestStatus>();
+		CHECK(status.hp == 10);
+		status.hp = 8; // 止めている時の値(初期値)
+		editor.play();
+		CHECK(editor.world().resource<TestStatus>().hp == 8);
+		Json state = editor.playState();
+		CHECK(state["resources"]["TestStatus"]["hp"] == 8);
+		editor.world().resource<TestStatus>().hp = 3;
+		CHECK(editor.restorePlayState(state, error));
+		CHECK(editor.getResources().get<TestStatus>().hp == 8);
+		editor.world().resource<TestStatus>().hp = 1;
+		editor.stop();
+		CHECK(editor.getResources().get<TestStatus>().hp == 8);
+		editor.getResources().clear();
+		ResourceRegistry::getInstance().truncate(0);
 	}
 
 	if (failures == 0) std::cout << "EditorTest: all passed" << std::endl;

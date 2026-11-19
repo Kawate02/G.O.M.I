@@ -33,6 +33,7 @@ private:
 	bool stepRequested = false;
 	int playFrame = 0;     //再生してから進めたフレーム数
 	Json playSnapshot;     //再生前の状態
+	Json playResources;    //再生前の Resource の値(止めたら戻す)
 	std::string playScene; //再生中の今のシーンの名前(ゲームの中で切り替わると変わる)
 	std::vector<Json> undoStack;
 	std::vector<Json> redoStack;
@@ -211,7 +212,7 @@ public:
 	void stepFrame();
 	inline int getPlayFrame() const { return playFrame; }
 	/// <summary>
-	/// 再生中の今の状態(World・シーンの名前・フレーム・ポーズなど)。巻き戻し用
+	/// 再生中の今の状態(World・Resource・シーンの名前・フレーム・ポーズなど)。巻き戻し用
 	/// </summary>
 	Json playState();
 	/// <summary>

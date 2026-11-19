@@ -1911,7 +1911,7 @@ void EditorApp::afterReplayFrame()
 	if (frame != run.lastChecked && run.replay.isCheckpoint(frame))
 	{
 		run.lastChecked = frame;
-		Json state = { { "scene", editor->getPlayScene() }, { "frame", frame }, { "world", SceneLoader::save(editor->world()) } };
+		Json state = checkpointState(editor->getPlayScene(), frame, SceneLoader::save(editor->world()), editor->getResources().save());
 		auto& result = run.check->checkpoint(frame, state, [&](const std::string& path) { return drawer.captureScreen(path); });
 		if (run.check->getMode() == ReplayCheck::Mode::Check && !result.ok()) log(run.name + ": フレーム " + std::to_string(frame) + " が基準と違います", LogLevel::Warning);
 	}

@@ -118,7 +118,7 @@ int Game::run()
 		}
 		if (replayCheck && replayPlayer->getReplay().isCheckpoint(totalFrames))
 		{
-			Json state = { { "scene", world.getCurrentScene() }, { "frame", totalFrames }, { "world", SceneLoader::save(world.getWorld()) } };
+			Json state = checkpointState(world.getCurrentScene(), totalFrames, SceneLoader::save(world.getWorld()), resources.save());
 			replayCheck->checkpoint(totalFrames, state, [&](const std::string& path) { return drawer->captureScreen(path); });
 		}
 		drawer->present();
