@@ -244,6 +244,13 @@ private:
 	void drawHierarchy();
 	void drawInspector();
 	bool drawField(Entity e, const struct ComponentInfo& info, const struct FieldInfo& f);
+	/// <summary>
+	/// 1項目の値の欄。recordUndo は編集を始めた時、set は値が変わった時に呼ぶ。owner はエラー表示用(Component・Resource の名前)
+	/// </summary>
+	bool drawFieldValue(const struct FieldInfo& f, const std::string& owner, const Json& v, const std::function<void()>& recordUndo, const std::function<bool(const Json&, std::string*)>& set);
+	void drawResources();
+	/// <summary>pending の操作の前に「保存していない変更」を聞くか(終了は Resource の初期値の変更も)</summary>
+	inline bool needsSaveConfirm() const { return editor->isDirty() || (pending == Pending::Quit && editor->isResourcesDirty()); }
 	void drawFieldRows(Entity e, const struct ComponentInfo& info, bool runtime);
 	void drawSceneView();
 	void drawAssets();

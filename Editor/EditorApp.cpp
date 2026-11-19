@@ -3,6 +3,7 @@
 #include "EditorApp.h"
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
+#include "ResourceRegistry.h"
 #include "SettingManager.h"
 #include "ResourceManager.h"
 #include "SceneLoader.h"
@@ -34,6 +35,7 @@ namespace
 	const char* WIN_LOG = "ログ";
 	const char* WIN_REPLAYS = "再現テスト";
 	const char* WIN_CHANGES = "差分";
+	const char* WIN_RESOURCES = "Resource";
 	const char* POPUP_CONFLICT = "外でファイルが変わりました";
 	const char* ASSET_PAYLOAD = "GOMI_ASSET";
 
@@ -282,7 +284,7 @@ void EditorApp::request(Pending action, const std::string& scene)
 {
 	pending = action;
 	pendingScene = scene;
-	if (!editor->isDirty()) doPending();
+	if (!needsSaveConfirm()) doPending();
 }
 
 void EditorApp::doPending()
@@ -314,6 +316,13 @@ void EditorApp::doPending()
 
 void EditorApp::saveScene()
 {
+	if (editor->isResourcesDirty())
+	{
+		std::string resourceError;
+		if (editor->saveResources(resourceError)) log(std::string("保存しました: ") + ResourceStore::INITIAL_FILE);
+		else log("Resource の初期値を保存できませんでした: " + resourceError, LogLevel::Error);
+		if (editor->getPath().empty() && !editor->isDirty()) return;
+	}
 	if (editor->getPath().empty())
 	{
 		openSaveAs = true;
@@ -504,7 +513,7 @@ void EditorApp::drawToolbar()
 	}
 
 	//右端にシーンのファイル名
-	std::string name = (editor->getPath().empty() ? std::string("(新しいシーン)") : editor->getPath()) + (editor->isDirty() ? " *" : "");
+	std::string name = (editor->getPath().empty() ? std::string("(新しいシーン)") : editor->getPath()) + (editor->isDirty() || editor->isResourcesDirty() ? " *" : "");
 	float w = ImGui::CalcTextSize(name.c_str()).x;
 	ImGui::SameLine(std::max(ImGui::GetCursorPosX() + 20, ImGui::GetWindowWidth() - w - 16));
 	if (playing) ImGui::TextUnformatted(name.c_str()); //色の付いた帯の上では薄い文字が読めない
@@ -734,19 +743,24 @@ namespace
 
 bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& f)
 {
-	Json v = editor->getField(e, info.name, f.name);
+	return drawFieldValue(f, info.name, editor->getField(e, info.name, f.name), [this] { editor->recordUndo(); },
+		[&](const Json& value, std::string* error) { return editor->setField(e, info.name, f.name, value, error); });
+}
+
+bool EditorApp::drawFieldValue(const FieldInfo& f, const std::string& owner, const Json& v, const std::function<void()>& recordUndo, const std::function<bool(const Json&, std::string*)>& set)
+{
 	const char* label = "##v";
 	ImGui::SetNextItemWidth(-FLT_MIN);
 	bool changed = false;
 	Json next;
-	auto startEdit = [&]() { if (ImGui::IsItemActivated()) editor->recordUndo(); };
+	auto startEdit = [&]() { if (ImGui::IsItemActivated()) recordUndo(); };
 
 	switch (f.kind)
 	{
 	case FieldKind::Bool:
 	{
 		bool b = v.get<bool>();
-		if (ImGui::Checkbox(label, &b)) { editor->recordUndo(); changed = true; next = b; }
+		if (ImGui::Checkbox(label, &b)) { recordUndo(); changed = true; next = b; }
 		break;
 	}
 	case FieldKind::Int:
@@ -770,7 +784,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 		float a[2] = { v[0].get<float>(), v[1].get<float>() };
 		bool activated = false;
 		changed = dragVector(a, 2, 0.05f, activated);
-		if (activated) editor->recordUndo();
+		if (activated) recordUndo();
 		next = Json::array({ a[0], a[1] });
 		break;
 	}
@@ -780,7 +794,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 		float speed = f.name == "rotation" ? 0.5f : 0.05f;
 		bool activated = false;
 		changed = dragVector(a, 3, speed, activated);
-		if (activated) editor->recordUndo();
+		if (activated) recordUndo();
 		next = Json::array({ a[0], a[1], a[2] });
 		break;
 	}
@@ -797,7 +811,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 		{
 			if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
 			{
-				editor->recordUndo();
+				recordUndo();
 				next = std::string(static_cast<const char*>(p->Data));
 				changed = true;
 			}
@@ -818,7 +832,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 				{
 					if (ImGui::Selectable(c.empty() ? "(なし)" : c.c_str(), c == s))
 					{
-						editor->recordUndo();
+						recordUndo();
 						next = c;
 						changed = true;
 					}
@@ -837,7 +851,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 			{
 				if (ImGui::Selectable(n.c_str(), n == cur) && n != cur)
 				{
-					editor->recordUndo();
+					recordUndo();
 					next = n;
 					changed = true;
 				}
@@ -864,7 +878,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 			firstFlag = false;
 			if (ImGui::Checkbox(n.c_str(), &on))
 			{
-				editor->recordUndo();
+				recordUndo();
 				names = Json::array();
 				for (auto& m : f.enumNames)
 				{
@@ -955,7 +969,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 		}
 		if (changed)
 		{
-			editor->recordUndo();
+			recordUndo();
 			next = map;
 		}
 		break;
@@ -973,12 +987,12 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 			try
 			{
 				next = Json::parse(text);
-				editor->recordUndo();
+				recordUndo();
 				changed = true;
 			}
 			catch (const std::exception& ex)
 			{
-				log(info.name + "." + f.name + ": JSON の書き方が違います: " + ex.what(), LogLevel::Error);
+				log(owner + "." + f.name + ": JSON の書き方が違います: " + ex.what(), LogLevel::Error);
 			}
 		}
 		break;
@@ -988,7 +1002,7 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 	if (changed)
 	{
 		std::string error;
-		if (!editor->setField(e, info.name, f.name, next, &error)) log(info.name + "." + f.name + ": " + error, LogLevel::Error);
+		if (!set(next, &error)) log(owner + "." + f.name + ": " + error, LogLevel::Error);
 	}
 	return changed;
 }
@@ -1368,6 +1382,55 @@ void EditorApp::drawAssets()
 	ImGui::End();
 }
 
+void EditorApp::drawResources()
+{
+	if (!ImGui::Begin(WIN_RESOURCES))
+	{
+		ImGui::End();
+		return;
+	}
+	auto& registry = ResourceRegistry::getInstance();
+	bool playing = editor->isPlaying();
+	if (playing) ImGui::TextDisabled("再生中の今の値(止めると初期値に戻る)");
+	else ImGui::TextDisabled("初期値(assets/%s)%s", ResourceStore::INITIAL_FILE, editor->isResourcesDirty() ? " *未保存" : "");
+	if (!editor->getResourceError().empty())
+	{
+		ImGui::PushStyleColor(ImGuiCol_Text, COLOR_WARNING);
+		ImGui::TextWrapped("読めませんでした: %s", editor->getResourceError().c_str());
+		ImGui::PopStyleColor();
+	}
+	if (registry.all().empty())
+	{
+		ImGui::TextWrapped("Resource はまだありません。ゲームのコードの GOMI_REGISTER で resources.add<型>(\"名前\").field(...) と登録すると、ここに出ます(コマンド code.newResource でひな形を作れます)");
+	}
+	for (auto& info : registry.all())
+	{
+		if (!ImGui::CollapsingHeader(info.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) continue;
+		ImGui::PushID(info.name.c_str());
+		if (ImGui::BeginTable("fields", 2, ImGuiTableFlags_SizingStretchProp))
+		{
+			ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthFixed, 112);
+			ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+			for (auto& f : info.fields)
+			{
+				ImGui::PushID(f.name.c_str());
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::AlignTextToFramePadding();
+				ImGui::TextUnformatted(f.name.c_str());
+				ImGui::TableSetColumnIndex(1);
+				const std::string name = info.name, field = f.name;
+				drawFieldValue(f, name, editor->getResourceField(name, field), [this] { editor->recordResourceUndo(); },
+					[this, name, field](const Json& value, std::string* error) { return editor->setResourceField(name, field, value, error); });
+				ImGui::PopID();
+			}
+			ImGui::EndTable();
+		}
+		ImGui::PopID();
+	}
+	ImGui::End();
+}
+
 void EditorApp::drawSystems()
 {
 	ImGui::Begin(WIN_SYSTEMS);
@@ -1437,14 +1500,16 @@ void EditorApp::drawLog()
 
 void EditorApp::drawPopups()
 {
-	if (pending != Pending::None && editor->isDirty() && !ImGui::IsPopupOpen("保存されていない変更")) ImGui::OpenPopup("保存されていない変更");
+	if (pending != Pending::None && needsSaveConfirm() && !ImGui::IsPopupOpen("保存されていない変更")) ImGui::OpenPopup("保存されていない変更");
 	if (ImGui::BeginPopupModal("保存されていない変更", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::Text("%s に保存していない変更があります。", editor->getPath().empty() ? "新しいシーン" : editor->getPath().c_str());
+		std::string target = editor->isDirty() ? (editor->getPath().empty() ? std::string("新しいシーン") : editor->getPath()) : std::string();
+		if (pending == Pending::Quit && editor->isResourcesDirty()) target += std::string(target.empty() ? "" : " と ") + "Resource の初期値";
+		ImGui::Text("%s に保存していない変更があります。", target.c_str());
 		if (ImGui::Button("保存する"))
 		{
 			saveScene();
-			if (!editor->isDirty()) doPending();
+			if (!needsSaveConfirm()) doPending();
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
@@ -1626,6 +1691,7 @@ void EditorApp::buildDefaultLayout(ImGuiID dockspace)
 	ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.27f, nullptr, &center);
 	ImGui::DockBuilderDockWindow(WIN_HIERARCHY, left);
 	ImGui::DockBuilderDockWindow(WIN_INSPECTOR, right);
+	ImGui::DockBuilderDockWindow(WIN_RESOURCES, right);
 	ImGui::DockBuilderDockWindow(WIN_ASSETS, bottom);
 	ImGui::DockBuilderDockWindow(WIN_SYSTEMS, bottom);
 	ImGui::DockBuilderDockWindow(WIN_LOG, bottom);
@@ -1758,6 +1824,7 @@ bool EditorApp::canStartReplay(std::string* reason) const
 	if (editor->getPath().empty()) return fail("シーンを保存してから(記録は保存したシーンから始める)");
 	if (editor->isPrefabMode()) return fail("プレハブを直している間は記録できない(シーンに戻ってから)");
 	if (editor->isDirty()) return fail("保存していない変更がある(記録・再現テストはシーンを開き直して始める)");
+	if (editor->isResourcesDirty()) return fail("Resource の初期値に保存していない変更がある(記録・再現テストは resources.json の値から始める)");
 	return true;
 }
 
@@ -2206,6 +2273,7 @@ int EditorApp::run()
 		drawSceneView();
 		drawAssets();
 		drawSystems();
+		drawResources();
 		if (focusLog)
 		{
 			ImGui::SetWindowFocus(WIN_LOG);
@@ -2263,7 +2331,7 @@ int EditorApp::run()
 		audioPlayer.play(audioBackend, audioQueue);
 		EventBus::getInstance().cleanup();
 
-		std::string title = "G.O.M.I Editor " GOMI_VERSION " - " + (editor->getPath().empty() ? std::string("(新しいシーン)") : editor->getPath()) + (editor->isDirty() ? " *" : "");
+		std::string title = "G.O.M.I Editor " GOMI_VERSION " - " + (editor->getPath().empty() ? std::string("(新しいシーン)") : editor->getPath()) + (editor->isDirty() || editor->isResourcesDirty() ? " *" : "");
 		window.setTitle(title);
 
 		if (debug.shouldQuit(frame)) break;
@@ -2529,6 +2597,39 @@ void EditorApp::registerCommands()
 		c.choices = [] { return SystemRegistry::getInstance().names(); };
 		c.argName = "System の名前(System タブの「System を追加」と同じ候補)";
 	}
+	{
+		auto& c = add("resource.set", "Resource の値を変える", "", 0, nullptr, [this](const std::string& a) {
+			//「名前.項目 JSON」。止めている時は初期値(元に戻すに乗る)、再生中は今の値
+			size_t dot = a.find('.'), space = a.find(' ');
+			if (dot == std::string::npos || space == std::string::npos || dot > space)
+			{
+				log("resource.set: 「名前.項目 値(JSON)」で書いてください(例: PlayerStatus.hp 5)", LogLevel::Error);
+				return;
+			}
+			std::string name = a.substr(0, dot), field = a.substr(dot + 1, space - dot - 1);
+			Json value;
+			try { value = Json::parse(a.substr(space + 1)); }
+			catch (const std::exception& ex)
+			{
+				log("resource.set: JSON の書き方が違います: " + std::string(ex.what()), LogLevel::Error);
+				return;
+			}
+			if (editor->getResourceField(name, field).is_null())
+			{
+				log("resource.set: 知らない項目です: " + name + "." + field, LogLevel::Error);
+				return;
+			}
+			editor->recordResourceUndo();
+			std::string error;
+			if (!editor->setResourceField(name, field, value, &error)) log("resource.set: " + name + "." + field + ": " + error, LogLevel::Error);
+		});
+		c.argName = "名前.項目 値(JSON)。例: PlayerStatus.hp 5";
+	}
+	add("resource.reload", "Resource の初期値を resources.json から読み直す", "", 0, stopped, [this](const std::string&) {
+		std::string error;
+		if (editor->loadResources(error)) log(std::string("読み直しました: ") + ResourceStore::INITIAL_FILE);
+		else log("Resource の初期値を読めませんでした: " + error, LogLevel::Error);
+	});
 	add("entity.duplicate", "複製", "Ctrl+D", ImGuiMod_Ctrl | ImGuiKey_D, hasSelection, [this, lastSelected](const std::string&) {
 		editor->duplicate(selectedEntity());
 		lastSelected(1);
@@ -2671,7 +2772,7 @@ void EditorApp::registerCommands()
 	const std::pair<const char*, const char*> windows[] = {
 		{ "window.hierarchy", WIN_HIERARCHY }, { "window.inspector", WIN_INSPECTOR }, { "window.scene", WIN_SCENE },
 		{ "window.replays", WIN_REPLAYS }, { "window.changes", WIN_CHANGES }, { "window.assets", WIN_ASSETS },
-		{ "window.systems", WIN_SYSTEMS }, { "window.log", WIN_LOG },
+		{ "window.systems", WIN_SYSTEMS }, { "window.log", WIN_LOG }, { "window.resources", WIN_RESOURCES },
 	};
 	for (auto& [id, name] : windows)
 	{

@@ -34,6 +34,8 @@ private:
 	int playFrame = 0;     //再生してから進めたフレーム数
 	Json playSnapshot;     //再生前の状態
 	Json playResources;    //再生前の Resource の値(止めたら戻す)
+	bool resourcesDirty = false; //Resource の初期値に保存していない変更がある
+	std::string resourceError;   //resources.json を読めなかった理由(読めたら空)
 	std::string playScene; //再生中の今のシーンの名前(ゲームの中で切り替わると変わる)
 	std::vector<Json> undoStack;
 	std::vector<Json> redoStack;
@@ -53,6 +55,9 @@ private:
 	Json diskScene;            //その時のファイルの中身
 
 	void rebuild(const Json& scene);
+	/// <summary>元に戻すの1件(シーンと、その時の Resource の値)</summary>
+	Json undoEntry(const Json& scene);
+	void applyUndoEntry(const Json& entry);
 	Json snapshot();
 	const std::vector<Json>& prefabDefs(const AssetID& prefab);
 	std::map<AssetID, FileStamp> scanFiles() const;
@@ -177,6 +182,29 @@ public:
 	/// 外の変更を読まずに今の状態を続ける(次の保存でファイルを上書きする)
 	/// </summary>
 	void keepEdits();
+
+	// ---- Resource(シーンをまたいで残るデータ)。止めている時は初期値(assets/resources.json)、再生中は今の値
+	/// <summary>
+	/// resources.json を読み直す(保存していない変更は捨てる)。読めなければ理由を返し、値は今のまま
+	/// </summary>
+	bool loadResources(std::string& error);
+	/// <summary>
+	/// 今の値を resources.json に書く(止めている時だけ)
+	/// </summary>
+	bool saveResources(std::string& error);
+	inline bool isResourcesDirty() const { return resourcesDirty; }
+	/// <summary>resources.json を読めなかった理由(読めたら空)</summary>
+	inline const std::string& getResourceError() const { return resourceError; }
+	/// <summary>登録されていない名前・項目なら null</summary>
+	Json getResourceField(const std::string& resource, const std::string& field);
+	/// <summary>
+	/// 1項目を JSON の値で書き換える(元に戻す記録はしない。止めている時は先に recordResourceUndo を呼ぶ)
+	/// </summary>
+	bool setResourceField(const std::string& resource, const std::string& field, const Json& value, std::string* error = nullptr);
+	/// <summary>
+	/// Resource の初期値を変える前に呼ぶ(元に戻す先として積む。再生中は何もしない)
+	/// </summary>
+	void recordResourceUndo();
 
 	// ---- System の並び
 	std::vector<std::string> systems();

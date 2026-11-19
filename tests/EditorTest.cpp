@@ -355,6 +355,21 @@ int main()
 		editor.world().resource<TestStatus>().hp = 1;
 		editor.stop();
 		CHECK(editor.getResources().get<TestStatus>().hp == 8);
+
+		// 初期値の編集: 元に戻す・やり直す・未保存の印。読み直すと resources.json(見本には無い)の既定値
+		CHECK(editor.loadResources(error) && !editor.isResourcesDirty());
+		CHECK(editor.getResourceField("TestStatus", "hp") == 10);
+		CHECK(editor.getResourceField("TestStatus", "nope").is_null());
+		editor.recordResourceUndo();
+		CHECK(editor.setResourceField("TestStatus", "hp", 4));
+		CHECK(editor.isResourcesDirty() && editor.getResourceField("TestStatus", "hp") == 4);
+		CHECK(!editor.setResourceField("TestStatus", "hp", "bad", &error));
+		CHECK(editor.getResourceField("TestStatus", "hp") == 4);
+		editor.undo();
+		CHECK(editor.getResourceField("TestStatus", "hp") == 10 && !editor.isResourcesDirty());
+		editor.redo();
+		CHECK(editor.getResourceField("TestStatus", "hp") == 4 && editor.isResourcesDirty());
+		CHECK(editor.loadResources(error) && editor.getResourceField("TestStatus", "hp") == 10);
 		editor.getResources().clear();
 		ResourceRegistry::getInstance().truncate(0);
 	}

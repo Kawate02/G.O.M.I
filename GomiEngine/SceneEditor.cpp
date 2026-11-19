@@ -2,6 +2,7 @@
 #include "SceneEditor.h"
 #include "ComponentRegistry.h"
 
+#include <algorithm>
 #include <iostream>
 
 namespace
@@ -18,6 +19,7 @@ SceneEditor::SceneEditor(InputState& input, RenderQueue& render, AudioQueue& aud
 	auto& db = AssetDatabase::getInstance();
 	project = Project::getInstance().read();
 	newScene();
+	loadResources(resourceError);
 }
 
 void SceneEditor::rebuild(const Json& scene)
@@ -32,6 +34,18 @@ void SceneEditor::rebuild(const Json& scene)
 	{
 		if (const PrefabLink* link = currentWorld->getPrefabLink(e)) prefabDefs(link->prefab);
 	}
+}
+
+Json SceneEditor::undoEntry(const Json& scene)
+{
+	return { { "scene", scene }, { "resources", resources.save() }, { "resourcesDirty", resourcesDirty } };
+}
+
+void SceneEditor::applyUndoEntry(const Json& entry)
+{
+	rebuild(entry.at("scene"));
+	resources.restore(entry.at("resources"));
+	resourcesDirty = entry.value("resourcesDirty", true);
 }
 
 Json SceneEditor::snapshot()
@@ -288,7 +302,7 @@ bool SceneEditor::pasteEntities(const Json& items, int& count, std::string& erro
 		rebuild(before);
 		return false;
 	}
-	undoStack.push_back(before);
+	undoStack.push_back(undoEntry(before));
 	if (undoStack.size() > MAX_UNDO) undoStack.erase(undoStack.begin());
 	redoStack.clear();
 	dirty = true;
@@ -321,7 +335,7 @@ std::vector<Entity> SceneEditor::createFromPrefab(const AssetID& prefab)
 	try
 	{
 		auto made = SceneLoader::instantiate(*currentWorld, prefab);
-		undoStack.push_back(before);
+		undoStack.push_back(undoEntry(before));
 		if (undoStack.size() > MAX_UNDO) undoStack.erase(undoStack.begin());
 		redoStack.clear();
 		dirty = true;
@@ -501,6 +515,13 @@ SceneEditor::FileCheck SceneEditor::checkFiles()
 	}
 	fileStamps = std::move(now);
 	if (result.changed.empty()) return result;
+	//resources.json が外で変わった: 保存していない変更が無ければ読み直す
+	if (!resourcesDirty && std::find(result.changed.begin(), result.changed.end(), ResourceStore::INITIAL_FILE) != result.changed.end())
+	{
+		std::string resourceLoadError;
+		if (loadResources(resourceLoadError)) result.refreshed = true;
+		else result.error = resourceLoadError;
+	}
 
 	bool sceneHit = false;
 	bool others = false;
@@ -599,7 +620,7 @@ bool SceneEditor::reloadFromFile(std::string& error)
 		error = e.what();
 		return false;
 	}
-	undoStack.push_back(before);
+	undoStack.push_back(undoEntry(before));
 	if (undoStack.size() > MAX_UNDO) undoStack.erase(undoStack.begin());
 	redoStack.clear();
 	savedScene = disk;
@@ -644,30 +665,112 @@ void SceneEditor::setSystems(const std::vector<std::string>& names)
 void SceneEditor::recordUndo()
 {
 	if (playing) return; //再生中の変更は止めた時に捨てる
-	undoStack.push_back(snapshot());
+	undoStack.push_back(undoEntry(snapshot()));
 	if (undoStack.size() > MAX_UNDO) undoStack.erase(undoStack.begin());
 	redoStack.clear();
 	dirty = true;
 }
 
+void SceneEditor::recordResourceUndo()
+{
+	if (playing) return;
+	undoStack.push_back(undoEntry(snapshot()));
+	if (undoStack.size() > MAX_UNDO) undoStack.erase(undoStack.begin());
+	redoStack.clear();
+	resourcesDirty = true;
+}
+
 void SceneEditor::undo()
 {
 	if (!canUndo()) return;
-	redoStack.push_back(snapshot());
-	Json scene = undoStack.back();
+	redoStack.push_back(undoEntry(snapshot()));
+	Json entry = undoStack.back();
 	undoStack.pop_back();
-	rebuild(scene);
+	applyUndoEntry(entry);
 	dirty = true;
 }
 
 void SceneEditor::redo()
 {
 	if (!canRedo()) return;
-	undoStack.push_back(snapshot());
-	Json scene = redoStack.back();
+	undoStack.push_back(undoEntry(snapshot()));
+	Json entry = redoStack.back();
 	redoStack.pop_back();
-	rebuild(scene);
+	applyUndoEntry(entry);
 	dirty = true;
+}
+
+// ---- Resource
+
+bool SceneEditor::loadResources(std::string& error)
+{
+	try
+	{
+		resources.resetToInitial();
+	}
+	catch (const std::exception& e)
+	{
+		error = resourceError = e.what();
+		return false;
+	}
+	resourceError.clear();
+	resourcesDirty = false;
+	return true;
+}
+
+bool SceneEditor::saveResources(std::string& error)
+{
+	if (playing)
+	{
+		error = "stop playing before saving";
+		return false;
+	}
+	try
+	{
+		AssetDatabase::getInstance().writeJson(ResourceStore::INITIAL_FILE, resources.save());
+	}
+	catch (const std::exception& e)
+	{
+		error = e.what();
+		return false;
+	}
+	rememberStamp(ResourceStore::INITIAL_FILE); //自分の保存は「外で変わった」に数えない
+	resourceError.clear();
+	resourcesDirty = false;
+	return true;
+}
+
+Json SceneEditor::getResourceField(const std::string& resource, const std::string& field)
+{
+	const ResourceInfo* info = ResourceRegistry::getInstance().find(resource);
+	const FieldInfo* f = info ? info->findField(field) : nullptr;
+	if (!f) return Json();
+	return f->save(resources.find(resource));
+}
+
+bool SceneEditor::setResourceField(const std::string& resource, const std::string& field, const Json& value, std::string* error)
+{
+	const ResourceInfo* info = ResourceRegistry::getInstance().find(resource);
+	const FieldInfo* f = info ? info->findField(field) : nullptr;
+	if (!f)
+	{
+		if (error) *error = "unknown resource field " + resource + "." + field;
+		return false;
+	}
+	void* target = resources.find(resource);
+	Json before = f->save(target);
+	try
+	{
+		f->load(target, value);
+	}
+	catch (const std::exception& e)
+	{
+		f->load(target, before);
+		if (error) *error = e.what();
+		return false;
+	}
+	if (!playing) resourcesDirty = true;
+	return true;
 }
 
 // ---- 再生
@@ -724,6 +827,7 @@ bool SceneEditor::swapCode(const std::function<bool(std::string& error)>& swap, 
 		try
 		{
 			resources.restore(resourceValues);
+			if (!resourcesDirty) loadResources(resourceError); //新しいコードの型で resources.json を読み直す
 			rebuild(scene);
 			return true;
 		}
