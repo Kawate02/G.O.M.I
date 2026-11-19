@@ -361,6 +361,33 @@ GOMI_REGISTER
 }
 )";
 
+	const char* RESOURCE_HEADER = R"(#pragma once
+// @Name@: シーンをまたいで残るデータ(何を持つかを書く)。World の外に1つだけあり、シーンを切り替えても値が残る
+// System からは world.resource<@Name@>() で読み書きする。初期値はエディタの Resource パネルで直す(assets/resources.json に保存)
+// 項目を足したら @Name@.cpp の GOMI_REGISTER にも .field で並べる。使える型は数値・bool・文字列・Vec2/Vec3・名前付きの enum、
+// std::vector<T>(配列)・std::map<std::string, T>(名前で引く表)、GOMI_FIELDS を書いた構造体(入れ子)
+#include "JsonConvert.h"
+
+#include <map>
+#include <string>
+#include <vector>
+
+struct @Name@
+{
+	int value = 0;
+};
+)";
+
+	const char* RESOURCE_SOURCE = R"(#include "GameCode.h"
+#include "@Name@.h"
+
+GOMI_REGISTER
+{
+	resources.add<@Name@>("@Name@")
+		.field("value", &@Name@::value);
+}
+)";
+
 	const char* SYSTEM_SOURCE = R"(// @Name@System: (何をするかを書く)
 // シーンの System タブの「System を追加」で並べると、上から順に毎フレーム動く
 #include "GameCode.h"
@@ -392,8 +419,8 @@ GOMI_REGISTER
 std::vector<fs::path> GameCodeHost::createTemplate(TemplateKind kind, const std::string& rawName, std::string& error) const
 {
 	std::string name = rawName;
-	const std::string suffix = kind == TemplateKind::Component ? "Component" : "System";
-	if (name.size() > suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0) name.erase(name.size() - suffix.size());
+	const std::string suffix = kind == TemplateKind::Component ? "Component" : kind == TemplateKind::System ? "System" : "";
+	if (!suffix.empty() && name.size() > suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0) name.erase(name.size() - suffix.size());
 	if (!isIdentifier(name))
 	{
 		error = "\"" + rawName + "\" は名前に使えません(英字で始まる英数字と _ だけ)";
@@ -404,6 +431,11 @@ std::vector<fs::path> GameCodeHost::createTemplate(TemplateKind kind, const std:
 	{
 		files.push_back({ config.sourceDir / (name + "Component.h"), COMPONENT_HEADER });
 		files.push_back({ config.sourceDir / (name + "Component.cpp"), COMPONENT_SOURCE });
+	}
+	else if (kind == TemplateKind::Resource)
+	{
+		files.push_back({ config.sourceDir / (name + ".h"), RESOURCE_HEADER });
+		files.push_back({ config.sourceDir / (name + ".cpp"), RESOURCE_SOURCE });
 	}
 	else files.push_back({ config.sourceDir / (name + "System.cpp"), SYSTEM_SOURCE });
 	std::error_code ec;
@@ -428,7 +460,7 @@ std::vector<fs::path> GameCodeHost::createTemplate(TemplateKind kind, const std:
 		}
 		made.push_back(path);
 	}
-	//Component は登録の .cpp より型の .h を先に開く
+	//Component・Resource は登録の .cpp より型の .h を先に開く
 	return made;
 }
 

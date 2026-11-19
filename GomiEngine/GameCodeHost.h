@@ -85,9 +85,9 @@ public:
 	void revert();
 	inline const GameModule& module() const { return gameModule; }
 
-	enum class TemplateKind { Component, System };
+	enum class TemplateKind { Component, System, Resource };
 	/// <summary>
-	/// game/ にひな形を作る。Component は X.h(型)と X.cpp(登録)、System は X.cpp。
+	/// game/ にひな形を作る。Component は X.h(型)と X.cpp(登録)、System は X.cpp、Resource は名前のままの X.h(型)と X.cpp(登録)。
 	/// name は "Hp" のような名前(後ろの Component / System は付けても付けなくてもよい)。作ったファイルを返す(最初が開く物)
 	/// </summary>
 	std::vector<std::filesystem::path> createTemplate(TemplateKind kind, const std::string& name, std::string& error) const;

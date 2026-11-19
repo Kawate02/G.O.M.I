@@ -388,6 +388,7 @@ void EditorApp::drawMenuBar()
 		menuItem("code.open");
 		menuItem("code.newComponent");
 		menuItem("code.newSystem");
+		menuItem("code.newResource");
 		ImGui::Separator();
 		menuItem("code.build");
 		ImGui::EndMenu();
@@ -1597,8 +1598,9 @@ void EditorApp::drawPopups()
 	}
 	if (ImGui::BeginPopupModal("ひな形を作る", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		bool component = newCodeKind == GameCodeHost::TemplateKind::Component;
-		ImGui::TextUnformatted(component ? "新しい Component の名前(Hp なら game/HpComponent.h と .cpp を作る)" : "新しい System の名前(Damage なら game/DamageSystem.cpp を作る)");
+		ImGui::TextUnformatted(newCodeKind == GameCodeHost::TemplateKind::Component ? "新しい Component の名前(Hp なら game/HpComponent.h と .cpp を作る)"
+			: newCodeKind == GameCodeHost::TemplateKind::Resource ? "新しい Resource の名前(PlayerStatus なら game/PlayerStatus.h と .cpp を作る)"
+			: "新しい System の名前(Damage なら game/DamageSystem.cpp を作る)");
 		ImGui::TextDisabled("英字で始まる英数字と _ だけ。作ったら VS Code で開く");
 		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
 		ImGui::SetNextItemWidth(360);
@@ -2562,6 +2564,12 @@ void EditorApp::registerCommands()
 			newCodeName.clear();
 			openNewCode = true;
 		}).argName = "(省略可)名前(Damage なら DamageSystem.cpp)。省略すると名前を聞く";
+		add("code.newResource", "新しい Resource のひな形を作る", "", 0, hasCode, [this](const std::string& a) {
+			if (!a.empty()) return createCode(GameCodeHost::TemplateKind::Resource, a);
+			newCodeKind = GameCodeHost::TemplateKind::Resource;
+			newCodeName.clear();
+			openNewCode = true;
+		}).argName = "(省略可)名前(PlayerStatus なら PlayerStatus.h/.cpp)。省略すると名前を聞く";
 		add("code.build", "ゲームのコードをビルドし直す", "", 0, [this, hasCode] { return hasCode() && !gameCode->isBuilding(); }, [this](const std::string&) {
 			gameCode->startBuild();
 		});
