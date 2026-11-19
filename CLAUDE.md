@@ -19,6 +19,7 @@ CLAUDE.mdに追記・修正する時の基準は `D:/claude/knowledge/notes/CLAU
 | ビルドする・動作確認する・変更後に確かめる | `G.O.M.Iを変えたらtools-verify-shでビルドと画面と再現テストを確かめる.md` |
 | ゲームのプロジェクト(assets・project.json・見本)を作る・直す | `G.O.M.Iでゲームを作るにはプロジェクトのフォルダにassetsのJSONとgameのコードを置く.md` |
 | ゲームのコード(game/・GomiGame.dll)を書く・試す | `G.O.M.Iのゲームのコードはプロジェクトのgame-に書きエディタを開いたまま試す.md` |
+| シーンをまたぐデータ(フラグ・HP・持ち物、Resource・resources.json)を使う・直す | `G.O.M.Iのシーンをまたぐデータはgameの構造体をResourceに登録しworld.resourceで読み書きする.md` |
 | エディタを使う・操作を足す | `G.O.M.Iのエディタを使うには--projectでプロジェクトを渡し操作は全部コマンドのIDで呼ぶ.md` |
 | 操作を記録して再現テストにする | `G.O.M.Iの操作の記録はGomiEngineの--recordと--replayで流して基準と比べる.md` |
 | ランチャー(版・プロジェクト管理) | `G.O.M.Iのエンジンの版とプロジェクトを扱うにはGomiLauncherを使う.md` |
