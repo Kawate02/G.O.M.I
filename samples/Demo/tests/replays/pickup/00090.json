@@ -44,13 +44,31 @@
       },
       {
         "components": {
+          "Collision": {
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "radius": 0.0,
+            "size": [
+              64.0,
+              64.0,
+              0.0
+            ],
+            "type": "BOX"
+          },
+          "EntityTag": {
+            "tags": [
+              "ITEM"
+            ]
+          },
           "Name": {
             "name": "gem #2"
           },
           "Pickup": {
             "count": 2,
-            "item": "gem",
-            "radius": 48.0
+            "item": "gem"
           },
           "Renderer": {
             "enable": true,
@@ -85,11 +103,11 @@
       "PhysicsSystem",
       "MoveResolveSystem",
       "MoveSystem",
+      "CollisionSystem",
       "PickupSystem",
       "CameraSystem",
       "OffScreenSystem",
       "RendererSystem",
-      "CollisionSystem",
       "BackGroundSystem"
     ],
     "ui": []

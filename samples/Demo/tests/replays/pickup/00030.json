@@ -4,6 +4,7 @@
     "PlayerStatus": {
       "hp": 3,
       "items": {
+        "gem": 1,
         "key": 1
       }
     }
@@ -43,45 +44,27 @@
       },
       {
         "components": {
-          "Name": {
-            "name": "gem"
-          },
-          "Pickup": {
-            "count": 1,
-            "item": "gem",
-            "radius": 48.0
-          },
-          "Renderer": {
-            "enable": true,
-            "layer": 0,
-            "order": 0,
-            "path": "images/UIFrame.png",
-            "useCamera": true
-          },
-          "Transform": {
-            "position": [
-              400.0,
-              300.0,
-              0.0
-            ],
-            "rotation": [
+          "Collision": {
+            "offset": [
               0.0,
               0.0,
               0.0
             ],
-            "scale": [
-              1.0,
-              1.0,
-              1.0
+            "radius": 0.0,
+            "size": [
+              64.0,
+              28.0,
+              0.0
+            ],
+            "type": "BOX"
+          },
+          "EntityTag": {
+            "tags": [
+              "HAZARD"
             ]
-          }
-        }
-      },
-      {
-        "components": {
+          },
           "Hazard": {
-            "damage": 1,
-            "radius": 48.0
+            "damage": 1
           },
           "Name": {
             "name": "spike"
@@ -114,13 +97,31 @@
       },
       {
         "components": {
+          "Collision": {
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "radius": 0.0,
+            "size": [
+              64.0,
+              64.0,
+              0.0
+            ],
+            "type": "BOX"
+          },
+          "EntityTag": {
+            "tags": [
+              "ITEM"
+            ]
+          },
           "Name": {
             "name": "gem #2"
           },
           "Pickup": {
             "count": 2,
-            "item": "gem",
-            "radius": 48.0
+            "item": "gem"
           },
           "Renderer": {
             "enable": true,
@@ -155,11 +156,11 @@
       "PhysicsSystem",
       "MoveResolveSystem",
       "MoveSystem",
+      "CollisionSystem",
       "PickupSystem",
       "CameraSystem",
       "OffScreenSystem",
       "RendererSystem",
-      "CollisionSystem",
       "BackGroundSystem"
     ],
     "ui": []

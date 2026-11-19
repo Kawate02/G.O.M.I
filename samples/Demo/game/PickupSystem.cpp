@@ -1,59 +1,51 @@
-// 拾う物と痛い物: プレイヤー(PlayerControl を持つ物)が近づくと、PlayerStatus(Resource)の持ち物を増やす・HP を減らして消える
-// 当たり判定のルールを使わず、Transform の位置の距離で見る簡単な例
+// 拾う物と痛い物: プレイヤーが触れると、PlayerStatus(Resource)の持ち物を増やす・HP を減らして消える。
+// 触れたかどうかは当たり判定のルール(assets/collision_rules.json の TRIGGER)で決まり、CollisionSystem がイベントを出す。
+// ここではそのイベントを受けて何をするかだけを書く(シーンの systems で CollisionSystem より後に置く)
 #include "GameCode.h"
 #include "PlayerStatus.h"
-#include "TransformComponent.h"
-#include "ControllerComponent.h"
 
 #include <algorithm>
 
-/// <summary>近づくと持ち物に item を count 個足して消える</summary>
+/// <summary>触れると持ち物に item を count 個足して消える(タグ ITEM と Collision も付ける)</summary>
 struct PickupComponent
 {
 	std::string item = "gem";
 	int count = 1;
-	float radius = 48;
 };
 
-/// <summary>近づくと HP を damage 減らして消える</summary>
+/// <summary>触れると HP を damage 減らして消える(タグ HAZARD と Collision も付ける)</summary>
 struct HazardComponent
 {
 	int damage = 1;
-	float radius = 48;
 };
 
 class PickupSystem : public ISystem
 {
-private:
-	static bool near(const Vec3& a, const Vec3& b, float radius)
-	{
-		float dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
-		return dx * dx + dy * dy + dz * dz <= radius * radius;
-	}
 public:
 	void initialize(World&) override {}
 
 	void update(World& world, int, float) override
 	{
 		auto& cm = world.getComponentManager();
+		auto& pickups = cm.getComponentArray<PickupComponent>();
+		auto& hazards = cm.getComponentArray<HazardComponent>();
 		auto& status = world.resource<PlayerStatus>();
-		cm.each<PlayerControlComponent, TransformComponent>([&](Entity player) {
-			Vec3 p = cm.getComponentArray<TransformComponent>().getComponent(player).position;
-			cm.each<PickupComponent, TransformComponent>([&](Entity e) {
-				if (!world.alive(e)) return;
-				auto& pickup = cm.getComponentArray<PickupComponent>().getComponent(e);
-				if (!near(p, cm.getComponentArray<TransformComponent>().getComponent(e).position, pickup.radius)) return;
+		//このフレームの当たり判定のイベント(出た順。毎回同じ)。self が受け取った側
+		for (auto& ev : world.event().collisions())
+		{
+			if (ev.phase != CollisionPhase::ENTER || !world.alive(ev.self)) continue;
+			if (ev.rule == "player_item" && pickups.hasComponent(ev.self))
+			{
+				auto& pickup = pickups.getComponent(ev.self);
 				status.items[pickup.item] += pickup.count;
-				world.destroyEntity(e);
-			});
-			cm.each<HazardComponent, TransformComponent>([&](Entity e) {
-				if (!world.alive(e)) return;
-				auto& hazard = cm.getComponentArray<HazardComponent>().getComponent(e);
-				if (!near(p, cm.getComponentArray<TransformComponent>().getComponent(e).position, hazard.radius)) return;
-				status.hp = std::max(0, status.hp - hazard.damage);
-				world.destroyEntity(e);
-			});
-		});
+				world.destroyEntity(ev.self);
+			}
+			else if (ev.rule == "player_hazard" && hazards.hasComponent(ev.self))
+			{
+				status.hp = std::max(0, status.hp - hazards.getComponent(ev.self).damage);
+				world.destroyEntity(ev.self);
+			}
+		}
 	}
 };
 
@@ -61,10 +53,8 @@ GOMI_REGISTER
 {
 	components.add<PickupComponent>("Pickup")
 		.field("item", &PickupComponent::item)
-		.field("count", &PickupComponent::count)
-		.field("radius", &PickupComponent::radius);
+		.field("count", &PickupComponent::count);
 	components.add<HazardComponent>("Hazard")
-		.field("damage", &HazardComponent::damage)
-		.field("radius", &HazardComponent::radius);
+		.field("damage", &HazardComponent::damage);
 	systems.add<PickupSystem>("PickupSystem");
 }

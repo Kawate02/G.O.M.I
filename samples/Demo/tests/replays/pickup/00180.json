@@ -49,11 +49,11 @@
       "PhysicsSystem",
       "MoveResolveSystem",
       "MoveSystem",
+      "CollisionSystem",
       "PickupSystem",
       "CameraSystem",
       "OffScreenSystem",
       "RendererSystem",
-      "CollisionSystem",
       "BackGroundSystem"
     ],
     "ui": []
