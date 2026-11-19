@@ -6,6 +6,12 @@ struct SampleHpComponent
 	int hp = 3;
 };
 
+struct SampleScore
+{
+	int hits = 0;
+	std::vector<std::string> log;
+};
+
 class SampleDamageSystem : public ISystem
 {
 public:
@@ -14,7 +20,11 @@ public:
 	{
 		world.getComponentManager().each<SampleHpComponent>([&](Entity e) {
 			auto& hp = world.getComponentManager().getComponentArray<SampleHpComponent>().getComponent(e);
-			if (hp.hp > 0) hp.hp--;
+			if (hp.hp > 0)
+			{
+				hp.hp--;
+				world.resource<SampleScore>().hits++;
+			}
 		});
 	}
 };
@@ -23,4 +33,5 @@ GOMI_REGISTER
 {
 	components.add<SampleHpComponent>("SampleHp").field("hp", &SampleHpComponent::hp);
 	systems.add<SampleDamageSystem>("SampleDamageSystem");
+	resources.add<SampleScore>("SampleScore").field("hits", &SampleScore::hits).field("log", &SampleScore::log);
 }

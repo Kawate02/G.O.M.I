@@ -73,6 +73,50 @@ struct FieldInfo
 };
 
 /// <summary>
+/// 型の項目を並べる(Component・Resource の登録で .field("名前", &C::メンバ) と続けて書く)
+/// </summary>
+template <typename C>
+class FieldBuilder
+{
+private:
+	std::function<std::vector<FieldInfo>&()> fields; //登録先の項目の並び(登録の表が伸びても追えるよう毎回引く)
+public:
+	explicit FieldBuilder(std::function<std::vector<FieldInfo>&()> fields) : fields(std::move(fields)) {}
+	/// <summary>
+	/// ゲームが動いている間に System が書き換える値として登録する(保存はするが、エディタでは読むだけ)
+	/// </summary>
+	template <typename F>
+	FieldBuilder& runtime(const char* fieldName, F C::* member)
+	{
+		field(fieldName, member);
+		fields().back().runtime = true;
+		return *this;
+	}
+
+	template <typename F>
+	FieldBuilder& field(const char* fieldName, F C::* member)
+	{
+		FieldInfo f;
+		f.name = fieldName;
+		f.kind = fieldKindOf<F>();
+		if constexpr (NamedEnum<F>)
+		{
+			for (auto& [e, n] : EnumNames<F>::list()) f.enumNames.push_back(n);
+		}
+		if constexpr (EnumMapTypes<F>::value)
+		{
+			for (auto& [e, n] : EnumNames<typename EnumMapTypes<F>::Key>::list()) f.keyNames.push_back(n);
+			for (auto& [e, n] : EnumNames<typename EnumMapTypes<F>::Value>::list()) f.enumNames.push_back(n);
+		}
+		f.save = [member](const void* c) { return ::toJson(static_cast<const C*>(c)->*member); };
+		f.load = [member](void* c, const Json& j) { ::fromJson(j, static_cast<C*>(c)->*member); };
+		f.address = [member](void* c) -> void* { return &(static_cast<C*>(c)->*member); };
+		fields().push_back(std::move(f));
+		return *this;
+	}
+};
+
+/// <summary>
 /// 登録済みコンポーネント型の情報と、型を知らずに Entity へ付け外し・保存するための関数
 /// </summary>
 struct ComponentInfo
@@ -101,46 +145,7 @@ public:
 	static ComponentRegistry& getInstance();
 
 	template <typename C>
-	class Builder
-	{
-	private:
-		ComponentRegistry& registry;
-		size_t index;
-	public:
-		Builder(ComponentRegistry& registry, size_t index) : registry(registry), index(index) {}
-		/// <summary>
-		/// ゲームが動いている間に System が書き換える値として登録する(保存はするが、エディタでは読むだけ)
-		/// </summary>
-		template <typename F>
-		Builder& runtime(const char* fieldName, F C::* member)
-		{
-			field(fieldName, member);
-			registry.components[index].fields.back().runtime = true;
-			return *this;
-		}
-
-		template <typename F>
-		Builder& field(const char* fieldName, F C::* member)
-		{
-			FieldInfo f;
-			f.name = fieldName;
-			f.kind = fieldKindOf<F>();
-			if constexpr (NamedEnum<F>)
-			{
-				for (auto& [e, n] : EnumNames<F>::list()) f.enumNames.push_back(n);
-			}
-			if constexpr (EnumMapTypes<F>::value)
-			{
-				for (auto& [e, n] : EnumNames<typename EnumMapTypes<F>::Key>::list()) f.keyNames.push_back(n);
-				for (auto& [e, n] : EnumNames<typename EnumMapTypes<F>::Value>::list()) f.enumNames.push_back(n);
-			}
-			f.save = [member](const void* c) { return ::toJson(static_cast<const C*>(c)->*member); };
-			f.load = [member](void* c, const Json& j) { ::fromJson(j, static_cast<C*>(c)->*member); };
-			f.address = [member](void* c) -> void* { return &(static_cast<C*>(c)->*member); };
-			registry.components[index].fields.push_back(std::move(f));
-			return *this;
-		}
-	};
+	using Builder = FieldBuilder<C>;
 
 	/// <summary>
 	/// コンポーネント型を名前付きで登録する。続けて .field("名前", &C::メンバ) で項目を並べる
@@ -181,7 +186,7 @@ public:
 		};
 		info.remove = [](ComponentManager& cm, Entity e) { if (cm.has<C>(e)) cm.getComponentArray<C>().removeComponent(e); };
 		components.push_back(std::move(info));
-		return Builder<C>(*this, index);
+		return Builder<C>([this, index]() -> std::vector<FieldInfo>& { return components[index].fields; });
 	}
 
 	const ComponentInfo* find(std::string_view name) const;

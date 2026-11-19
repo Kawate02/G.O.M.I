@@ -22,7 +22,7 @@ SceneEditor::SceneEditor(InputState& input, RenderQueue& render, AudioQueue& aud
 
 void SceneEditor::rebuild(const Json& scene)
 {
-	auto next = std::make_unique<World>(inputState, renderQueue, audioQueue);
+	auto next = std::make_unique<World>(inputState, renderQueue, audioQueue, resources);
 	next->setPauseUI(project.value("pauseUI", std::string()));
 	next->initialize(scene, path.empty() ? "(new scene)" : path);
 	if (currentWorld) currentWorld->release();
@@ -711,14 +711,17 @@ bool SceneEditor::swapCode(const std::function<bool(std::string& error)>& swap, 
 		return false;
 	}
 	Json scene = snapshot();
-	//DLL の型の配列・System を持つものを先に全部消す(関数の実体が DLL の中にある)
+	Json resourceValues = resources.save();
+	//DLL の型の配列・System・Resource の値を持つものを先に全部消す(関数の実体が DLL の中にある)
 	currentWorld->release();
 	currentWorld.reset();
 	prefabCache.clear();
+	resources.clear();
 	if (swap(error))
 	{
 		try
 		{
+			resources.restore(resourceValues);
 			rebuild(scene);
 			return true;
 		}
@@ -728,9 +731,11 @@ bool SceneEditor::swapCode(const std::function<bool(std::string& error)>& swap, 
 			if (currentWorld) currentWorld->release();
 			currentWorld.reset();
 			prefabCache.clear();
+			resources.clear();
 		}
 	}
 	revert();
+	resources.restore(resourceValues);
 	try { rebuild(scene); }
 	catch (const std::exception& e)
 	{

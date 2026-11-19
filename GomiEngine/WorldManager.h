@@ -16,10 +16,11 @@ private:
 	InputState& inputState;
 	RenderQueue& renderQueue;
 	AudioQueue& audioQueue;
+	ResourceStore& resources;
 
 	std::unique_ptr<World> createWorld(const std::string& scene);
 public:
-	WorldManager(InputState& input, RenderQueue& rend, AudioQueue& audio) : inputState(input), renderQueue(rend), audioQueue(audio) {}
+	WorldManager(InputState& input, RenderQueue& rend, AudioQueue& audio, ResourceStore& res) : inputState(input), renderQueue(rend), audioQueue(audio), resources(res) {}
 	/// <summary>
 	/// startScene から始める(空なら project.json の startScene)。読めなければ例外
 	/// </summary>

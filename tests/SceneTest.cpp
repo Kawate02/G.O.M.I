@@ -15,12 +15,13 @@ struct Env
 	InputState input;
 	RenderQueue render;
 	AudioQueue audio;
+	ResourceStore resources;
 };
 
 static Json loadAndSave(const Json& scene, const std::string& source)
 {
 	Env env;
-	World world(env.input, env.render, env.audio);
+	World world(env.input, env.render, env.audio, env.resources);
 	world.initialize(scene, source);
 	return SceneLoader::save(world);
 }
@@ -53,7 +54,7 @@ int main()
 		CHECK(saved["systems"].size() == 10);
 		CHECK(countEntities(saved) == 2); // プレハブ2つ(プレイヤー + 背景4枚)
 		Env env;
-		World world(env.input, env.render, env.audio);
+		World world(env.input, env.render, env.audio, env.resources);
 		world.initialize(db.readJson("scenes/Field.json"), "Field");
 		CHECK(world.getEntities().size() == 5);
 		const Json player = SceneLoader::componentsOf(world, world.getEntities()[0]);
@@ -71,7 +72,7 @@ int main()
 		CHECK(saved["entities"][1] == Json::parse(R"({"prefab": "prefabs/background.json"})"));
 
 		Env env;
-		World world(env.input, env.render, env.audio);
+		World world(env.input, env.render, env.audio, env.resources);
 		world.initialize(db.readJson("scenes/Field.json"), "Field");
 		auto& cm = world.getComponentManager();
 		Entity player = world.getEntities()[0];
@@ -101,7 +102,7 @@ int main()
 	// 破棄した Entity は保存されない
 	{
 		Env env;
-		World world(env.input, env.render, env.audio);
+		World world(env.input, env.render, env.audio, env.resources);
 		world.initialize(db.readJson("scenes/Field.json"), "Field");
 		world.destroyEntity(world.getEntities()[1]);
 		world.update(0.0f, false); // 破棄はフレームの最後に反映される
@@ -114,7 +115,7 @@ int main()
 	// getEntities は生きている Entity だけを返す
 	{
 		Env env;
-		World world(env.input, env.render, env.audio);
+		World world(env.input, env.render, env.audio, env.resources);
 		world.initialize(db.readJson("scenes/Field.json"), "Field");
 		auto has = [&](Entity x) {
 			auto v = world.getEntities();
@@ -149,7 +150,7 @@ int main()
 	// 間違ったシーンは読めない
 	{
 		Env env;
-		World world(env.input, env.render, env.audio);
+		World world(env.input, env.render, env.audio, env.resources);
 		bool threw = false;
 		try { world.initialize(Json::parse(R"({"systems": ["NoSuchSystem"]})"), "bad"); }
 		catch (const std::exception& e) { threw = std::string(e.what()).find("NoSuchSystem") != std::string::npos; }

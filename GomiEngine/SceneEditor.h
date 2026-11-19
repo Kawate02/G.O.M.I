@@ -23,6 +23,7 @@ private:
 	InputState& inputState;
 	RenderQueue& renderQueue;
 	AudioQueue& audioQueue;
+	ResourceStore resources; //World より先に置く(World が参照する)
 	std::unique_ptr<World> currentWorld;
 	Json project;
 	AssetID path;          //空なら未保存の新しいシーン
@@ -92,6 +93,7 @@ public:
 	bool saveAsPrefab(Entity e, const AssetID& id, std::string& error);
 	inline bool isDirty() const { return dirty; }
 	inline World& world() { return *currentWorld; }
+	inline ResourceStore& getResources() { return resources; }
 
 	// ---- Entity
 	/// <summary>

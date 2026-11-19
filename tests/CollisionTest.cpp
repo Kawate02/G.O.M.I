@@ -12,7 +12,8 @@ struct Env
 	InputState input;
 	RenderQueue render;
 	AudioQueue audio;
-	World world{ input, render, audio };
+	ResourceStore resources;
+	World world{ input, render, audio, resources };
 
 	Entity add(Vec3 pos, CollisionComponent col, EntityTag tag)
 	{

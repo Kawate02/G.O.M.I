@@ -4,7 +4,7 @@
 
 /// <summary>
 /// ゲームのコードの DLL(GomiGame.dll)を読んで Component・System を登録し、外す時に登録ごと消す。
-/// 外す前に、その DLL の型を持つ World と System を全部消しておくこと(関数の実体が DLL の中にあるため)
+/// 外す前に、その DLL の型を持つ World と System、ResourceStore の値を全部消しておくこと(関数の実体が DLL の中にあるため)
 /// </summary>
 class GameModule
 {
@@ -12,6 +12,7 @@ private:
 	void* handle = nullptr;
 	size_t componentBase = 0;
 	size_t systemBase = 0;
+	size_t resourceBase = 0;
 	std::filesystem::path loadedPath;
 public:
 	GameModule() = default;

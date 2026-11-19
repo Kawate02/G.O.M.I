@@ -2,6 +2,7 @@
 #include "GameModule.h"
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
+#include "ResourceRegistry.h"
 #include "SceneLoader.h"
 #include "World.h"
 #include <iostream>
@@ -15,6 +16,7 @@ struct Env
 	InputState input;
 	RenderQueue render;
 	AudioQueue audio;
+	ResourceStore resources;
 };
 
 static int hpOf(World& world)
@@ -44,16 +46,38 @@ int main()
 		if (!error.empty()) std::cerr << "  " << error << std::endl;
 		CHECK(components.find("SampleHp") != nullptr);
 		CHECK(systems.contains("SampleDamageSystem"));
+		CHECK(ResourceRegistry::getInstance().find("SampleScore") != nullptr);
 		{
 			Env env;
-			auto world = std::make_unique<World>(env.input, env.render, env.audio);
+			auto world = std::make_unique<World>(env.input, env.render, env.audio, env.resources);
 			world->initialize(scene, "test");
 			CHECK(hpOf(*world) == 5);
 			world->update(1.0f / 60);
 			world->update(1.0f / 60);
 			CHECK(hpOf(*world) == 3);
-		} // World(DLL の型の配列と System)を先に消す
+			// Resource は World を作り直しても残る
+			CHECK(env.resources.save()["SampleScore"]["hits"] == 2);
+			world->release();
+			world = std::make_unique<World>(env.input, env.render, env.audio, env.resources);
+			world->initialize(scene, "test");
+			world->update(1.0f / 60);
+			CHECK(env.resources.save()["SampleScore"]["hits"] == 3);
+			// 初期値の上書き: 書いた項目だけ、知らない名前・項目は名前付きの例外で値は変わらない
+			env.resources.reset(Json::parse(R"({ "SampleScore": { "log": ["a"] } })"));
+			CHECK(env.resources.save()["SampleScore"] == Json::parse(R"({ "hits": 0, "log": ["a"] })"));
+			std::string message;
+			try { env.resources.reset(Json::parse(R"({ "SampleScore": { "hit": 1 } })"), "resources.json"); }
+			catch (const std::exception& ex) { message = ex.what(); }
+			CHECK(message.find("resources.json: SampleScore: unknown field \"hit\"") != std::string::npos);
+			message.clear();
+			try { env.resources.reset(Json::parse(R"({ "Score": {} })"), "resources.json"); }
+			catch (const std::exception& ex) { message = ex.what(); }
+			CHECK(message.find("resources.json: unknown resource \"Score\"") != std::string::npos);
+			CHECK(env.resources.save()["SampleScore"]["log"] == Json::parse(R"(["a"])"));
+			env.resources.clear();
+		} // World(DLL の型の配列と System)と Resource の値を先に消す
 		module.unload();
+		CHECK(ResourceRegistry::getInstance().size() == 0);
 		CHECK(components.size() == builtinComponents);
 		CHECK(systems.size() == builtinSystems);
 		CHECK(components.find("SampleHp") == nullptr);

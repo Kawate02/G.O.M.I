@@ -40,6 +40,7 @@ private:
 	AudioPlayer audioPlayer;
 	AudioQueue audioQueue;
 
+    ResourceStore resources; //シーンをまたいで残るデータ。World より先に置く(World が参照する)
     WorldManager world;
     DebugOptions debug;
     std::optional<ReplayPlayer> replayPlayer;
@@ -57,7 +58,7 @@ public:
         std::unique_ptr<IInput> i,
         std::unique_ptr<IDrawer> d,
         std::unique_ptr<IAudioBackend> a)
-        : settings(), window(std::move(w)), input(std::move(i)), drawer(std::move(d)), audioBackend(std::move(a)), world(inputState, renderQueue, audioQueue) {}
+        : settings(), window(std::move(w)), input(std::move(i)), drawer(std::move(d)), audioBackend(std::move(a)), world(inputState, renderQueue, audioQueue, resources) {}
 
     /// <summary>
     /// 終了コードを返す(記録の再生で基準と違えば 1)

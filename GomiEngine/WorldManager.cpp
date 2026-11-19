@@ -8,7 +8,7 @@ std::unique_ptr<World> WorldManager::createWorld(const std::string& scene)
 {
 	AssetID path = SceneLoader::scenePath(scene);
 	Json data = AssetDatabase::getInstance().readJson(path);
-	auto world = std::make_unique<World>(inputState, renderQueue, audioQueue);
+	auto world = std::make_unique<World>(inputState, renderQueue, audioQueue, resources);
 	world->setPauseUI(project.value("pauseUI", std::string()));
 	world->initialize(data, path);
 	return world;

@@ -1,6 +1,7 @@
 #include "GameModule.h"
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
+#include "ResourceRegistry.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -32,6 +33,7 @@ bool GameModule::load(const std::filesystem::path& dll, std::string& error)
 	}
 	componentBase = components.size();
 	systemBase = systems.size();
+	resourceBase = ResourceRegistry::getInstance().size();
 	try
 	{
 		func(components, systems);
@@ -40,6 +42,7 @@ bool GameModule::load(const std::filesystem::path& dll, std::string& error)
 	{
 		components.truncate(componentBase);
 		systems.truncate(systemBase);
+		ResourceRegistry::getInstance().truncate(resourceBase);
 		FreeLibrary(module);
 		error = ex.what();
 		return false;
@@ -54,6 +57,7 @@ void GameModule::unload()
 	if (!handle) return;
 	ComponentRegistry::getInstance().truncate(componentBase);
 	SystemRegistry::getInstance().truncate(systemBase);
+	ResourceRegistry::getInstance().truncate(resourceBase);
 	FreeLibrary(static_cast<HMODULE>(handle));
 	handle = nullptr;
 	loadedPath.clear();

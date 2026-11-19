@@ -8,6 +8,7 @@
 #include "JsonConvert.h"
 #include "AssetDatabase.h"
 #include "CollisionContext.h"
+#include "ResourceRegistry.h"
 
 #include "InputState.h"
 #include "RenderQueue.h"
@@ -38,6 +39,7 @@ protected:
 	InputState& inputState;
 	RenderQueue& renderQueue;
 	AudioQueue& audioQueue;
+	ResourceStore& resources;
 	WorldEventBus eventBus;
 
 	std::vector<Entity> entities;
@@ -56,7 +58,7 @@ protected:
 	bool simulating = true;
 	float deltaTime = 0.0f;
 public:
-	World(InputState& input, RenderQueue& rend, AudioQueue& aud) : inputState(input), renderQueue(rend), audioQueue(aud) {}
+	World(InputState& input, RenderQueue& rend, AudioQueue& aud, ResourceStore& res) : inputState(input), renderQueue(rend), audioQueue(aud), resources(res) {}
 	/// <summary>
 	/// シーンの JSON から System・Entity・UI を作る。source はエラー表示用のファイル名
 	/// </summary>
@@ -111,4 +113,10 @@ public:
 	inline RenderQueue& getRenderQueue() { return renderQueue; }
 	inline AudioQueue& getAudioQueue() { return audioQueue; }
 	inline UIManager& getUIManager() { return uiManager; }
+	/// <summary>
+	/// シーンをまたいで残るデータ(GOMI_REGISTER で resources.add した型)。World を作り直しても値は残る
+	/// </summary>
+	template <typename T>
+	inline T& resource() { return resources.get<T>(); }
+	inline ResourceStore& getResources() { return resources; }
 };
