@@ -73,6 +73,9 @@ void registerBuiltinComponents()
 	r.add<EntityTagComponent>("EntityTag")
 		.field("tags", &EntityTagComponent::tags);
 
+	r.add<OffScreenComponent>("OffScreen")
+		.field("mode", &OffScreenComponent::mode);
+
 	r.add<BackGroundComponent>("BackGround")
 		.field("asset", &BackGroundComponent::asset)
 		.field("origin", &BackGroundComponent::origin)

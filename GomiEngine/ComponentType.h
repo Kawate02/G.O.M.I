@@ -9,6 +9,7 @@
 #include "CameraFollowComponent.h"
 #include "CollisionComponent.h"
 #include "EntityTagComponent.h"
+#include "OffScreenComponent.h"
 #include "BackGroundComponent.h"
 #include "MeshRendererComponent.h"
 #include "Camera3DComponent.h"
