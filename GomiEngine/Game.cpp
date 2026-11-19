@@ -22,7 +22,7 @@ void Game::init()
 		std::string error;
 		if (!gameModule.load(gameDll, error)) std::cerr << "game code: " << error << std::endl;
 	}
-	resources.reset();
+	resources.resetToInitial(); //assets/resources.json の初期値
 	auto& sm = SettingManager::getInstance();
 	window->init(sm.getValue<int>("windowWidth"), sm.getValue<int>("windowHeight"), "Gomi", sm.getValue<bool>("fullscreen"));
 	drawer->init();

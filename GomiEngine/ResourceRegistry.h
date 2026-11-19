@@ -88,6 +88,11 @@ public:
 	/// </summary>
 	void reset(const Json& initial = Json::object(), const std::string& source = "resources");
 	/// <summary>
+	/// assets/resources.json(無ければ全部既定値)の初期値にする。間違いはファイル名付きの例外
+	/// </summary>
+	void resetToInitial();
+	static constexpr const char* INITIAL_FILE = "resources.json";
+	/// <summary>
 	/// 全部を既定値にし、state のうち今も登録されている名前・項目だけ戻す(ゲームのコードを差し替えた後。型が変わった項目は既定値のまま)
 	/// </summary>
 	void restore(const Json& state);

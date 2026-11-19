@@ -1,4 +1,5 @@
 #include "ResourceRegistry.h"
+#include "AssetDatabase.h"
 
 const FieldInfo* ResourceInfo::findField(std::string_view fieldName) const
 {
@@ -85,6 +86,12 @@ void ResourceStore::reset(const Json& initial, const std::string& source)
 		catch (const std::exception& ex) { throw std::runtime_error(source + ": " + ex.what()); }
 	}
 	values = std::move(next);
+}
+
+void ResourceStore::resetToInitial()
+{
+	auto& db = AssetDatabase::getInstance();
+	reset(db.exists(INITIAL_FILE) ? db.readJson(INITIAL_FILE) : Json::object(), INITIAL_FILE);
 }
 
 void ResourceStore::restore(const Json& state)
