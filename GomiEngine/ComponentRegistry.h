@@ -24,6 +24,9 @@ enum class FieldKind
 	Enum,
 	Flags,
 	EnumMap, //列挙 → 列挙の表(キー割り当てなど)
+	List,    //std::vector(JSON の配列)
+	Table,   //文字列などのキー → 値の表(std::map / std::unordered_map)
+	Struct,  //GOMI_FIELDS で項目を並べた構造体
 	Other,
 };
 
@@ -48,6 +51,9 @@ constexpr FieldKind fieldKindOf()
 	else if constexpr (std::is_same_v<T, Vec3>) return FieldKind::Vec3;
 	else if constexpr (NamedEnum<T>) return IsFlagEnum<T>::value ? FieldKind::Flags : FieldKind::Enum;
 	else if constexpr (EnumMapTypes<T>::value) return FieldKind::EnumMap;
+	else if constexpr (IsJsonVector<T>::value) return FieldKind::List;
+	else if constexpr (IsJsonMap<T>::value) return FieldKind::Table;
+	else if constexpr (FieldStruct<T>) return FieldKind::Struct;
 	else return FieldKind::Other;
 }
 

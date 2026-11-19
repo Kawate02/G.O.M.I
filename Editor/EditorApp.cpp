@@ -960,9 +960,12 @@ bool EditorApp::drawField(Entity e, const ComponentInfo& info, const FieldInfo& 
 		}
 		break;
 	}
+	case FieldKind::List:
+	case FieldKind::Table:
+	case FieldKind::Struct:
 	case FieldKind::Other:
 	{
-		//型の決まった欄が無いもの(キー割り当ての表など)は JSON のまま直す
+		//型の決まった欄が無いもの(配列・表・入れ子の構造体など)は JSON のまま直す
 		std::string text = v.dump(1);
 		ImGui::InputTextMultiline(label, &text, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 6));
 		if (ImGui::IsItemDeactivatedAfterEdit())

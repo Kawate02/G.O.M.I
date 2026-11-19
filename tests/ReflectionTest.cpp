@@ -4,6 +4,24 @@
 #include "ComponentType.h"
 #include <iostream>
 
+// 配列・表・入れ子の構造体を持つコンポーネント(ゲームのコードで書く形)
+struct TestItem
+{
+	std::string id;
+	int count = 1;
+};
+GOMI_FIELDS(TestItem, id, count)
+
+struct TestBag
+{
+	TestItem main;
+	std::vector<TestItem> items;
+	std::vector<int> numbers;
+	std::vector<bool> flags;
+	std::map<std::string, int> hp;
+	std::unordered_map<std::string, TestItem> named;
+};
+
 static int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { std::cerr << "FAIL line " << __LINE__ << ": " #cond << std::endl; failures++; } } while (0)
 
@@ -97,6 +115,60 @@ int main()
 		CHECK(reg.find("Move")->findField("result")->runtime);
 		CHECK(!reg.find("Move")->findField("speed")->runtime);
 		CHECK(reg.find("Physics")->findField("isGround")->runtime);
+	}
+
+	// 配列・表・入れ子の構造体
+	{
+		reg.add<TestBag>("TestBag")
+			.field("main", &TestBag::main)
+			.field("items", &TestBag::items)
+			.field("numbers", &TestBag::numbers)
+			.field("flags", &TestBag::flags)
+			.field("hp", &TestBag::hp)
+			.field("named", &TestBag::named);
+		auto* bag = reg.find("TestBag");
+		CHECK(bag->findField("main")->kind == FieldKind::Struct);
+		CHECK(bag->findField("items")->kind == FieldKind::List);
+		CHECK(bag->findField("hp")->kind == FieldKind::Table);
+		CHECK(bag->findField("named")->kind == FieldKind::Table);
+
+		ComponentManager cm;
+		Entity e{ 0, 0 };
+		Json in = Json::parse(R"({
+			"main": { "id": "sword" },
+			"items": [ { "id": "potion", "count": 3 }, { "id": "key" } ],
+			"numbers": [1, 2, 3],
+			"flags": [true, false],
+			"hp": { "alice": 10, "bob": 7 },
+			"named": { "left": { "id": "shield", "count": 2 } }
+		})");
+		bag->addFromJson(cm, e, in);
+		auto& b = cm.getComponentArray<TestBag>().getComponent(e);
+		CHECK(b.main.id == "sword" && b.main.count == 1); // 書かない項目は既定値
+		CHECK(b.items.size() == 2 && b.items[0].count == 3 && b.items[1].count == 1);
+		CHECK(b.numbers == std::vector<int>({ 1, 2, 3 }));
+		CHECK(b.flags.size() == 2 && b.flags[0] && !b.flags[1]);
+		CHECK(b.hp.at("bob") == 7);
+		CHECK(b.named.at("left").id == "shield");
+		Json out = bag->toJson(cm, e);
+		CHECK(out["main"] == Json::parse(R"({ "id": "sword", "count": 1 })"));
+		CHECK(out["items"][1] == Json::parse(R"({ "id": "key", "count": 1 })"));
+		CHECK(out["hp"] == in["hp"]);
+		ComponentManager cm2;
+		bag->addFromJson(cm2, e, out);
+		CHECK(bag->toJson(cm2, e) == out);
+
+		// 間違いは場所の分かる例外
+		auto message = [&](const char* text) {
+			ComponentManager c;
+			try { bag->addFromJson(c, e, Json::parse(text)); }
+			catch (const std::exception& ex) { return std::string(ex.what()); }
+			return std::string();
+		};
+		CHECK(message(R"({ "items": [ { "id": "a" }, { "idd": "b" } ] })").find("TestBag.items: [1]: unknown field \"idd\"") != std::string::npos);
+		CHECK(message(R"({ "hp": { "alice": "ten" } })").find("TestBag.hp: alice:") != std::string::npos);
+		CHECK(message(R"({ "main": [] })").find("TestBag.main: expected an object") != std::string::npos);
+		CHECK(message(R"({ "numbers": {} })").find("expected an array") != std::string::npos);
 	}
 
 	if (failures == 0) std::cout << "ReflectionTest: all passed" << std::endl;
