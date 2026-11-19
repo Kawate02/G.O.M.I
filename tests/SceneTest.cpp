@@ -37,6 +37,7 @@ int main()
 	registerBuiltinSystems();
 	auto& db = AssetDatabase::getInstance();
 	Project::getInstance().open(Project::findRoot(""));
+	loadCollisionSettings(Project::getInstance().read()); //タグ(project.json)はシーンを読む前に要る
 
 	// 全シーン: 読む → 保存 → 保存したものを読む → 保存、が一致する
 	for (auto name : { "Title", "Field", "Result" })

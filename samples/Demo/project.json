@@ -1,5 +1,6 @@
 {
   "engine": "0.1.1",
   "startScene": "Title",
-  "pauseUI": "ui/pause.json"
+  "pauseUI": "ui/pause.json",
+  "tags": ["UNIT", "PLAYER", "WALL", "ITEM", "HAZARD"]
 }

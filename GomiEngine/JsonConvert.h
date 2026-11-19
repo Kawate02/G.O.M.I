@@ -1,6 +1,7 @@
 #pragma once
 #include "include/json.hpp"
 #include "EnumNames.h"
+#include "EntityTag.h"
 #include "Vec2.h"
 #include "Vec3.h"
 
@@ -123,6 +124,12 @@ Json toJson(const T& v)
 	{
 		return Json::array({ floatToJsonNumber(v.x), floatToJsonNumber(v.y), floatToJsonNumber(v.z) });
 	}
+	else if constexpr (std::is_same_v<T, TagSet>)
+	{
+		Json names = Json::array();
+		for (auto& n : TagRegistry::getInstance().toNames(v)) names.push_back(n);
+		return names;
+	}
 	else if constexpr (NamedEnum<T>)
 	{
 		if constexpr (IsFlagEnum<T>::value)
@@ -190,6 +197,17 @@ void fromJson(const Json& j, T& v)
 		//2D 用に [x, y] も受け付ける(z = 0)
 		if (!j.is_array() || (j.size() != 3 && j.size() != 2)) throw std::runtime_error("expected [x, y, z]");
 		v = Vec3(j[0].template get<float>(), j[1].template get<float>(), j.size() == 3 ? j[2].template get<float>() : 0.0f);
+	}
+	else if constexpr (std::is_same_v<T, TagSet>)
+	{
+		if (!j.is_array()) throw std::runtime_error("expected an array of tag names");
+		TagSet tags;
+		for (auto& s : j)
+		{
+			if (!s.is_string()) throw std::runtime_error("expected a tag name (string)");
+			tags = tags | TagRegistry::getInstance().get(s.template get<std::string>());
+		}
+		v = tags;
 	}
 	else if constexpr (NamedEnum<T>)
 	{

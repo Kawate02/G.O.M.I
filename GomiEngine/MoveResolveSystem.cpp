@@ -65,13 +65,12 @@ void MoveResolveSystem::update(World& world, int frameCount, float deltaTime)
 		}
 
 		movec.result = movec.inputVel * deltaTime + movec.physVel * deltaTime;
-		//軸ごとに壁を調べ、ぶつかる軸だけ止める(壁に沿って滑る)
+		//軸ごとに BLOCK のルールの相手(壁など)を調べ、ぶつかる軸だけ止める(壁に沿って滑る)
 		for (int axis = 0; axis < 3; axis++)
 		{
 			Vec3 step;
 			step[axis] = movec.result[axis];
-			auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, collisionRules().at("unit_to_wall"), step);
-			if (hitE.entities.size() > 0)
+			if (world.col().blocked(world, e, step))
 			{
 				movec.result[axis] = 0;
 			}

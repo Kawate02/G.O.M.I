@@ -862,12 +862,16 @@ bool EditorApp::drawFieldValue(const FieldInfo& f, const std::string& owner, con
 		break;
 	}
 	case FieldKind::Flags:
+	case FieldKind::Tags:
 	{
+		//タグの選択肢はプロジェクト(project.json の "tags")で決まる
+		const std::vector<std::string>& choices = f.kind == FieldKind::Tags ? TagRegistry::getInstance().getNames() : f.enumNames;
+		if (choices.empty()) ImGui::TextDisabled("project.json の \"tags\" にタグがありません");
 		Json names = v;
 		bool firstFlag = true;
 		const float cellWidth = ImGui::GetContentRegionAvail().x;
 		float lineUsed = 0;
-		for (auto& n : f.enumNames)
+		for (auto& n : choices)
 		{
 			if (n == "NONE") continue;
 			bool on = std::find(v.begin(), v.end(), Json(n)) != v.end();
@@ -881,7 +885,7 @@ bool EditorApp::drawFieldValue(const FieldInfo& f, const std::string& owner, con
 			{
 				recordUndo();
 				names = Json::array();
-				for (auto& m : f.enumNames)
+				for (auto& m : choices)
 				{
 					bool mOn = m == n ? on : std::find(v.begin(), v.end(), Json(m)) != v.end();
 					if (mOn && m != "NONE") names.push_back(m);

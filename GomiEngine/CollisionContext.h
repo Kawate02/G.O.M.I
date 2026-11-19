@@ -42,7 +42,11 @@ public:
 	static bool checkSphereAABB(const Sphere& sphere, const Box& box);
 	void createGrid(World& world);
 	/// <summary>
-	/// self を postmove だけ動かした位置で、rule の相手タグを持つ Entity と重なるものを返す
+	/// self(selfTag を持っていること)を postmove だけ動かした位置で、otherTag を持つ Entity と重なるものを返す
 	/// </summary>
-	CollisionHit queryAt(World& world, const Entity& self, EntityTag selftag, CollisionRule rule, const Vec3& postmove = {});
+	CollisionHit queryAt(World& world, const Entity& self, TagSet selfTag, TagSet otherTag, const Vec3& postmove = {});
+	/// <summary>
+	/// self を postmove だけ動かした位置が、BLOCK のルール(self が a なら b、b なら a)の相手と重なるか
+	/// </summary>
+	bool blocked(World& world, const Entity& self, const Vec3& postmove = {});
 };

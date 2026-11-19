@@ -72,16 +72,29 @@ void CollisionContext::createGrid(World& world)
 	}
 }
 
-CollisionHit CollisionContext::queryAt(World& world, const Entity& self, EntityTag selftag, CollisionRule rule, const Vec3& postmove)
+bool CollisionContext::blocked(World& world, const Entity& self, const Vec3& postmove)
+{
+	auto& tags = world.getComponentManager().getComponentArray<EntityTagComponent>();
+	if (!tags.hasComponent(self)) return false;
+	TagSet mine = tags.getComponent(self).tags;
+	for (auto& [id, rule] : CollisionRules::getInstance().all())
+	{
+		if (rule.kind != CollisionKind::BLOCK) continue;
+		if (mine.has(rule.a) && !queryAt(world, self, rule.a, rule.b, postmove).entities.empty()) return true;
+		if (mine.has(rule.b) && !queryAt(world, self, rule.b, rule.a, postmove).entities.empty()) return true;
+	}
+	return false;
+}
+
+CollisionHit CollisionContext::queryAt(World& world, const Entity& self, TagSet selfTag, TagSet otherTag, const Vec3& postmove)
 {
 	CollisionHit hit;
-	auto& tag = world.getComponentManager().getComponentArray<EntityTagComponent>().getComponent(self);
+	auto& tags = world.getComponentManager().getComponentArray<EntityTagComponent>();
 	auto& collision = world.getComponentManager().getComponentArray<CollisionComponent>();
-	if (!tag.has(selftag) || !collision.hasComponent(self))
+	if (!tags.hasComponent(self) || !tags.getComponent(self).has(selfTag) || !collision.hasComponent(self))
 	{
-		return hit; //自分がタグ持ってないのは論外だよ
+		return hit; //自分がタグを持っていなければ何にも当たらない
 	}
-	EntityTag othertag = rule.getPair(selftag);//相方のタグはこれしかダメだよ
 	auto& tf = world.getComponentManager().getComponentArray<TransformComponent>();
 	auto& selftf = tf.getComponent(self);
 	auto& selfcol = collision.getComponent(self);
@@ -103,8 +116,7 @@ CollisionHit CollisionContext::queryAt(World& world, const Entity& self, EntityT
 				if (std::find(visited.begin(), visited.end(), otherE) != visited.end()) continue;//既に見たエンティティは無視
 				if (!world.alive(otherE)) continue;//生きてないエンティティは無視
 				visited.push_back(otherE);
-				auto& otherTag = world.getComponentManager().getComponentArray<EntityTagComponent>().getComponent(otherE);
-				if (!otherTag.has(othertag) || !collision.hasComponent(otherE)) continue;//タグが合わない
+				if (!tags.hasComponent(otherE) || !tags.getComponent(otherE).has(otherTag) || !collision.hasComponent(otherE)) continue;//タグが合わない
 
 				auto& othertf = tf.getComponent(otherE);
 				auto& othercol = collision.getComponent(otherE);

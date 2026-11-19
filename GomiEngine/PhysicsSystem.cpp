@@ -52,13 +52,12 @@ void PhysicsSystem::update(World& world, int frameCount, float deltaTime)
 		}
 
 		movec.physVel = physc.gravVel + physc.extraVel;
-		//このフレームで動く距離(速度 x 時間)の先に壁があるかを軸ごとに見る。重力の向きで止まったら接地
+		//このフレームで動く距離(速度 x 時間)の先に BLOCK のルールの相手(壁など)があるかを軸ごとに見る。重力の向きで止まったら接地
 		for (int axis = 0; axis < 3; axis++)
 		{
 			Vec3 step;
 			step[axis] = movec.physVel[axis] * deltaTime;
-			auto hitE = world.col().queryAt(world, e, EntityTag::UNIT, collisionRules().at("unit_to_wall"), step);
-			if (hitE.entities.size() > 0)
+			if (world.col().blocked(world, e, step))
 			{
 				if (down[axis] != 0 && movec.physVel[axis] * down[axis] >= 0 && physc.gravity > 0)
 				{

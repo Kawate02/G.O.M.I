@@ -18,6 +18,8 @@ SceneEditor::SceneEditor(InputState& input, RenderQueue& render, AudioQueue& aud
 {
 	auto& db = AssetDatabase::getInstance();
 	project = Project::getInstance().read();
+	try { loadCollisionSettings(project); }
+	catch (const std::exception& e) { std::cerr << e.what() << std::endl; } //直して保存すれば checkFiles で読み直す
 	newScene();
 	loadResources(resourceError);
 }
@@ -537,11 +539,14 @@ SceneEditor::FileCheck SceneEditor::checkFiles()
 		Json scene = snapshot(); //読み込んだ時のプレハブとの差で書く
 		auto oldCache = prefabCache;
 		Json oldProject = project;
+		auto oldTags = TagRegistry::getInstance().getNames();
+		auto oldRules = CollisionRules::getInstance().all();
 		auto& db = AssetDatabase::getInstance();
 		prefabCache.clear();
 		try
 		{
 			project = Project::getInstance().read();
+			loadCollisionSettings(project); //project.json の tags・collision_rules.json
 			rebuild(scene);
 			result.refreshed = true;
 		}
@@ -549,6 +554,8 @@ SceneEditor::FileCheck SceneEditor::checkFiles()
 		{
 			prefabCache = oldCache;
 			project = oldProject;
+			TagRegistry::getInstance().set(oldTags);
+			CollisionRules::getInstance().set(oldRules);
 			result.error = e.what();
 		}
 	}

@@ -38,7 +38,7 @@ int main()
 	registerBuiltinComponents();
 	registerBuiltinComponents(); // 2回呼んでも二重登録しない
 	auto& reg = ComponentRegistry::getInstance();
-	CHECK(reg.all().size() == 14);
+	CHECK(reg.all().size() == 15);
 
 	// 全コンポーネント: 既定値 → JSON → 付け直し → JSON が一致する
 	for (auto& info : reg.all())
@@ -59,6 +59,7 @@ int main()
 	{
 		ComponentManager cm;
 		Entity e{ 3, 1 };
+		TagRegistry::getInstance().set({ "UNIT", "PLAYER", "WALL" }); //ふつうは project.json の "tags"
 		Json j = Json::parse(R"({
 			"Transform": { "position": [100, 300, 0], "rotation": [0, 0.6, 0] },
 			"EntityTag": { "tags": ["UNIT", "PLAYER"] },
@@ -73,8 +74,17 @@ int main()
 		CHECK(reg.find("Transform")->toJson(cm, e)["rotation"].dump() == "[0.0,0.6,0.0]");
 
 		auto& tag = cm.getComponentArray<EntityTagComponent>().getComponent(e);
-		CHECK(tag.has(EntityTag::UNIT) && tag.has(EntityTag::PLAYER) && !tag.has(EntityTag::WALL));
+		CHECK(tag.has("UNIT") && tag.has(TagSet::of("PLAYER")) && !tag.has("WALL"));
 		CHECK(reg.find("EntityTag")->toJson(cm, e)["tags"] == Json::parse(R"(["UNIT", "PLAYER"])"));
+		// project.json の tags に無い名前は、足す場所を書いたエラー
+		bool unknownTag = false;
+		try { reg.find("EntityTag")->addFromJson(cm, Entity{ 4, 1 }, Json::parse(R"({ "tags": ["ENEMY"] })")); }
+		catch (const std::exception& ex) { unknownTag = std::string(ex.what()).find("project.json") != std::string::npos; }
+		CHECK(unknownTag);
+		// タグの並びの間違い
+		CHECK(throws([] { TagRegistry::getInstance().loadProject(Json::parse(R"({ "tags": ["A", "A"] })")); }));
+		CHECK(throws([] { TagRegistry::getInstance().loadProject(Json::parse(R"({ "tags": "A" })")); }));
+		CHECK(TagRegistry::getInstance().getNames().size() == 3); // 間違えた時は今のまま
 
 		auto& pc = cm.getComponentArray<PlayerControlComponent>().getComponent(e);
 		CHECK(pc.actions.size() == 2 && pc.actions[ActionID::JUMP] == InputKey::KEY_SPACE);
@@ -108,7 +118,7 @@ int main()
 		auto* col = reg.find("Collision");
 		CHECK(col->findField("type")->kind == FieldKind::Enum);
 		CHECK(col->findField("type")->enumNames.size() == 2);
-		CHECK(reg.find("EntityTag")->findField("tags")->kind == FieldKind::Flags);
+		CHECK(reg.find("EntityTag")->findField("tags")->kind == FieldKind::Tags);
 		CHECK(reg.find("Transform")->findField("position")->kind == FieldKind::Vec3);
 		CHECK(reg.find(std::type_index(typeid(MoveComponent)))->name == "Move");
 		// 実行時の値の印

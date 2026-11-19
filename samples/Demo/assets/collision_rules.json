@@ -1,0 +1,6 @@
+{
+  "unit_to_wall": { "a": "UNIT", "b": "WALL", "kind": "BLOCK" },
+  "unit_to_unit": { "a": "UNIT", "b": "UNIT", "kind": "BLOCK" },
+  "player_item": { "a": "PLAYER", "b": "ITEM", "kind": "TRIGGER" },
+  "player_hazard": { "a": "PLAYER", "b": "HAZARD", "kind": "TRIGGER" }
+}

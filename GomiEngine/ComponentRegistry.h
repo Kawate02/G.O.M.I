@@ -23,6 +23,7 @@ enum class FieldKind
 	Vec3,
 	Enum,
 	Flags,
+	Tags,    //TagSet(選択肢は project.json の "tags")
 	EnumMap, //列挙 → 列挙の表(キー割り当てなど)
 	List,    //std::vector(JSON の配列)
 	Table,   //文字列などのキー → 値の表(std::map / std::unordered_map)
@@ -49,6 +50,7 @@ constexpr FieldKind fieldKindOf()
 	else if constexpr (std::is_same_v<T, std::string>) return FieldKind::String;
 	else if constexpr (std::is_same_v<T, Vec2>) return FieldKind::Vec2;
 	else if constexpr (std::is_same_v<T, Vec3>) return FieldKind::Vec3;
+	else if constexpr (std::is_same_v<T, TagSet>) return FieldKind::Tags;
 	else if constexpr (NamedEnum<T>) return IsFlagEnum<T>::value ? FieldKind::Flags : FieldKind::Enum;
 	else if constexpr (EnumMapTypes<T>::value) return FieldKind::EnumMap;
 	else if constexpr (IsJsonVector<T>::value) return FieldKind::List;

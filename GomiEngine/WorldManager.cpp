@@ -18,6 +18,7 @@ void WorldManager::initialize(const std::string& startScene)
 {
 	auto& db = AssetDatabase::getInstance();
 	project = Project::getInstance().read();
+	loadCollisionSettings(project); //タグはシーンを読む前に要る
 	std::string first = startScene.empty() ? project.value("startScene", std::string()) : startScene;
 	if (first.empty()) throw std::runtime_error("no start scene: set \"startScene\" in project.json");
 	currentWorld = createWorld(first);
