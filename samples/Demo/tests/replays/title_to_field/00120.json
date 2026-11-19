@@ -1,5 +1,13 @@
 {
   "frame": 120,
+  "resources": {
+    "PlayerStatus": {
+      "hp": 3,
+      "items": {
+        "key": 1
+      }
+    }
+  },
   "scene": "Field",
   "world": {
     "entities": [

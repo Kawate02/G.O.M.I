@@ -356,8 +356,12 @@ int main()
 		editor.stop();
 		CHECK(editor.getResources().get<TestStatus>().hp == 8);
 
-		// 初期値の編集: 元に戻す・やり直す・未保存の印。読み直すと resources.json(見本には無い)の既定値
-		CHECK(editor.loadResources(error) && !editor.isResourcesDirty());
+		// 見本の resources.json はゲームのコードの PlayerStatus を書いているので、コードを読まないこのテストでは読めない(値は今のまま)
+		CHECK(!editor.loadResources(error) && error.find("resources.json: unknown resource \"PlayerStatus\"") != std::string::npos);
+		CHECK(editor.getResourceError() == error && editor.getResourceField("TestStatus", "hp") == 8);
+		// 初期値の編集: 元に戻す・やり直す・未保存の印
+		editor.getResources().reset();
+		CHECK(!editor.isResourcesDirty());
 		CHECK(editor.getResourceField("TestStatus", "hp") == 10);
 		CHECK(editor.getResourceField("TestStatus", "nope").is_null());
 		editor.recordResourceUndo();
@@ -369,7 +373,6 @@ int main()
 		CHECK(editor.getResourceField("TestStatus", "hp") == 10 && !editor.isResourcesDirty());
 		editor.redo();
 		CHECK(editor.getResourceField("TestStatus", "hp") == 4 && editor.isResourcesDirty());
-		CHECK(editor.loadResources(error) && editor.getResourceField("TestStatus", "hp") == 10);
 		editor.getResources().clear();
 		ResourceRegistry::getInstance().truncate(0);
 	}

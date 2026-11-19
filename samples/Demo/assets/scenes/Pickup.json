@@ -1,0 +1,23 @@
+{
+  "systems": [
+    "PlayerControlSystem",
+    "ForwardMoveSystem",
+    "PhysicsSystem",
+    "MoveResolveSystem",
+    "MoveSystem",
+    "PickupSystem",
+    "CameraSystem",
+    "OffScreenSystem",
+    "RendererSystem",
+    "CollisionSystem",
+    "BackGroundSystem"
+  ],
+  "entities": [
+    { "prefab": "prefabs/player.json", "overrides": { "Transform": { "position": [100, 300, 0], "scale": [1, 1, 1] } } },
+    { "prefab": "prefabs/background.json" },
+    { "components": { "Name": { "name": "gem" }, "Transform": { "position": [400, 300, 0], "scale": [1, 1, 1] }, "Renderer": { "path": "images/UIFrame.png", "enable": true }, "Pickup": { "item": "gem" } } },
+    { "components": { "Name": { "name": "spike" }, "Transform": { "position": [700, 300, 0], "scale": [1, 1, 1] }, "Renderer": { "path": "images/UIHover.png", "enable": true }, "Hazard": { "damage": 1 } } },
+    { "components": { "Name": { "name": "gem #2" }, "Transform": { "position": [1000, 300, 0], "scale": [1, 1, 1] }, "Renderer": { "path": "images/UIFrame.png", "enable": true }, "Pickup": { "item": "gem", "count": 2 } } }
+  ],
+  "ui": []
+}

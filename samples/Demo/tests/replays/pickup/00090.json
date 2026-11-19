@@ -1,0 +1,97 @@
+{
+  "frame": 90,
+  "resources": {
+    "PlayerStatus": {
+      "hp": 2,
+      "items": {
+        "gem": 1,
+        "key": 1
+      }
+    }
+  },
+  "scene": "Pickup",
+  "world": {
+    "entities": [
+      {
+        "overrides": {
+          "Move": {
+            "inputVel": [
+              500.0,
+              0.0,
+              0.0
+            ],
+            "result": [
+              8.333334,
+              0.0,
+              0.0
+            ]
+          },
+          "Physics": {
+            "isGround": false
+          },
+          "Transform": {
+            "position": [
+              837.49945,
+              300.0,
+              0.0
+            ]
+          }
+        },
+        "prefab": "prefabs/player.json"
+      },
+      {
+        "prefab": "prefabs/background.json"
+      },
+      {
+        "components": {
+          "Name": {
+            "name": "gem #2"
+          },
+          "Pickup": {
+            "count": 2,
+            "item": "gem",
+            "radius": 48.0
+          },
+          "Renderer": {
+            "enable": true,
+            "layer": 0,
+            "order": 0,
+            "path": "images/UIFrame.png",
+            "useCamera": true
+          },
+          "Transform": {
+            "position": [
+              1000.0,
+              300.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        }
+      }
+    ],
+    "systems": [
+      "PlayerControlSystem",
+      "ForwardMoveSystem",
+      "PhysicsSystem",
+      "MoveResolveSystem",
+      "MoveSystem",
+      "PickupSystem",
+      "CameraSystem",
+      "OffScreenSystem",
+      "RendererSystem",
+      "CollisionSystem",
+      "BackGroundSystem"
+    ],
+    "ui": []
+  }
+}

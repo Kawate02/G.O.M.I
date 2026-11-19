@@ -78,6 +78,8 @@ for s in $SCENES; do
   project="$OUT/project-copy"
   rm -rf "$project"; mkdir -p "$project"
   cp -r "$ROOT/samples/Demo/project.json" "$ROOT/samples/Demo/assets" "$ROOT/samples/Demo/game" "$project/"
+  # ゲームのコード(CMake の DemoGame が samples/Demo/build/bin に作る)も一緒に
+  mkdir -p "$project/build/bin" && cp "$ROOT/samples/Demo/build/bin/GomiGame.dll" "$project/build/bin/" 2>/dev/null
   D=$(cygpath -m "$cur"); P=$(cygpath -m "$project")
   args=$(scene_args "$s")
   [ -z "$args" ] && { echo "$s: 不明な場面"; FAIL=1; continue; }

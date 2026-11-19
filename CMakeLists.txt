@@ -197,6 +197,14 @@ add_library(GameSampleModule SHARED GomiEngine/game_entry/GameEntry.cpp tests/ga
 target_link_libraries(GameSampleModule PRIVATE GomiCore)
 add_dependencies(GameModuleTest GameSampleModule)
 
+# 見本のプロジェクトのゲームのコード(samples/Demo/game)。エディタがビルドするのと同じ <プロジェクト>/build/bin/GomiGame.dll に置き、
+# 再現テスト(Replay.*)と tools/verify.sh がゲームのコード込みで流せるようにする
+file(GLOB DEMO_GAME_SOURCES CONFIGURE_DEPENDS ${GOMI_SAMPLE_PROJECT}/game/*.cpp ${GOMI_SAMPLE_PROJECT}/game/*.h)
+add_library(DemoGame SHARED GomiEngine/game_entry/GameEntry.cpp ${DEMO_GAME_SOURCES})
+target_link_libraries(DemoGame PRIVATE GomiCore)
+set_target_properties(DemoGame PROPERTIES OUTPUT_NAME GomiGame RUNTIME_OUTPUT_DIRECTORY $<1:${GOMI_SAMPLE_PROJECT}/build/bin>)
+add_dependencies(GomiEngine DemoGame)
+
 # 見本のプロジェクトの操作の記録(samples/Demo/tests/replays/*.json)を流し、確認点の画面と状態を基準と比べる。基準を作り直す時は
 #   GomiEngine --project samples/Demo --replay samples/Demo/tests/replays/<名前>.json --replay-update
 file(GLOB GOMI_REPLAYS CONFIGURE_DEPENDS ${GOMI_SAMPLE_PROJECT}/tests/replays/*.json)

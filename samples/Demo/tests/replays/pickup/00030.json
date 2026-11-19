@@ -1,0 +1,167 @@
+{
+  "frame": 30,
+  "resources": {
+    "PlayerStatus": {
+      "hp": 3,
+      "items": {
+        "key": 1
+      }
+    }
+  },
+  "scene": "Pickup",
+  "world": {
+    "entities": [
+      {
+        "overrides": {
+          "Move": {
+            "inputVel": [
+              499.9999,
+              0.0,
+              0.0
+            ],
+            "result": [
+              8.333332,
+              0.0,
+              0.0
+            ]
+          },
+          "Physics": {
+            "isGround": false
+          },
+          "Transform": {
+            "position": [
+              337.50003,
+              300.0,
+              0.0
+            ]
+          }
+        },
+        "prefab": "prefabs/player.json"
+      },
+      {
+        "prefab": "prefabs/background.json"
+      },
+      {
+        "components": {
+          "Name": {
+            "name": "gem"
+          },
+          "Pickup": {
+            "count": 1,
+            "item": "gem",
+            "radius": 48.0
+          },
+          "Renderer": {
+            "enable": true,
+            "layer": 0,
+            "order": 0,
+            "path": "images/UIFrame.png",
+            "useCamera": true
+          },
+          "Transform": {
+            "position": [
+              400.0,
+              300.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        }
+      },
+      {
+        "components": {
+          "Hazard": {
+            "damage": 1,
+            "radius": 48.0
+          },
+          "Name": {
+            "name": "spike"
+          },
+          "Renderer": {
+            "enable": true,
+            "layer": 0,
+            "order": 0,
+            "path": "images/UIHover.png",
+            "useCamera": true
+          },
+          "Transform": {
+            "position": [
+              700.0,
+              300.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        }
+      },
+      {
+        "components": {
+          "Name": {
+            "name": "gem #2"
+          },
+          "Pickup": {
+            "count": 2,
+            "item": "gem",
+            "radius": 48.0
+          },
+          "Renderer": {
+            "enable": true,
+            "layer": 0,
+            "order": 0,
+            "path": "images/UIFrame.png",
+            "useCamera": true
+          },
+          "Transform": {
+            "position": [
+              1000.0,
+              300.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        }
+      }
+    ],
+    "systems": [
+      "PlayerControlSystem",
+      "ForwardMoveSystem",
+      "PhysicsSystem",
+      "MoveResolveSystem",
+      "MoveSystem",
+      "PickupSystem",
+      "CameraSystem",
+      "OffScreenSystem",
+      "RendererSystem",
+      "CollisionSystem",
+      "BackGroundSystem"
+    ],
+    "ui": []
+  }
+}
