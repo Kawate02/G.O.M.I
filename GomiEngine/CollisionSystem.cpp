@@ -1,9 +1,36 @@
 #include "CollisionSystem.h"
 #include "World.h"
+#include <map>
 
 void CollisionSystem::initialize(World& world)
 {
 	previous.clear();
+}
+
+Json CollisionSystem::runState(const std::vector<Entity>& order) const
+{
+	std::map<Entity, int> index;
+	for (size_t i = 0; i < order.size(); i++) index[order[i]] = static_cast<int>(i);
+	Json pairs = Json::array();
+	for (auto& [rule, lo, hi] : previous)
+	{
+		auto a = index.find(lo), b = index.find(hi);
+		if (a != index.end() && b != index.end()) pairs.push_back({ rule, a->second, b->second });
+	}
+	return pairs;
+}
+
+void CollisionSystem::restoreRunState(const Json& state, const std::vector<Entity>& order)
+{
+	previous.clear();
+	for (auto& p : state)
+	{
+		size_t a = p.at(1).get<size_t>(), b = p.at(2).get<size_t>();
+		if (a >= order.size() || b >= order.size()) continue;
+		Entity lo = order[a], hi = order[b];
+		if (hi < lo) std::swap(lo, hi);
+		previous.insert({ p.at(0).get<RuleID>(), lo, hi });
+	}
 }
 
 void CollisionSystem::update(World& world, int frameCount, float deltaTime)

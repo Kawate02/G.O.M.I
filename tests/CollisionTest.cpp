@@ -3,6 +3,7 @@
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
 #include "CollisionSystem.h"
+#include "SceneLoader.h"
 #include <iostream>
 
 static int failures = 0;
@@ -165,6 +166,44 @@ int main()
 
 		auto f5 = step();
 		CHECK(f5.empty());
+	}
+
+	// 巻き戻し: 重なりの組を runState に入れて戻すと、そのまま進めた時と同じ STAY が出る(Entity の ID が変わっても)
+	{
+		registerBuiltinComponents(); // シーンの保存と読み込みに要る
+		Env a;
+		CollisionSystem sysA;
+		sysA.initialize(a.world);
+		Entity dead = a.add({ 50, 50, 0 }, box({ 1, 1, 0 }), tag("ENEMY")); // 消して ID をずらす
+		Entity player = a.add({ 0, 0, 0 }, box({ 1, 1, 0 }), tag("PLAYER"));
+		Entity item = a.add({ 0, 0.5f, 0 }, box({ 1, 1, 0 }), tag("ITEM"));
+		a.world.destroyEntity(dead);
+		a.world.update(0, false); // 消えた ID の掃除
+		auto stepA = [&] {
+			a.world.event().clearEvents();
+			a.world.col().createGrid(a.world);
+			sysA.update(a.world, 0, 0);
+			return a.world.event().collisions();
+		};
+		stepA(); // ENTER
+		std::vector<Entity> order;
+		Json saved = SceneLoader::save(a.world, &order);
+		Json state = sysA.runState(order);
+		auto expect = stepA(); // そのまま進めた時(STAY)
+
+		Env b;
+		b.world.initialize(saved, "test");
+		CollisionSystem sysB;
+		sysB.initialize(b.world);
+		sysB.restoreRunState(state, b.world.getEntities());
+		b.world.event().clearEvents();
+		b.world.col().createGrid(b.world);
+		sysB.update(b.world, 0, 0);
+		auto got = b.world.event().collisions();
+		CHECK(expect.size() == 2 && expect[0].phase == CollisionPhase::STAY);
+		CHECK(got.size() == expect.size());
+		for (size_t i = 0; i < got.size() && i < expect.size(); i++) CHECK(got[i].phase == expect[i].phase && got[i].rule == expect[i].rule);
+		CHECK(player.id != b.world.getEntities()[0].id); // ID は確かにずれている
 	}
 
 	if (failures == 0) std::cout << "CollisionTest: all passed" << std::endl;

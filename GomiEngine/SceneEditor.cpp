@@ -860,7 +860,9 @@ bool SceneEditor::swapCode(const std::function<bool(std::string& error)>& swap, 
 
 Json SceneEditor::playState()
 {
-	return { { "world", SceneLoader::save(*currentWorld) }, { "resources", resources.save() }, { "scene", playScene }, { "frame", playFrame }, { "run", currentWorld->runState() } };
+	std::vector<Entity> order;
+	Json world = SceneLoader::save(*currentWorld, &order);
+	return { { "world", world }, { "resources", resources.save() }, { "scene", playScene }, { "frame", playFrame }, { "run", currentWorld->runState(order) } };
 }
 
 bool SceneEditor::restorePlayState(const Json& state, std::string& error)

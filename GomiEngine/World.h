@@ -82,7 +82,7 @@ public:
 	/// <summary>
 	/// シーンの JSON に入らない、動いている間の状態(フレーム数・ポーズ中か)。巻き戻しで覚えて戻す
 	/// </summary>
-	Json runState() const;
+	Json runState(const std::vector<Entity>& order = {}) const;
 	void restoreRunState(const Json& state);
 	inline const std::vector<std::string>& getSystemNames() const { return systemNames; }
 	inline const Json& getUIEntries() const { return uiEntries; }

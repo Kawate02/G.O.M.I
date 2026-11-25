@@ -20,4 +20,6 @@ private:
 public:
 	void initialize(World& world) override;
 	void update(World& world, int frameCount, float deltaTime) override;
+	Json runState(const std::vector<Entity>& order) const override;
+	void restoreRunState(const Json& state, const std::vector<Entity>& order) override;
 };

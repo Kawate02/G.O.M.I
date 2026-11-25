@@ -122,9 +122,11 @@ void World::flushDestroyed()
 	}
 	pendingDestroy.clear();
 }
-Json World::runState() const
+Json World::runState(const std::vector<Entity>& order) const
 {
-	return { { "frameCount", frameCount }, { "pause", pause } };
+	Json systemStates = Json::array();
+	for (auto& it : systems) systemStates.push_back(it->runState(order));
+	return { { "frameCount", frameCount }, { "pause", pause }, { "systems", systemStates } };
 }
 
 void World::restoreRunState(const Json& state)
@@ -135,5 +137,12 @@ void World::restoreRunState(const Json& state)
 	{
 		pauseUI = spawnUI(pauseUIPath, { 0, 0 }, 1);
 		pause = true;
+	}
+	//System ごとの状態(System の並びは保存したシーンの "systems" と同じ)
+	const Json systemStates = state.value("systems", Json::array());
+	const std::vector<Entity> order = getEntities();
+	for (size_t i = 0; i < systems.size() && i < systemStates.size(); i++)
+	{
+		if (!systemStates[i].is_null()) systems[i]->restoreRunState(systemStates[i], order);
 	}
 }

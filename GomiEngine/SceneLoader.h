@@ -38,12 +38,12 @@ namespace SceneLoader
 	/// World の今の状態をシーンの JSON にする。プレハブから作った Entity は "prefab" + 変えた項目だけの "overrides" で書く
 	/// (仲間が消えた・2番目以降を変えた・コンポーネントを外した時は、つながりを切って components で書く)
 	/// </summary>
-	Json save(World& world);
+	Json save(World& world, std::vector<Entity>* order = nullptr);
 	/// <summary>
 	/// プレハブの中身(各 Entity の既定値で埋めたコンポーネント)を prefabs から取って書き出す。
 	/// エディタは読み込んだ時のプレハブで overrides を作る(外でプレハブが変わっても、自分の変更だけを overrides にする)
 	/// </summary>
-	Json save(World& world, const std::function<std::vector<Json>(const AssetID&)>& prefabs);
+	Json save(World& world, const std::function<std::vector<Json>(const AssetID&)>& prefabs, std::vector<Entity>* order = nullptr);
 	/// <summary>
 	/// プレハブのファイルを読み、各 Entity のコンポーネントを既定値で埋めて返す。読めなければ空
 	/// </summary>

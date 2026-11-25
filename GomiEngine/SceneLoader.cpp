@@ -291,12 +291,12 @@ std::vector<Json> SceneLoader::prefabComponents(const AssetID& prefabId)
 	return list;
 }
 
-Json SceneLoader::save(World& world)
+Json SceneLoader::save(World& world, std::vector<Entity>* order)
 {
-	return save(world, prefabComponents);
+	return save(world, prefabComponents, order);
 }
 
-Json SceneLoader::save(World& world, const std::function<std::vector<Json>(const AssetID&)>& prefabs)
+Json SceneLoader::save(World& world, const std::function<std::vector<Json>(const AssetID&)>& prefabs, std::vector<Entity>* order)
 {
 	Json scene = Json::object();
 	scene["systems"] = world.getSystemNames();
@@ -324,6 +324,7 @@ Json SceneLoader::save(World& world, const std::function<std::vector<Json>(const
 		if (!link)
 		{
 			entities.push_back({ { "components", componentsOf(world, e) } });
+			if (order) order->push_back(e);
 			continue;
 		}
 		if (written.count(link->instance)) continue;
@@ -352,10 +353,15 @@ Json SceneLoader::save(World& world, const std::function<std::vector<Json>(const
 			Json item = { { "prefab", link->prefab } };
 			if (overrides.is_object() && !overrides.empty()) item["overrides"] = overrides;
 			entities.push_back(item);
+			if (order) order->insert(order->end(), members.begin(), members.end());
 		}
 		else
 		{
-			for (auto& m : members) entities.push_back({ { "components", componentsOf(world, m) } });
+			for (auto& m : members)
+			{
+				entities.push_back({ { "components", componentsOf(world, m) } });
+				if (order) order->push_back(m);
+			}
 		}
 	}
 	scene["entities"] = entities;
