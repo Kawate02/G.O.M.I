@@ -1283,7 +1283,7 @@ bool EditorApp::spriteRect(Entity e, Vec2& min, Vec2& max)
 	if (!editor->world().alive(e) || !cm.has<RendererComponent>(e) || !cm.has<TransformComponent>(e)) return false;
 	auto& r = cm.getComponentArray<RendererComponent>().getComponent(e);
 	auto& t = cm.getComponentArray<TransformComponent>().getComponent(e);
-	Vec2 size = AssetDatabase::getInstance().imageSize(r.path);
+	Vec2 size = rendererImageSize(r);
 	if (size.x <= 0 || size.y <= 0) size = Vec2(32, 32); //画像が読めなくても選べるように
 	min = Vec2(t.position.x, t.position.y);
 	if (r.useCamera) min -= editor->world().getCamera().position;

@@ -223,6 +223,25 @@ Json SceneLoader::normalize(const Json& components)
 	return out;
 }
 
+Json SceneLoader::omitDefaults(const Json& components)
+{
+	Json out = components;
+	for (auto& [name, fields] : out.items())
+	{
+		const ComponentInfo* info = ComponentRegistry::getInstance().find(name);
+		if (!info || !fields.is_object()) continue;
+		bool any = false;
+		for (auto& f : info->fields) any = any || f.omitDefault;
+		if (!any) continue;
+		Json defaults = normalize(Json{ { name, Json::object() } })[name];
+		for (auto& f : info->fields)
+		{
+			if (f.omitDefault && fields.contains(f.name) && fields[f.name] == defaults[f.name]) fields.erase(f.name);
+		}
+	}
+	return out;
+}
+
 Json SceneLoader::diff(const Json& base, const Json& current)
 {
 	if (!base.is_object() || !current.is_object()) return base == current ? Json() : current;
@@ -323,7 +342,7 @@ Json SceneLoader::save(World& world, const std::function<std::vector<Json>(const
 		const PrefabLink* link = world.getPrefabLink(e);
 		if (!link)
 		{
-			entities.push_back({ { "components", componentsOf(world, e) } });
+			entities.push_back({ { "components", omitDefaults(componentsOf(world, e)) } });
 			if (order) order->push_back(e);
 			continue;
 		}
@@ -359,7 +378,7 @@ Json SceneLoader::save(World& world, const std::function<std::vector<Json>(const
 		{
 			for (auto& m : members)
 			{
-				entities.push_back({ { "components", componentsOf(world, m) } });
+				entities.push_back({ { "components", omitDefaults(componentsOf(world, m)) } });
 				if (order) order->push_back(m);
 			}
 		}

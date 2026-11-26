@@ -68,7 +68,7 @@ struct FieldInfo
 	FieldKind kind;
 	std::vector<std::string> enumNames; //Enum / Flags の選択肢(EnumMap では値の選択肢)
 	std::vector<std::string> keyNames;  //EnumMap のキーの選択肢
-	bool omitDefault = false; //既定値のままなら保存で書かない(後から足した項目で、既存のシーンの保存結果を変えないため)
+	bool omitDefault = false; //Entity の保存(SceneLoader::omitDefaults)で既定値のままなら書かない(後から足した項目で、既存のシーンの保存結果を変えないため。プレハブとの差分は全項目で取る)
 	bool runtime = false; //ゲームが動いている間に変わる値(速度・接地など)。エディタでは読むだけにする
 	std::function<Json(const void* component)> save;
 	std::function<void(void* component, const Json& value)> load;
@@ -86,16 +86,17 @@ private:
 public:
 	explicit FieldBuilder(std::function<std::vector<FieldInfo>&()> fields) : fields(std::move(fields)) {}
 	/// <summary>
-	/// ゲームが動いている間に System が書き換える値として登録する(保存はするが、エディタでは読むだけ)
-	/// </summary>
-	/// <summary>
-	/// 直前に足した項目を、既定値のままなら保存(toJson)で書かないようにする。読む時は省略で既定値になる
+	/// 直前に足した項目を、既定値のままなら Entity の保存で書かないようにする。読む時は省略で既定値になる
 	/// </summary>
 	FieldBuilder& omitDefault()
 	{
 		fields().back().omitDefault = true;
 		return *this;
 	}
+
+	/// <summary>
+	/// ゲームが動いている間に System が書き換える値として登録する(保存はするが、エディタでは読むだけ)
+	/// </summary>
 
 	template <typename F>
 	FieldBuilder& runtime(const char* fieldName, F C::* member)
@@ -193,13 +194,7 @@ public:
 			Json j = Json::object();
 			if (!cm.has<C>(e)) return j;
 			const C& value = cm.getComponentArray<C>().getComponent(e);
-			static const C defaults{};
-			for (auto& f : self.fields)
-			{
-				Json v = f.save(&value);
-				if (f.omitDefault && v == f.save(&defaults)) continue;
-				j[f.name] = std::move(v);
-			}
+			for (auto& f : self.fields) j[f.name] = f.save(&value);
 			return j;
 		};
 		info.remove = [](ComponentManager& cm, Entity e) { if (cm.has<C>(e)) cm.getComponentArray<C>().removeComponent(e); };

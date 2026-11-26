@@ -7,6 +7,7 @@
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 
 static int failures = 0;
@@ -107,6 +108,25 @@ int main()
 		Json saved2 = SceneLoader::save(world2);
 		CHECK(saved2["entities"][0]["components"]["Renderer"]["flipX"] == true);
 		CHECK(saved2["entities"][0]["components"]["Renderer"]["uv"].size() == 4);
+	}
+
+	// プレハブで flipX=true、インスタンスで false に戻しても、保存して読み直すと false のまま(omitDefault が上書きを消さない)
+	{
+		auto& db = AssetDatabase::getInstance();
+		const AssetID prefab = "prefabs/_animation_test_flipped.json";
+		db.writeJson(prefab, Json::parse(R"({ "entities": [ { "components": { "Transform": {}, "Renderer": { "path": "images/player.png", "flipX": true } } } ] })"));
+		Json scene = Json::parse(R"({ "systems": [], "entities": [ { "prefab": "prefabs/_animation_test_flipped.json", "overrides": { "Renderer": { "flipX": false } } } ], "ui": [] })");
+		Env env;
+		World world(env.input, env.render, env.audio, env.resources);
+		world.initialize(scene, "t");
+		Json saved = SceneLoader::save(world);
+		Env env2;
+		World world2(env2.input, env2.render, env2.audio, env2.resources);
+		world2.initialize(saved, "saved");
+		Entity e = world2.getEntities()[0];
+		CHECK(!world2.getComponentManager().getComponentArray<RendererComponent>().getComponent(e).flipX);
+		CHECK(SceneLoader::save(world2) == saved);
+		std::filesystem::remove(db.resolve(prefab));
 	}
 
 	// 見本のシーンを読んで保存しても元と同じ(Animation を含む全シーン)

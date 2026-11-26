@@ -63,6 +63,10 @@ namespace SceneLoader
 	/// </summary>
 	Json normalize(const Json& components);
 	/// <summary>
+	/// omitDefault の項目が既定値のままなら取り除く(Entity をそのまま書く時に使う。プレハブとの差分には使わない)
+	/// </summary>
+	Json omitDefaults(const Json& components);
+	/// <summary>
 	/// base から current で変わった所だけを返す(オブジェクトは中まで比べる)
 	/// </summary>
 	Json diff(const Json& base, const Json& current);

@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+struct Vec2;
 struct RendererComponent
 {
 	std::string path;
@@ -13,3 +14,8 @@ struct RendererComponent
 	std::vector<float> uv = { 0, 0, 1, 1 };
 	bool flipX = false; //左右反転
 };
+
+/// <summary>
+/// 画像の切り出し(uv)を含めた、scale をかける前の描く大きさ。読めない画像は {0, 0}
+/// </summary>
+Vec2 rendererImageSize(const RendererComponent& renderer);

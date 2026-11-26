@@ -3,14 +3,21 @@
 #include "ComponentType.h"
 #include "World.h"
 
+#include <cmath>
+
 void SpriteAnimationSystem::initialize(World& world)
 {
 }
 
 static const AnimationClip* currentClip(const SpriteAnimationComponent& anim)
 {
+	if (anim.clip.empty()) return nullptr;
 	auto it = anim.clips.find(anim.clip);
-	if (it == anim.clips.end()) return nullptr;
+	if (it == anim.clips.end())
+	{
+		AssetDatabase::getInstance().warnOnce("animation:clip:" + anim.clip, "SpriteAnimation: clip \"" + anim.clip + "\" is not in clips");
+		return nullptr;
+	}
 	return AnimationClip::load(it->second);
 }
 
@@ -34,6 +41,7 @@ void SpriteAnimationSystem::update(World& world, int frameCount, float deltaTime
 			anim.time += deltaTime * anim.speed;
 			if (anim.time < 0) anim.time = 0;
 			if (!clip->loop && anim.time > clip->duration()) anim.time = clip->duration();
+			if (clip->loop && anim.time >= clip->duration()) anim.time = std::fmod(anim.time, clip->duration()); //増え続けて精度が落ちないように
 		}
 		});
 }

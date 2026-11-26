@@ -6,7 +6,7 @@ Vec2 OffScreenSystem::imageSize(World& world, Entity e)
 {
 	auto& rend = world.getComponentManager().getComponentArray<RendererComponent>();
 	if (!rend.hasComponent(e)) return {};
-	return AssetDatabase::getInstance().imageSize(rend.getComponent(e).path);
+	return rendererImageSize(rend.getComponent(e));
 }
 
 void OffScreenSystem::despawn(World& world, Entity e)

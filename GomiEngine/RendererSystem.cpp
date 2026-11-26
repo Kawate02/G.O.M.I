@@ -2,6 +2,17 @@
 #include "World.h"
 #include "MathUtil.h"
 
+Vec2 rendererImageSize(const RendererComponent& renderer)
+{
+	Vec2 size = AssetDatabase::getInstance().imageSize(renderer.path);
+	if (renderer.uv.size() == 4)
+	{
+		size.x *= std::abs(renderer.uv[2] - renderer.uv[0]);
+		size.y *= std::abs(renderer.uv[3] - renderer.uv[1]);
+	}
+	return size;
+}
+
 void RendererSystem::initialize(World& world)
 {
 }

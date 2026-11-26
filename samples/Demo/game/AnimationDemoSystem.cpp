@@ -3,7 +3,7 @@
 // 動かすのはシーンの systems の PlayerControlSystem など。シーンでは SpriteAnimationSystem を RendererSystem より前に置く
 #include "GameCode.h"
 
-/// <summary>AnimationDemoSystem が操作する印(中身は無い)</summary>
+/// <summary>AnimationDemoSystem が操作する印(ジャンプ中かどうかだけ持つ)</summary>
 struct AnimationDemoComponent
 {
 	bool jumping = false;

@@ -48,9 +48,7 @@ int main()
 		info.addFromJson(cm, e, Json::object());
 		CHECK(info.has(cm, e));
 		Json first = info.toJson(cm, e);
-		size_t omitted = 0; //既定値なら書かない項目(omitDefault)は、既定値のままの時は出ない
-		for (auto& f : info.fields) { if (f.omitDefault) omitted++; }
-		CHECK(first.size() == info.fields.size() - omitted);
+		CHECK(first.size() == info.fields.size());
 		ComponentManager cm2;
 		info.addFromJson(cm2, e, first);
 		if (info.toJson(cm2, e) != first) std::cerr << "  round trip differs: " << info.name << std::endl;
