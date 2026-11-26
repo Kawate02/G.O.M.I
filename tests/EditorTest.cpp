@@ -399,8 +399,17 @@ int main()
 		std::string savedPath = (std::filesystem::temp_directory_path() / "gomi_preview_test.json").generic_string();
 		CHECK(editor.saveAs(savedPath, error));
 		CHECK(editor.isAnimationPreviewing() && editor.animationPreviewFrame() == 2); // 保存してもプレビューは続く
+		Json written = db.readJson(savedPath);
+		std::string dump = written.dump();
+		CHECK(dump.find("bot_walk.png") != std::string::npos && dump.find("\"uv\"") == std::string::npos && dump.find("\"time\":0.0") != std::string::npos); // プレビューのコマ・time が入っていない
+		CHECK(editor.changesFromSaved().empty());
 		std::filesystem::remove(savedPath);
-
+		// プレハブとして保存しても、プレビューの値は World に残らない(プレビューは止まる)
+		CHECK(editor.saveAsPrefab(bot, "prefabs/_editor_test_bot.json", error));
+		bot = editor.entities().back(); // プレハブの配置になって Entity が作り直される
+		CHECK(!editor.isAnimationPreviewing() && editor.getField(bot, "Renderer", "path") == Json("images/bot_walk.png") && editor.getField(bot, "SpriteAnimation", "time") == Json(0.0));
+		CHECK(editor.startAnimationPreview(bot, error));
+		editor.update(1.0f / 12 * 2.5f);
 		editor.setAnimationPreviewRunning(false);
 		editor.update(1.0f);
 		CHECK(editor.animationPreviewFrame() == 2); // 止めたら進まない
@@ -429,6 +438,7 @@ int main()
 		editor.undo();
 		editor.undo();
 		CHECK(editor.open("Field", error));
+		std::filesystem::remove(db.getRoot() / "prefabs/_editor_test_bot.json");
 	}
 
 	// ---- クリップを作る

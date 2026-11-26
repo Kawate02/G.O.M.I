@@ -6,6 +6,7 @@
 #include "ResourceRegistry.h"
 #include "SettingManager.h"
 #include "ResourceManager.h"
+#include "AnimationClip.h"
 #include "SceneLoader.h"
 #include "Random.h"
 
@@ -1415,9 +1416,11 @@ void EditorApp::drawClipView()
 		try
 		{
 			json = AssetDatabase::getInstance().readJson(clipView);
+			AnimationClip::parse(json, clipView); //型や画像の間違いはここで例外にして、下の描画に持ち込まない
 		}
 		catch (const std::exception& ex)
 		{
+			json = Json();
 			ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "読めません: %s", ex.what());
 		}
 		if (json.is_object() && json.contains("sheet"))

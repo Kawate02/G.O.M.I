@@ -61,6 +61,7 @@ private:
 	struct AnimationPreview
 	{
 		bool active = false;
+		bool held = false;    //書き出しのために World を元の値に戻している間
 		bool running = false; //時間が進んでいる(false ならコマを止めている)
 		Entity entity;
 		std::string clip;

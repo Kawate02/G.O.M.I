@@ -62,14 +62,19 @@ void SceneEditor::applyUndoEntry(const Json& entry)
 struct SceneEditor::PreviewHold
 {
 	SceneEditor& editor;
-	bool held;
-	explicit PreviewHold(SceneEditor& e) : editor(e), held(e.preview.active)
+	bool mine; //入れ子の時は一番外の1つだけが入れ替える
+	explicit PreviewHold(SceneEditor& e) : editor(e), mine(e.preview.active && !e.preview.held)
 	{
-		if (held) editor.swapPreviewValues();
+		if (!mine) return;
+		editor.swapPreviewValues();
+		editor.preview.held = true;
 	}
 	~PreviewHold()
 	{
-		if (held) editor.swapPreviewValues();
+		//中でプレビューが止められていたら、止める時に元の値のままにしてあるので何もしない
+		if (!mine || !editor.preview.active) return;
+		editor.swapPreviewValues();
+		editor.preview.held = false;
 	}
 };
 
@@ -979,7 +984,7 @@ void SceneEditor::update(float deltaTime)
 			}
 		}
 		if (clip) applyPreviewFrame();
-		else preview = AnimationPreview(); //Entity かクリップが無くなった
+		else stopAnimationPreview(); //Entity かクリップが無くなった(Entity が生きていれば元の値に戻す)
 	}
 	bool advance = playing && (!paused || stepRequested);
 	stepRequested = false;
@@ -1070,7 +1075,7 @@ bool SceneEditor::startAnimationPreview(Entity e, std::string& error)
 void SceneEditor::stopAnimationPreview()
 {
 	if (!preview.active) return;
-	swapPreviewValues();
+	if (!preview.held) swapPreviewValues(); //書き出しで戻している間は、World はもう元の値
 	preview = AnimationPreview();
 }
 
@@ -1085,6 +1090,12 @@ bool SceneEditor::stepAnimationPreview(Entity e, int delta, std::string& error)
 	preview.running = false;
 	auto& anim = currentWorld->getComponentManager().getComponentArray<SpriteAnimationComponent>().getComponent(e);
 	const AnimationClip* clip = AnimationClip::load(anim.clips.at(anim.clip));
+	if (!clip || clip->frames.empty())
+	{
+		stopAnimationPreview();
+		error = "cannot read the clip: " + anim.clips.at(anim.clip);
+		return false;
+	}
 	int count = static_cast<int>(clip->frames.size());
 	int index = clip->frameAt(anim.time) + delta;
 	if (clip->loop) index = ((index % count) + count) % count;
