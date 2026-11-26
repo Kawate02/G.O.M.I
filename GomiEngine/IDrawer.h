@@ -85,6 +85,10 @@ public:
 	/// 描き先のテクスチャの番号(OpenGL ならテクスチャ名)。ImGui::Image などに渡す。上下は逆さま
 	/// </summary>
 	virtual uintptr_t renderTargetTexture(int target) { return 0; }
+	/// <summary>
+	/// createTexture で作った画像のテクスチャの番号(ImGui::Image などに渡す。上下は画像のまま)。未対応・不正なら 0
+	/// </summary>
+	virtual uintptr_t imageTexture(int handle) { return 0; }
 
 	/// <summary>
 	/// 今描いた画面を画像ファイルに保存する(present の前に呼ぶ)。描き先を切り替えていればその中身。未対応なら false

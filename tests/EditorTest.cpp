@@ -4,6 +4,7 @@
 #include "ComponentRegistry.h"
 #include "SystemRegistry.h"
 #include "ResourceRegistry.h"
+#include "AnimationClip.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -375,6 +376,79 @@ int main()
 		CHECK(editor.getResourceField("TestStatus", "hp") == 4 && editor.isResourcesDirty());
 		editor.getResources().clear();
 		ResourceRegistry::getInstance().truncate(0);
+	}
+
+	// ---- アニメーションのプレビュー: 止めたまま動かし、保存・元に戻すにはプレビューの途中の値が入らない
+	{
+		std::string error;
+		CHECK(editor.open("Field", error));
+		Entity bot = editor.createEntity("bot");
+		CHECK(editor.addComponent(bot, "Renderer") && editor.addComponent(bot, "SpriteAnimation"));
+		CHECK(editor.setField(bot, "Renderer", "path", "images/bot_walk.png"));
+		CHECK(editor.setField(bot, "SpriteAnimation", "clips", Json::parse(R"({"walk":"animations/bot_walk.json","jump":"animations/bot_jump.json"})")));
+		CHECK(editor.setField(bot, "SpriteAnimation", "clip", "walk"));
+		Json before = editor.copyEntity(bot);
+		CHECK(!editor.isAnimationPreviewing() && editor.animationPreviewFrame() == -1);
+
+		CHECK(editor.startAnimationPreview(bot, error));
+		CHECK(editor.isAnimationPreviewing() && editor.isAnimationPreviewRunning() && editor.animationPreviewFrame() == 0);
+		editor.update(1.0f / 12 * 2.5f); // 12fps で 2.5 コマ分 → 2 コマ目
+		CHECK(editor.animationPreviewFrame() == 2);
+		CHECK(editor.getField(bot, "Renderer", "uv") != Json::parse("[0, 0, 1, 1]")); // 絵が切り出されている
+		CHECK(editor.copyEntity(bot) == before); // 書き出した結果はプレビュー前と同じ
+		std::string savedPath = (std::filesystem::temp_directory_path() / "gomi_preview_test.json").generic_string();
+		CHECK(editor.saveAs(savedPath, error));
+		CHECK(editor.isAnimationPreviewing() && editor.animationPreviewFrame() == 2); // 保存してもプレビューは続く
+		std::filesystem::remove(savedPath);
+
+		editor.setAnimationPreviewRunning(false);
+		editor.update(1.0f);
+		CHECK(editor.animationPreviewFrame() == 2); // 止めたら進まない
+		CHECK(editor.stepAnimationPreview(bot, 1, error) && editor.animationPreviewFrame() == 3);
+		CHECK(editor.stepAnimationPreview(bot, -4, error) && editor.animationPreviewFrame() == 7); // ループは端でつながる
+		editor.stopAnimationPreview();
+		CHECK(!editor.isAnimationPreviewing());
+		CHECK(editor.getField(bot, "Renderer", "uv") == Json::parse("[0, 0, 1, 1]") && editor.getField(bot, "SpriteAnimation", "time") == Json(0.0));
+		CHECK(editor.getField(bot, "Renderer", "path") == Json("images/bot_walk.png"));
+
+		// ループしないクリップは端で止まる。編集を始めるとプレビューは元に戻る
+		CHECK(editor.setField(bot, "SpriteAnimation", "clip", "jump"));
+		CHECK(editor.stepAnimationPreview(bot, 99, error) && editor.animationPreviewFrame() == 3);
+		CHECK(editor.getField(bot, "Renderer", "path") == Json("images/bot_jump_03.png"));
+		editor.recordUndo();
+		CHECK(!editor.isAnimationPreviewing() && editor.getField(bot, "Renderer", "path") == Json("images/bot_walk.png"));
+		// 再生を始める時・別の Entity を選ぶ時も戻る
+		CHECK(editor.startAnimationPreview(bot, error));
+		editor.play();
+		CHECK(!editor.isAnimationPreviewing());
+		editor.stop();
+		bot = editor.entities().back();
+		Entity other = editor.createEntity("other");
+		CHECK(!editor.startAnimationPreview(other, error)); // SpriteAnimation が無い
+		CHECK(!editor.isAnimationPreviewing());
+		editor.undo();
+		editor.undo();
+		CHECK(editor.open("Field", error));
+	}
+
+	// ---- クリップを作る
+	{
+		std::string error;
+		const AssetID sheetId = "animations/_editor_test_sheet.json", seqId = "animations/_editor_test_seq.json";
+		CHECK(editor.createSheetClip(sheetId, "images/bot_walk.png", 4, 2, 0, 10, error));
+		Json sheet = db.readJson(sheetId);
+		CHECK(sheet["columns"] == 4 && sheet["rows"] == 2 && sheet["count"] == 8 && sheet["fps"] == 10 && sheet["sheet"] == "images/bot_walk.png");
+		CHECK(AnimationClip::load(sheetId) && AnimationClip::load(sheetId)->frames.size() == 8);
+		CHECK(!editor.createSheetClip(sheetId, "images/bot_walk.png", 0, 2, 0, 10, error));
+		CHECK(!editor.createSheetClip("animations/_editor_test_bad.json", "images/missing.png", 4, 2, 0, 10, error)); // 画像が無い
+		CHECK(!db.exists("animations/_editor_test_bad.json"));
+		CHECK(editor.createSequenceClip(seqId, "images/bot_jump_", 8, error));
+		Json seq = db.readJson(seqId);
+		CHECK(seq["frames"].size() == 4 && seq["frames"][0] == "images/bot_jump_00.png" && seq["fps"] == 8);
+		CHECK(!editor.createSequenceClip(seqId, "images/nothing_", 8, error));
+		std::filesystem::remove(db.getRoot() / "animations/_editor_test_sheet.json");
+		std::filesystem::remove(db.getRoot() / "animations/_editor_test_seq.json");
+		AnimationClip::clearCache();
 	}
 
 	if (failures == 0) std::cout << "EditorTest: all passed" << std::endl;

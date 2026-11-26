@@ -54,6 +54,28 @@ private:
 	bool scenePending = false; //開いているシーンが外で変わったが、未保存の変更があるので待っている
 	Json diskScene;            //その時のファイルの中身
 
+	/// <summary>
+	/// 止めたまま動かしているアニメーションのプレビュー。World の SpriteAnimation と Renderer を直接書き換えるので、
+	/// 書き換える前の値を持っておき、シーンを書き出す時・止める時に戻す
+	/// </summary>
+	struct AnimationPreview
+	{
+		bool active = false;
+		bool running = false; //時間が進んでいる(false ならコマを止めている)
+		Entity entity;
+		std::string clip;
+		float time = 0;
+		bool playing = true;
+		std::string path;
+		std::vector<float> uv;
+	};
+	AnimationPreview preview;
+	/// <summary>プレビューで書き換えた値と元の値を入れ替える(書き出しの前後で2回呼ぶ)</summary>
+	void swapPreviewValues();
+	/// <summary>プレビューの今の time のコマを Renderer に書く</summary>
+	void applyPreviewFrame();
+	struct PreviewHold; //書き出す間だけ元の値に戻す
+
 	void rebuild(const Json& scene);
 	/// <summary>元に戻すの1件(シーンと、その時の Resource の値)</summary>
 	Json undoEntry(const Json& scene);
@@ -205,6 +227,39 @@ public:
 	/// Resource の初期値を変える前に呼ぶ(元に戻す先として積む。再生中は何もしない)
 	/// </summary>
 	void recordResourceUndo();
+
+	// ---- アニメーションのプレビュー(止めている時だけ。選んだ Entity の SpriteAnimation を、シーンを変えずに動かす)
+	/// <summary>
+	/// e の今のクリップの再生を始める(別の Entity のプレビュー中なら先に止める)。クリップを読めない・SpriteAnimation か Renderer が無い・再生中なら false
+	/// </summary>
+	bool startAnimationPreview(Entity e, std::string& error);
+	/// <summary>
+	/// プレビューを止めて、Entity の SpriteAnimation と Renderer を始める前の値に戻す
+	/// </summary>
+	void stopAnimationPreview();
+	/// <summary>
+	/// プレビュー中に時間を止める/再開する
+	/// </summary>
+	void setAnimationPreviewRunning(bool running);
+	/// <summary>
+	/// e のクリップを delta コマ進める(負なら戻す)。時間を止める。プレビューが始まっていなければ始める。ループするクリップは端でつながり、しないクリップは端で止まる
+	/// </summary>
+	bool stepAnimationPreview(Entity e, int delta, std::string& error);
+	inline bool isAnimationPreviewing() const { return preview.active; }
+	inline bool isAnimationPreviewRunning() const { return preview.active && preview.running; }
+	inline Entity previewEntity() const { return preview.entity; }
+	/// <summary>
+	/// プレビュー中の今のコマの番号(プレビューしていなければ -1)
+	/// </summary>
+	int animationPreviewFrame();
+	/// <summary>
+	/// クリップの JSON を assets/animations/ などに作る(シート: columns・rows・count(0 で全マス)・fps)。画像が読めない・列や行が 0 以下なら false
+	/// </summary>
+	bool createSheetClip(const AssetID& id, const AssetID& sheet, int columns, int rows, int count, float fps, std::string& error);
+	/// <summary>
+	/// 連番の画像からクリップの JSON を作る(images/walk_ の後に 00, 01, … と続く .png を拾う。1枚も無ければ false)
+	/// </summary>
+	bool createSequenceClip(const AssetID& id, const std::string& imagePrefix, float fps, std::string& error);
 
 	// ---- System の並び
 	std::vector<std::string> systems();

@@ -1,8 +1,13 @@
 #include "Project.h"
 #include "SceneEditor.h"
 #include "ComponentRegistry.h"
+#include "AnimationClip.h"
+#include "SpriteAnimationComponent.h"
+#include "RendererComponent.h"
 
 #include <algorithm>
+#include <cmath>
+#include <filesystem>
 #include <iostream>
 
 namespace
@@ -26,6 +31,7 @@ SceneEditor::SceneEditor(InputState& input, RenderQueue& render, AudioQueue& aud
 
 void SceneEditor::rebuild(const Json& scene)
 {
+	preview = AnimationPreview(); //World ごと作り直すので、戻す先が無い
 	auto next = std::make_unique<World>(inputState, renderQueue, audioQueue, resources);
 	next->setPauseUI(project.value("pauseUI", std::string()));
 	next->initialize(scene, path.empty() ? "(new scene)" : path);
@@ -50,8 +56,26 @@ void SceneEditor::applyUndoEntry(const Json& entry)
 	resourcesDirty = entry.value("resourcesDirty", true);
 }
 
+/// <summary>
+/// 書き出す間だけ、プレビューで書き換えた値を元に戻す(シーンの JSON にプレビューの途中の time・画像を入れない)
+/// </summary>
+struct SceneEditor::PreviewHold
+{
+	SceneEditor& editor;
+	bool held;
+	explicit PreviewHold(SceneEditor& e) : editor(e), held(e.preview.active)
+	{
+		if (held) editor.swapPreviewValues();
+	}
+	~PreviewHold()
+	{
+		if (held) editor.swapPreviewValues();
+	}
+};
+
 Json SceneEditor::snapshot()
 {
+	PreviewHold hold(*this);
 	return SceneLoader::save(*currentWorld, [this](const AssetID& id) { return prefabDefs(id); });
 }
 
@@ -89,6 +113,7 @@ Json SceneEditor::readAsScene(const AssetID& id)
 
 Json SceneEditor::fileContent(const AssetID& id)
 {
+	PreviewHold hold(*this);
 	if (!isPrefabPath(id)) return snapshot();
 	Json entitiesJson = Json::array();
 	for (auto& e : entities()) entitiesJson.push_back({ { "components", SceneLoader::compact(SceneLoader::componentsOf(*currentWorld, e)) } });
@@ -229,6 +254,7 @@ bool SceneEditor::saveAsPrefab(Entity e, const AssetID& id, std::string& error)
 		error = "a prefab must be under prefabs/: " + id;
 		return false;
 	}
+	PreviewHold hold(*this);
 	Json file = { { "entities", Json::array({ { { "components", SceneLoader::compact(SceneLoader::componentsOf(*currentWorld, e)) } } }) } };
 	try
 	{
@@ -255,6 +281,7 @@ bool SceneEditor::saveAsPrefab(Entity e, const AssetID& id, std::string& error)
 
 Json SceneEditor::copyEntity(Entity e)
 {
+	PreviewHold hold(*this);
 	if (!currentWorld->alive(e)) return Json();
 	Json comps = SceneLoader::componentsOf(*currentWorld, e);
 	if (const PrefabLink* link = currentWorld->getPrefabLink(e))
@@ -406,6 +433,7 @@ bool SceneEditor::setField(Entity e, const std::string& component, const std::st
 {
 	const ComponentInfo* info = ComponentRegistry::getInstance().find(component);
 	if (!info) return false;
+	stopAnimationPreview();
 	void* ptr = info->get(currentWorld->getComponentManager(), e);
 	const FieldInfo* f = info->findField(field);
 	if (!ptr || !f) return false;
@@ -672,6 +700,7 @@ void SceneEditor::setSystems(const std::vector<std::string>& names)
 void SceneEditor::recordUndo()
 {
 	if (playing) return; //再生中の変更は止めた時に捨てる
+	stopAnimationPreview(); //編集の前にプレビューの書き換えを元に戻す
 	undoStack.push_back(undoEntry(snapshot()));
 	if (undoStack.size() > MAX_UNDO) undoStack.erase(undoStack.begin());
 	redoStack.clear();
@@ -785,6 +814,7 @@ bool SceneEditor::setResourceField(const std::string& resource, const std::strin
 void SceneEditor::play()
 {
 	if (playing || isPrefabMode()) return; //プレハブはシーンに置いてから動かす
+	stopAnimationPreview();
 	playSnapshot = snapshot();
 	playResources = resources.save();
 	playing = true;
@@ -931,8 +961,203 @@ void SceneEditor::update(float deltaTime)
 		worldChange.trigger();
 		quitRequest.trigger();
 	}
+	if (!playing && preview.active && preview.running)
+	{
+		auto& anims = currentWorld->getComponentManager().getComponentArray<SpriteAnimationComponent>();
+		const AnimationClip* clip = nullptr;
+		if (currentWorld->alive(preview.entity) && anims.hasComponent(preview.entity))
+		{
+			auto& anim = anims.getComponent(preview.entity);
+			auto it = anim.clips.find(anim.clip);
+			if (it != anim.clips.end()) clip = AnimationClip::load(it->second);
+			if (clip)
+			{
+				anim.time += deltaTime * anim.speed;
+				if (anim.time < 0) anim.time = 0;
+				if (clip->loop && anim.time >= clip->duration()) anim.time = std::fmod(anim.time, clip->duration());
+				if (!clip->loop && anim.time > clip->duration()) anim.time = clip->duration();
+			}
+		}
+		if (clip) applyPreviewFrame();
+		else preview = AnimationPreview(); //Entity かクリップが無くなった
+	}
 	bool advance = playing && (!paused || stepRequested);
 	stepRequested = false;
 	if (advance) playFrame++;
 	currentWorld->update(deltaTime, advance);
+}
+
+// ---- アニメーションのプレビュー
+
+void SceneEditor::swapPreviewValues()
+{
+	if (!preview.active || !currentWorld->alive(preview.entity)) return;
+	auto& cm = currentWorld->getComponentManager();
+	auto& anims = cm.getComponentArray<SpriteAnimationComponent>();
+	auto& renderers = cm.getComponentArray<RendererComponent>();
+	if (!anims.hasComponent(preview.entity) || !renderers.hasComponent(preview.entity)) return;
+	auto& anim = anims.getComponent(preview.entity);
+	auto& renderer = renderers.getComponent(preview.entity);
+	std::swap(anim.clip, preview.clip);
+	std::swap(anim.time, preview.time);
+	std::swap(anim.playing, preview.playing);
+	std::swap(renderer.path, preview.path);
+	std::swap(renderer.uv, preview.uv);
+}
+
+void SceneEditor::applyPreviewFrame()
+{
+	auto& cm = currentWorld->getComponentManager();
+	auto& anim = cm.getComponentArray<SpriteAnimationComponent>().getComponent(preview.entity);
+	auto& renderer = cm.getComponentArray<RendererComponent>().getComponent(preview.entity);
+	auto it = anim.clips.find(anim.clip);
+	if (it == anim.clips.end()) return;
+	const AnimationClip* clip = AnimationClip::load(it->second);
+	if (!clip || clip->frames.empty()) return;
+	const AnimationFrame& frame = clip->frames[clip->frameAt(anim.time)];
+	renderer.path = frame.image;
+	renderer.uv.assign(frame.uv.begin(), frame.uv.end());
+}
+
+bool SceneEditor::startAnimationPreview(Entity e, std::string& error)
+{
+	if (playing)
+	{
+		error = "stop playing first";
+		return false;
+	}
+	if (preview.active && preview.entity == e) return true;
+	if (!currentWorld->alive(e))
+	{
+		error = "no entity";
+		return false;
+	}
+	auto& cm = currentWorld->getComponentManager();
+	auto& anims = cm.getComponentArray<SpriteAnimationComponent>();
+	auto& renderers = cm.getComponentArray<RendererComponent>();
+	if (!anims.hasComponent(e) || !renderers.hasComponent(e))
+	{
+		error = "the entity needs both SpriteAnimation and Renderer";
+		return false;
+	}
+	auto& anim = anims.getComponent(e);
+	auto it = anim.clips.find(anim.clip);
+	if (it == anim.clips.end())
+	{
+		error = "SpriteAnimation.clip \"" + anim.clip + "\" is not in clips";
+		return false;
+	}
+	if (!AnimationClip::load(it->second))
+	{
+		error = "cannot read the clip: " + it->second;
+		return false;
+	}
+	stopAnimationPreview();
+	auto& renderer = renderers.getComponent(e);
+	preview.active = true;
+	preview.running = true;
+	preview.entity = e;
+	preview.clip = anim.clip;
+	preview.time = anim.time;
+	preview.playing = anim.playing;
+	preview.path = renderer.path;
+	preview.uv = renderer.uv;
+	anim.time = 0;
+	applyPreviewFrame();
+	return true;
+}
+
+void SceneEditor::stopAnimationPreview()
+{
+	if (!preview.active) return;
+	swapPreviewValues();
+	preview = AnimationPreview();
+}
+
+void SceneEditor::setAnimationPreviewRunning(bool running)
+{
+	if (preview.active) preview.running = running;
+}
+
+bool SceneEditor::stepAnimationPreview(Entity e, int delta, std::string& error)
+{
+	if (!startAnimationPreview(e, error)) return false;
+	preview.running = false;
+	auto& anim = currentWorld->getComponentManager().getComponentArray<SpriteAnimationComponent>().getComponent(e);
+	const AnimationClip* clip = AnimationClip::load(anim.clips.at(anim.clip));
+	int count = static_cast<int>(clip->frames.size());
+	int index = clip->frameAt(anim.time) + delta;
+	if (clip->loop) index = ((index % count) + count) % count;
+	else index = std::clamp(index, 0, count - 1);
+	//そのコマの頭の時間にする(コマの長さ durations と fps から)
+	float units = 0;
+	for (int i = 0; i < index; i++) units += clip->durations[i];
+	anim.time = units / clip->fps;
+	applyPreviewFrame();
+	return true;
+}
+
+int SceneEditor::animationPreviewFrame()
+{
+	if (!preview.active || !currentWorld->alive(preview.entity)) return -1;
+	auto& anim = currentWorld->getComponentManager().getComponentArray<SpriteAnimationComponent>().getComponent(preview.entity);
+	auto it = anim.clips.find(anim.clip);
+	const AnimationClip* clip = it == anim.clips.end() ? nullptr : AnimationClip::load(it->second);
+	return clip ? clip->frameAt(anim.time) : -1;
+}
+
+static bool writeClip(const AssetID& id, const Json& json, std::string& error)
+{
+	try
+	{
+		AnimationClip::parse(json, id); //書く前に、読み込みと同じ厳しさで調べる
+		AssetDatabase::getInstance().writeJson(id, json);
+		AnimationClip::clearCache();
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		error = e.what();
+		return false;
+	}
+}
+
+bool SceneEditor::createSheetClip(const AssetID& id, const AssetID& sheet, int columns, int rows, int count, float fps, std::string& error)
+{
+	if (columns <= 0 || rows <= 0)
+	{
+		error = "columns and rows must be 1 or more";
+		return false;
+	}
+	if (count <= 0) count = columns * rows;
+	Json json = { { "sheet", sheet }, { "columns", columns }, { "rows", rows }, { "count", count }, { "fps", fps }, { "loop", true } };
+	return writeClip(id, json, error);
+}
+
+bool SceneEditor::createSequenceClip(const AssetID& id, const std::string& imagePrefix, float fps, std::string& error)
+{
+	namespace fs = std::filesystem;
+	auto& db = AssetDatabase::getInstance();
+	fs::path prefix{ std::u8string(imagePrefix.begin(), imagePrefix.end()) };
+	fs::path dir = db.getRoot() / prefix.parent_path();
+	auto utf8 = [](const fs::path& p) { auto u = p.u8string(); return std::string(u.begin(), u.end()); };
+	std::string stem = utf8(prefix.filename());
+	std::vector<std::string> names;
+	std::error_code ec;
+	for (auto& entry : fs::directory_iterator(dir, ec))
+	{
+		std::string name = utf8(entry.path().filename());
+		if (entry.path().extension() == ".png" && name.rfind(stem, 0) == 0) names.push_back(name);
+	}
+	if (names.empty())
+	{
+		error = "no images start with " + imagePrefix;
+		return false;
+	}
+	std::sort(names.begin(), names.end()); //00, 01, … の連番は名前順で並ぶ
+	std::string folder = imagePrefix.find('/') == std::string::npos ? std::string() : imagePrefix.substr(0, imagePrefix.rfind('/'));
+	Json frames = Json::array();
+	for (auto& n : names) frames.push_back(folder.empty() ? n : folder + "/" + n);
+	Json json = { { "frames", frames }, { "fps", fps }, { "loop", true } };
+	return writeClip(id, json, error);
 }

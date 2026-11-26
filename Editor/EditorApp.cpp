@@ -1082,6 +1082,7 @@ void EditorApp::drawInspector()
 		if (ImGui::CollapsingHeader(info.name.c_str(), &open, ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			drawFieldRows(e, info, false);
+			if (info.name == "SpriteAnimation") drawAnimationPreviewButtons(e);
 			bool hasRuntime = std::any_of(info.fields.begin(), info.fields.end(), [](const FieldInfo& f) { return f.runtime; });
 			if (hasRuntime && info.has(cm, e))
 			{
@@ -1373,6 +1374,7 @@ void EditorApp::drawAssets()
 		{
 			if (f.rfind("scenes/", 0) == 0 && !editor->isPlaying()) request(Pending::OpenScene, f);
 			if (f.rfind("prefabs/", 0) == 0 && !editor->isPlaying()) editPrefab(f);
+			if (f.rfind("animations/", 0) == 0) clipView = f;
 		}
 		if (ImGui::BeginDragDropSource())
 		{
@@ -1385,6 +1387,84 @@ void EditorApp::drawAssets()
 	if (!currentFolder.empty() && folderOpen) ImGui::TreePop();
 	ImGui::EndChild();
 	ImGui::End();
+}
+
+void EditorApp::drawAnimationPreviewButtons(Entity e)
+{
+	if (editor->isPlaying()) return;
+	bool previewing = editor->isAnimationPreviewing() && editor->previewEntity() == e;
+	if (ImGui::Button(previewing && editor->isAnimationPreviewRunning() ? "一時停止##anim" : "プレビュー再生##anim")) runCommand(previewing && editor->isAnimationPreviewRunning() ? "anim.pause" : "anim.play", "");
+	ImGui::SameLine();
+	if (ImGui::Button("1コマ戻す##anim")) runCommand("anim.step", "-1");
+	ImGui::SameLine();
+	if (ImGui::Button("1コマ進める##anim")) runCommand("anim.step", "1");
+	ImGui::SameLine();
+	if (ImGui::Button("停止##anim")) runCommand("anim.stop", "");
+	if (previewing) ImGui::TextDisabled("プレビュー中(コマ %d)。保存・編集の前に元の値へ戻る", editor->animationPreviewFrame());
+}
+
+void EditorApp::drawClipView()
+{
+	if (clipView.empty()) return;
+	bool open = true;
+	ImGui::SetNextWindowSize(ImVec2(420, 380), ImGuiCond_FirstUseEver);
+	if (ImGui::Begin("クリップ", &open))
+	{
+		ImGui::TextUnformatted(clipView.c_str());
+		Json json;
+		try
+		{
+			json = AssetDatabase::getInstance().readJson(clipView);
+		}
+		catch (const std::exception& ex)
+		{
+			ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "読めません: %s", ex.what());
+		}
+		if (json.is_object() && json.contains("sheet"))
+		{
+			std::string sheet = json.value("sheet", std::string());
+			int columns = std::max(1, json.value("columns", 1)), rows = std::max(1, json.value("rows", 1)), count = json.value("count", columns * rows);
+			ImGui::TextDisabled("シート %s / %d 列 x %d 行 / %d コマ / %g fps", sheet.c_str(), columns, rows, count, json.value("fps", 12.0));
+			ImageResource image = ResourceManager::getInstance().loadImage(drawer, sheet);
+			uintptr_t texture = image.handle >= 0 ? drawer.imageTexture(image.handle) : 0;
+			if (texture != 0)
+			{
+				ImVec2 avail = ImGui::GetContentRegionAvail();
+				float scale = std::min(avail.x / image.width, (avail.y - 4) / image.height);
+				if (scale > 0)
+				{
+					ImVec2 size(image.width * scale, image.height * scale), min = ImGui::GetCursorScreenPos();
+					ImGui::Image(ImTextureRef(static_cast<ImTextureID>(texture)), size);
+					ImDrawList* list = ImGui::GetWindowDrawList();
+					float cw = size.x / columns, ch = size.y / rows;
+					for (int i = 0; i <= columns; i++) list->AddLine(ImVec2(min.x + cw * i, min.y), ImVec2(min.x + cw * i, min.y + size.y), IM_COL32(255, 255, 0, 200));
+					for (int i = 0; i <= rows; i++) list->AddLine(ImVec2(min.x, min.y + ch * i), ImVec2(min.x + size.x, min.y + ch * i), IM_COL32(255, 255, 0, 200));
+					for (int i = 0; i < std::min(count, columns * rows); i++)
+					{
+						char label[16];
+						snprintf(label, sizeof(label), "%d", i);
+						list->AddText(ImVec2(min.x + cw * (i % columns) + 3, min.y + ch * (i / columns) + 2), IM_COL32(255, 255, 255, 255), label);
+					}
+				}
+			}
+			else ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "シートの画像を読めません");
+		}
+		else if (json.is_object() && json.contains("frames"))
+		{
+			ImGui::TextDisabled("連番 %d コマ / %g fps", static_cast<int>(json["frames"].size()), json.value("fps", 12.0));
+			for (auto& f : json["frames"])
+			{
+				ImageResource image = ResourceManager::getInstance().loadImage(drawer, f.get<std::string>());
+				uintptr_t texture = image.handle >= 0 ? drawer.imageTexture(image.handle) : 0;
+				if (texture != 0) ImGui::Image(ImTextureRef(static_cast<ImTextureID>(texture)), ImVec2(std::min(64.0f, static_cast<float>(image.width)), std::min(64.0f, static_cast<float>(image.height))));
+				else ImGui::TextDisabled("%s(読めません)", f.get<std::string>().c_str());
+				ImGui::SameLine();
+			}
+			ImGui::NewLine();
+		}
+	}
+	ImGui::End();
+	if (!open) clipView.clear();
 }
 
 void EditorApp::drawResources()
@@ -2278,6 +2358,7 @@ int EditorApp::run()
 		drawInspector();
 		drawSceneView();
 		drawAssets();
+		drawClipView();
 		drawSystems();
 		drawResources();
 		if (focusLog)
@@ -2774,6 +2855,103 @@ void EditorApp::registerCommands()
 			log("フレームの番号を渡してください: " + a, LogLevel::Error);
 		}
 	}).argName = "フレーム番号";
+
+	// ---- アニメーション(止めている時だけ。選んだ Entity の SpriteAnimation をシーンを変えずに動かす)
+	{
+		auto canPreview = [this] { return selected >= 0 && !editor->isPlaying(); };
+		auto report = [this](bool ok, const std::string& error) {
+			if (!ok) log("アニメーションを動かせません: " + error, LogLevel::Error);
+		};
+		add("anim.play", "アニメーション: 選んだ Entity をプレビュー再生", "", 0, canPreview, [this, report](const std::string&) {
+			std::string error;
+			Entity e = selectedEntity();
+			if (editor->isAnimationPreviewing() && editor->previewEntity() == e) editor->setAnimationPreviewRunning(true);
+			else report(editor->startAnimationPreview(e, error), error);
+		});
+		add("anim.pause", "アニメーション: プレビューを一時停止", "", 0, [this] { return editor->isAnimationPreviewing(); }, [this](const std::string&) { editor->setAnimationPreviewRunning(false); });
+		add("anim.stop", "アニメーション: プレビューを止めて元に戻す", "", 0, [this] { return editor->isAnimationPreviewing(); }, [this](const std::string&) { editor->stopAnimationPreview(); });
+		add("anim.step", "アニメーション: コマを送る・戻す", "", 0, canPreview, [this, report](const std::string& a) {
+			int delta = 1;
+			try
+			{
+				if (!a.empty()) delta = std::stoi(a);
+			}
+			catch (...)
+			{
+				log("コマ数を整数で渡してください: " + a, LogLevel::Error);
+				return;
+			}
+			std::string error;
+			report(editor->stepAnimationPreview(selectedEntity(), delta, error), error);
+		}).argName = "(省略可)進めるコマ数(負で戻す。既定 1)";
+		auto words = [](const std::string& a) {
+			std::vector<std::string> out;
+			size_t i = 0;
+			while (i < a.size())
+			{
+				while (i < a.size() && a[i] == ' ') i++;
+				size_t j = i;
+				while (j < a.size() && a[j] != ' ') j++;
+				if (j > i) out.push_back(a.substr(i, j - i));
+				i = j;
+			}
+			return out;
+		};
+		add("clip.createSheet", "クリップを作る: シート", "", 0, stopped, [this, words](const std::string& a) {
+			auto w = words(a);
+			if (w.size() < 5)
+			{
+				log("使い方: 保存先 シートの画像 列 行 fps [コマ数]", LogLevel::Error);
+				return;
+			}
+			std::string error;
+			try
+			{
+				int count = w.size() > 5 ? std::stoi(w[5]) : 0;
+				if (editor->createSheetClip(w[0], w[1], std::stoi(w[2]), std::stoi(w[3]), count, std::stof(w[4]), error))
+				{
+					log("クリップを作りました: " + w[0]);
+					refreshAssets(true);
+					clipView = w[0];
+					return;
+				}
+			}
+			catch (const std::exception& ex)
+			{
+				error = ex.what();
+			}
+			log("クリップを作れませんでした: " + error, LogLevel::Error);
+		}).argName = "animations/X.json images/X.png 列 行 fps [コマ数]";
+		add("clip.createSequence", "クリップを作る: 連番の画像", "", 0, stopped, [this, words](const std::string& a) {
+			auto w = words(a);
+			if (w.size() != 3)
+			{
+				log("使い方: 保存先 画像の頭の名前(images/walk_) fps", LogLevel::Error);
+				return;
+			}
+			std::string error;
+			try
+			{
+				if (editor->createSequenceClip(w[0], w[1], std::stof(w[2]), error))
+				{
+					log("クリップを作りました: " + w[0]);
+					refreshAssets(true);
+					clipView = w[0];
+					return;
+				}
+			}
+			catch (const std::exception& ex)
+			{
+				error = ex.what();
+			}
+			log("クリップを作れませんでした: " + error, LogLevel::Error);
+		}).argName = "animations/X.json images/walk_ fps";
+		{
+			auto& c = add("clip.view", "クリップを開いてシートの切り方を見る", "", 0, nullptr, [this](const std::string& a) { clipView = a; });
+			c.choices = [this] { return assetsIn("animations", { ".json" }); };
+			c.argName = "クリップ(animations/X.json)";
+		}
+	}
 
 	// ---- 表示
 	add("gizmo.move", "ギズモ: 移動", "W", ImGuiKey_W, nullptr, [this](const std::string&) { gizmoOperation = 0; });

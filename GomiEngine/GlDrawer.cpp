@@ -473,6 +473,12 @@ uintptr_t GlDrawer::renderTargetTexture(int target)
 	return targets[target].color;
 }
 
+uintptr_t GlDrawer::imageTexture(int handle)
+{
+	if (handle < 0 || handle >= static_cast<int>(textures.size())) return 0;
+	return textures[handle];
+}
+
 bool GlDrawer::captureScreen(const std::string& path)
 {
 	int fbw, fbh;

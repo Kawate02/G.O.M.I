@@ -86,6 +86,7 @@ public:
 	int createRenderTarget(int w, int h) override;
 	void setRenderTarget(int target) override;
 	uintptr_t renderTargetTexture(int target) override;
+	uintptr_t imageTexture(int handle) override;
 	bool captureScreen(const std::string& path) override;
 	void present() override;
 };

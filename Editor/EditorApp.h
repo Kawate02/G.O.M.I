@@ -254,6 +254,11 @@ private:
 	void drawFieldRows(Entity e, const struct ComponentInfo& info, bool runtime);
 	void drawSceneView();
 	void drawAssets();
+	/// <summary>アセットで開いたクリップ(assets/animations/*.json)を、シートの切り方を絵に重ねて見せる</summary>
+	void drawClipView();
+	/// <summary>インスペクタの SpriteAnimation に出す、プレビューの再生・停止・コマ送りのボタン</summary>
+	void drawAnimationPreviewButtons(Entity e);
+	std::string clipView; //開いているクリップのパス(空なら閉じている)
 	void drawSystems();
 	void drawLog();
 	void drawPopups();
