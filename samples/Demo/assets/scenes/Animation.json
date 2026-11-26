@@ -1,0 +1,29 @@
+{
+  "systems": [
+    "PlayerControlSystem",
+    "PhysicsSystem",
+    "MoveResolveSystem",
+    "MoveSystem",
+    "AnimationDemoSystem",
+    "SpriteAnimationSystem",
+    "RendererSystem"
+  ],
+  "entities": [
+    {
+      "components": {
+        "Name": { "name": "bot" },
+        "Transform": { "position": [300, 250, 0], "scale": [4, 4, 1], "rotation": [0, 0, 0] },
+        "Renderer": { "path": "images/bot_walk.png", "enable": true, "useCamera": false },
+        "PlayerControl": { "actions": { "MOVE_RIGHT": "KEY_D", "MOVE_LEFT": "KEY_A" } },
+        "Move": { "speed": 50, "maxSpeed": 300, "stopDamp": 0.5, "turnBrake": 0.6 },
+        "Physics": { "gravity": 0 },
+        "SpriteAnimation": {
+          "clips": { "idle": "animations/bot_idle.json", "walk": "animations/bot_walk.json", "jump": "animations/bot_jump.json" },
+          "clip": "idle"
+        },
+        "AnimationDemo": {}
+      }
+    }
+  ],
+  "ui": []
+}

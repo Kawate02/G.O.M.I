@@ -11,3 +11,4 @@
 - 触れた時の処理: タグを `project.json` の `tags`、ルールを `assets/collision_rules.json`(`"kind": "TRIGGER"`)に書くと、`CollisionSystem` が重なった両方に `CollisionEvent`(rule・ENTER/STAY/EXIT)を出す。System で `world.event().collisions()` を回して書く(シーンの systems で CollisionSystem より後に置く。見本は `PickupSystem.cpp`)
 - ゲームの exe(GomiEngine.exe)は起動時に、exe の隣の `GomiGame.dll`、無ければプロジェクトの `build/bin/GomiGame.dll` を読む
 - 組み込みと同じ名前は登録できない。シーンで使っているコンポーネント・項目の名前を変えると、そのシーンが読めなくなる(エディタは前のコードに戻して理由を出す)
+- コマ送りで絵を動かす: クリップを `assets/animations/<名前>.json`(シート `{ "sheet", "columns", "rows", "count", "fps", "loop" }` か連番 `{ "frames": [...] }`、任意で `durations`)に書き、Entity に `SpriteAnimation { clips: {名前: パス}, clip: 最初の名前 }` と `Renderer` を付け、シーンの systems で `SpriteAnimationSystem` を `RendererSystem` より前に置く。ゲームのコードからは `playAnimation(world, e, "walk")`(同じ名前なら最初に戻らないので毎フレーム呼んでよい。`restart=true` で最初から)と `isAnimationFinished(world, e)`(ループしないクリップが終わったら true)だけ使う。左右反転は `Renderer.flipX`。見本は `AnimationDemoSystem.cpp` と `Animation` シーン

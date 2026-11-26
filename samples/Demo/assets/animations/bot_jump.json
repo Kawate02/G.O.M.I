@@ -1,0 +1,6 @@
+{
+  "frames": ["images/bot_jump_00.png", "images/bot_jump_01.png", "images/bot_jump_02.png", "images/bot_jump_03.png"],
+  "durations": [1, 1, 2, 1],
+  "fps": 10,
+  "loop": false
+}

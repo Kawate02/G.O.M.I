@@ -1,0 +1,128 @@
+{
+  "frame": 20,
+  "resources": {
+    "PlayerStatus": {
+      "hp": 3,
+      "items": {
+        "key": 1
+      }
+    }
+  },
+  "scene": "Animation",
+  "world": {
+    "entities": [
+      {
+        "components": {
+          "AnimationDemo": {
+            "jumping": false
+          },
+          "Move": {
+            "inputVel": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "maxSpeed": 300.0,
+            "physVel": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "result": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "speed": 50.0,
+            "stopDamp": 0.5,
+            "turnBrake": 0.6
+          },
+          "Name": {
+            "name": "bot"
+          },
+          "Physics": {
+            "decay": 3000.0,
+            "extraVel": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "gravVel": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "gravity": 0.0,
+            "gravityDirection": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "isGround": false,
+            "maxGravity": 3200.0
+          },
+          "PlayerControl": {
+            "actions": {
+              "MOVE_LEFT": "KEY_A",
+              "MOVE_RIGHT": "KEY_D"
+            },
+            "dashSpeed": 1000.0,
+            "jumpSpeed": 800.0,
+            "plane": "XY"
+          },
+          "Renderer": {
+            "enable": true,
+            "layer": 0,
+            "order": 0,
+            "path": "images/bot_walk.png",
+            "useCamera": false,
+            "uv": [
+              0.0,
+              0.0,
+              0.25,
+              0.5
+            ]
+          },
+          "SpriteAnimation": {
+            "clip": "idle",
+            "clips": {
+              "idle": "animations/bot_idle.json",
+              "jump": "animations/bot_jump.json",
+              "walk": "animations/bot_walk.json"
+            },
+            "playing": true,
+            "speed": 1.0,
+            "time": 0.3333334
+          },
+          "Transform": {
+            "position": [
+              300.0,
+              250.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "scale": [
+              4.0,
+              4.0,
+              1.0
+            ]
+          }
+        }
+      }
+    ],
+    "systems": [
+      "PlayerControlSystem",
+      "PhysicsSystem",
+      "MoveResolveSystem",
+      "MoveSystem",
+      "AnimationDemoSystem",
+      "SpriteAnimationSystem",
+      "RendererSystem"
+    ],
+    "ui": []
+  }
+}

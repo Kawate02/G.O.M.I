@@ -1,0 +1,15 @@
+{
+  "scene": "Animation",
+  "fps": 60,
+  "seed": 1,
+  "length": 240,
+  "checkpoints": [20, 60, 100, 122, 140, 240],
+  "input": [
+    {"frame":30,"press":["KEY_D"]},
+    {"frame":90,"release":["KEY_D"]},
+    {"frame":110,"press":["KEY_SPACE"]},
+    {"frame":111,"release":["KEY_SPACE"]},
+    {"frame":150,"press":["KEY_A"]},
+    {"frame":200,"release":["KEY_A"]}
+  ]
+}

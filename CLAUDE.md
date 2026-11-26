@@ -28,6 +28,7 @@ CLAUDE.mdに追記・修正する時の基準は `D:/claude/knowledge/notes/CLAU
 | 構造を思い出す・どこを触るか決める | `G.O.M.Iの全体構造(ECS・World・描画の流れ).md` |
 | シーン・プレハブ・アセットの形式を変える | `G.O.M.Iのデータ形式はパスID・厳格チェック・項目単位の上書きにした.md` |
 | エディタを触る | `G.O.M.Iのエディタは画面無しの中身とImGuiの画面に分けた.md` |
+| 2Dの絵をコマ送りで動かす(SpriteAnimation・クリップのJSON・playAnimation) | `G.O.M.Iのコマ送りアニメーション.md` |
 | 当たり判定のタグ・ルール(BLOCK・TRIGGER)・触れた時のイベントを使う・直す | `G.O.M.Iの当たり判定はproject.jsonのtagsとassets-collision_rules.jsonで決め触れた時はCollisionEventを受ける.md` |
 | 3D(座標・回転・当たり判定・描画)を触る | `G.O.M.Iの3D化はY上の右手系・度の回転・2DをZ0の3Dとして扱う形にした.md` |
 | 不具合を直す・挙動がおかしい | `G.O.M.Iの既知の不具合(2026-11-07時点).md` |
