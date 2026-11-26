@@ -24,7 +24,9 @@ void registerBuiltinComponents()
 		.field("layer", &RendererComponent::layer)
 		.field("order", &RendererComponent::order)
 		.field("enable", &RendererComponent::enable)
-		.field("useCamera", &RendererComponent::useCamera);
+		.field("useCamera", &RendererComponent::useCamera)
+		.field("uv", &RendererComponent::uv).omitDefault()
+		.field("flipX", &RendererComponent::flipX).omitDefault();
 
 	r.add<PhysicsComponent>("Physics")
 		.runtime("gravVel", &PhysicsComponent::gravVel)
@@ -84,6 +86,13 @@ void registerBuiltinComponents()
 		.field("order", &BackGroundComponent::order)
 		.field("enable", &BackGroundComponent::enable)
 		.field("margin", &BackGroundComponent::margin);
+
+	r.add<SpriteAnimationComponent>("SpriteAnimation")
+		.field("clips", &SpriteAnimationComponent::clips)
+		.field("clip", &SpriteAnimationComponent::clip)
+		.runtime("time", &SpriteAnimationComponent::time)
+		.field("speed", &SpriteAnimationComponent::speed)
+		.field("playing", &SpriteAnimationComponent::playing);
 
 	r.add<MeshRendererComponent>("MeshRenderer")
 		.field("mesh", &MeshRendererComponent::mesh)

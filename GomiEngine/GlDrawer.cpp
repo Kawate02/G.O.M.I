@@ -259,10 +259,13 @@ void GlDrawer::drawQuad(unsigned int texture, float x, float y, float w, float h
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-void GlDrawer::drawImage(int handle, float x, float y, float w, float h, float angle)
+void GlDrawer::drawImage(int handle, float x, float y, float w, float h, float angle, const float* uv, bool flipX)
 {
 	if (handle < 0 || handle >= static_cast<int>(textures.size())) return;
-	drawQuad(textures[handle], x, y, w, h, angle, fullUV, 0);
+	float range[4] = { fullUV[0], fullUV[1], fullUV[2], fullUV[3] };
+	if (uv) { for (int i = 0; i < 4; i++) range[i] = uv[i]; }
+	if (flipX) std::swap(range[0], range[2]);
+	drawQuad(textures[handle], x, y, w, h, angle, range, 0);
 }
 
 FontAtlas* GlDrawer::getFont(int size)

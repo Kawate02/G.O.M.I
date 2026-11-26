@@ -1,6 +1,7 @@
 #include "ResourceManager.h"
 #include "MeshFactory.h"
 #include "ModelLoader.h"
+#include "AnimationClip.h"
 
 ImageResource ResourceManager::loadImage(IDrawer& drawer, const AssetID& assetID)
 {
@@ -97,6 +98,7 @@ void ResourceManager::unloadAll()
     images.clear();
     sounds.clear();
     meshes.clear();
+    AnimationClip::clearCache();
 }
 
 ResourceManager& ResourceManager::getInstance()

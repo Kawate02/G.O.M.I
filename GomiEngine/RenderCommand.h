@@ -4,6 +4,7 @@
 #include "TextAnchor.h"
 #include "MathUtil.h"
 #include <variant>
+#include <array>
 
 struct RenderKey
 {
@@ -18,6 +19,8 @@ struct SpriteRenderCommand
 	Vec2 scale = { 1,1 };
 	float angle = 0;
 	RenderKey key;
+	std::array<float, 4> uv = { 0, 0, 1, 1 }; //画像の切り出す範囲 u0, v0, u1, v1
+	bool flipX = false;
 };
 
 struct TextRenderCommand

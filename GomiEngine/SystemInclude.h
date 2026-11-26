@@ -12,3 +12,4 @@
 #include "BackGroundSystem.h"
 #include "OffScreenSystem.h"
 #include "MeshRendererSystem.h"
+#include "SpriteAnimationSystem.h"

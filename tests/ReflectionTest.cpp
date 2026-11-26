@@ -38,7 +38,7 @@ int main()
 	registerBuiltinComponents();
 	registerBuiltinComponents(); // 2回呼んでも二重登録しない
 	auto& reg = ComponentRegistry::getInstance();
-	CHECK(reg.all().size() == 15);
+	CHECK(reg.all().size() == 16);
 
 	// 全コンポーネント: 既定値 → JSON → 付け直し → JSON が一致する
 	for (auto& info : reg.all())
@@ -48,7 +48,9 @@ int main()
 		info.addFromJson(cm, e, Json::object());
 		CHECK(info.has(cm, e));
 		Json first = info.toJson(cm, e);
-		CHECK(first.size() == info.fields.size());
+		size_t omitted = 0; //既定値なら書かない項目(omitDefault)は、既定値のままの時は出ない
+		for (auto& f : info.fields) { if (f.omitDefault) omitted++; }
+		CHECK(first.size() == info.fields.size() - omitted);
 		ComponentManager cm2;
 		info.addFromJson(cm2, e, first);
 		if (info.toJson(cm2, e) != first) std::cerr << "  round trip differs: " << info.name << std::endl;

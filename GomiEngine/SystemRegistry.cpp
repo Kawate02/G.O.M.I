@@ -48,6 +48,7 @@ void registerBuiltinSystems()
 	r.add<MoveSystem>("MoveSystem");
 	r.add<CameraSystem>("CameraSystem");
 	r.add<OffScreenSystem>("OffScreenSystem");
+	r.add<SpriteAnimationSystem>("SpriteAnimationSystem");
 	r.add<RendererSystem>("RendererSystem");
 	r.add<CollisionSystem>("CollisionSystem");
 	r.add<BackGroundSystem>("BackGroundSystem");

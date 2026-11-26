@@ -184,7 +184,7 @@ target_compile_definitions(LauncherTest PRIVATE GOMI_LAUNCHER_TEST_DIR="${CMAKE_
 
 # --- テスト(ctest で実行) ---
 enable_testing()
-foreach(test ComponentArrayTest ReflectionTest SceneTest CollisionTest ModelTest EditorTest ReplayTest GameModuleTest)
+foreach(test ComponentArrayTest ReflectionTest SceneTest CollisionTest ModelTest EditorTest ReplayTest GameModuleTest AnimationTest)
     add_executable(${test} tests/${test}.cpp GomiEngine/utf8.manifest)
     target_link_libraries(${test} PRIVATE GomiCore)
     add_test(NAME ${test} COMMAND ${test})

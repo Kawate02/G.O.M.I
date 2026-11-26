@@ -77,7 +77,7 @@ public:
 	void init() override;
 	void clearScreen(float r, float g, float b) override;
 	ImageResource createTexture(const unsigned char* fileData, size_t size) override;
-	void drawImage(int handle, float x, float y, float w, float h, float angle) override;
+	void drawImage(int handle, float x, float y, float w, float h, float angle, const float* uv, bool flipX) override;
 	void drawText(const std::string& text, int fontSize, Anchor anchor, float x, float y) override;
 	int createMesh(const MeshData& mesh) override;
 	void beginScene3D(const Scene3DParams& params) override;
