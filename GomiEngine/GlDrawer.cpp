@@ -51,7 +51,7 @@ uniform int uMode; // 0: 画像, 1: 文字(赤チャンネルを不透明度に�
 void main()
 {
 	vec4 t = texture(uTex, vUV);
-	FragColor = uMode == 1 ? vec4(uColor.rgb, uColor.a * t.r) : vec4(mix((t * uColor).rgb, uFlash.rgb, uFlash.a), (t * uColor).a);
+	FragColor = uMode == 1 ? vec4(uColor.rgb, uColor.a * t.r) : vec4(mix((t * uColor).rgb, uFlash.rgb, clamp(uFlash.a, 0.0, 1.0)), (t * uColor).a);
 }
 )";
 
