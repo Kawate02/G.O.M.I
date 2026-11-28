@@ -1,0 +1,8 @@
+{
+  "scene": "Tint",
+  "fps": 60,
+  "seed": 1,
+  "length": 30,
+  "checkpoints": [10, 30],
+  "input": []
+}

@@ -1,0 +1,29 @@
+{
+  "systems": [
+    "RendererSystem"
+  ],
+  "entities": [
+    {
+      "components": {
+        "Name": { "name": "normal" },
+        "Transform": { "position": [100, 200, 0], "scale": [4, 4, 1], "rotation": [0, 0, 0] },
+        "Renderer": { "path": "images/bot_jump_00.png", "enable": true, "useCamera": false }
+      }
+    },
+    {
+      "components": {
+        "Name": { "name": "hit" },
+        "Transform": { "position": [300, 200, 0], "scale": [4, 4, 1], "rotation": [0, 0, 0] },
+        "Renderer": { "path": "images/bot_jump_00.png", "enable": true, "useCamera": false, "flash": 0.8 }
+      }
+    },
+    {
+      "components": {
+        "Name": { "name": "broken" },
+        "Transform": { "position": [500, 200, 0], "scale": [4, 4, 1], "rotation": [0, 0, 0] },
+        "Renderer": { "path": "images/bot_jump_00.png", "enable": true, "useCamera": false, "color": [0.4, 0.4, 0.4, 1] }
+      }
+    }
+  ],
+  "ui": []
+}
