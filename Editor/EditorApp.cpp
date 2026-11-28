@@ -1814,7 +1814,10 @@ void EditorApp::applyScriptedInput(int frame)
 {
 	ImGuiIO& io = ImGui::GetIO();
 	auto click = debug.clickAt(frame);
-	if (click.move) io.AddMousePosEvent(click.pos.x, click.pos.y);
+	//マウスを起動オプションで動かす時は、毎フレーム最後に置いた位置で上書きする。
+	//窓にフォーカスがあると ImGui の GLFW 側が本物のカーソルの位置を毎フレーム入れ、撮る絵が使っている人のマウスの位置で変わるため
+	if (click.move) scriptedMouse = ImVec2(click.pos.x, click.pos.y);
+	if (debug.hasScriptedMouse()) io.AddMousePosEvent(scriptedMouse.x, scriptedMouse.y);
 	if (click.press) io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
 	if (click.release) io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
 	for (auto& text : debug.typedAt(frame))

@@ -122,6 +122,7 @@ private:
 	bool drag2D = false;
 	bool drag2DMoved = false;
 	ImVec2 dragMouseStart{ 0, 0 };
+	ImVec2 scriptedMouse{ -FLT_MAX, -FLT_MAX }; //--click/--drag で最後に置いたマウスの位置(まだ置いていなければ「マウス無し」)
 	Vec3 dragPosStart;
 	/// <summary>
 	/// スプライトの四角(ゲームの画面の座標)。スプライトでなければ false

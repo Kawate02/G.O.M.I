@@ -138,9 +138,15 @@ void GlfwInput::inputStateUpdate()
 		inputState.key[i] = glfwGetMouseButton(w, m.glfwKey) == GLFW_PRESS;
 	}
 
-	double x, y;
-	glfwGetCursorPos(w, &x, &y);
-	Vec2 pos = { static_cast<float>(x), static_cast<float>(y) };
+	//隠した窓(GOMI_HIDDEN=1)では本物のカーソルを読まない。キーとボタンは窓に届いた分だけなので漏れないが、
+	//位置は窓が見えなくても画面のカーソルから計算され、使っている人のマウスで結果が変わるため
+	Vec2 pos = inputState.mouse.position;
+	if (glfwGetWindowAttrib(w, GLFW_VISIBLE))
+	{
+		double x, y;
+		glfwGetCursorPos(w, &x, &y);
+		pos = { static_cast<float>(x), static_cast<float>(y) };
+	}
 	inputState.mouse.deltaPosition = firstUpdate ? Vec2{ 0, 0 } : pos - inputState.mouse.position;
 	inputState.mouse.position = pos;
 	firstUpdate = false;

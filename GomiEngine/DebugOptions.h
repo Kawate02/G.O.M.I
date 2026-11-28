@@ -109,5 +109,9 @@ public:
 		Vec2 pos;
 	};
 	ClickState clickAt(int frame) const;
+	/// <summary>
+	/// --click か --drag がある(マウスを起動オプションで動かす)
+	/// </summary>
+	inline bool hasScriptedMouse() const { return !clicks.empty() || !drags.empty(); }
 	inline bool shouldQuit(int frame) const { return maxFrames > 0 && frame >= maxFrames; }
 };
