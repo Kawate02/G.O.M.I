@@ -1,4 +1,5 @@
 #include "GlDrawer.h"
+#include "TextLayout.h"
 #include "GlfwWindow.h"
 
 #include <glad/gl.h>
@@ -329,12 +330,9 @@ void GlDrawer::drawText(const std::string& text, int fontSize, Anchor anchor, fl
 	FontAtlas* font = getFont(fontSize);
 	if (!font || text.empty()) return;
 
-	float w = 0;
-	for (unsigned char c : text)
-	{
-		if (c >= 32 && c < 127) w += font->chars[c - 32].xadvance;
-	}
-	float h = static_cast<float>(fontSize);
+	TextLayout layout = layoutText(text, fontSize, [font](unsigned char c) { return font->chars[c - 32].xadvance; });
+	float w = layout.width;
+	float h = layout.height;
 
 	switch (anchor)
 	{
@@ -349,15 +347,27 @@ void GlDrawer::drawText(const std::string& text, int fontSize, Anchor anchor, fl
 	case Anchor::BOTTOM_RIGHT: x -= w; y -= h; break;
 	}
 
-	float penX = x;
-	float baseline = y + font->ascent;
-	for (unsigned char c : text)
+	// 各行は anchor の横の寄せ(左・中央・右)で、全体の箱の中に揃える
+	for (size_t i = 0; i < layout.lines.size(); i++)
 	{
-		if (c < 32 || c >= 127) continue; // ASCII 以外はまだ描けない
-		stbtt_aligned_quad q;
-		stbtt_GetBakedQuad(font->chars, font->dim, font->dim, c - 32, &penX, &baseline, &q, 1);
-		const float uv[4] = { q.s0, q.t0, q.s1, q.t1 };
-		drawQuad(font->texture, q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0, 0, uv, 1);
+		const TextLine& line = layout.lines[i];
+		float lineX = x;
+		switch (anchor)
+		{
+		case Anchor::TOP_CENTER: case Anchor::CENTER: case Anchor::BOTTOM_CENTER: lineX += (w - line.width) / 2; break;
+		case Anchor::TOP_RIGHT: case Anchor::CENTER_RIGHT: case Anchor::BOTTOM_RIGHT: lineX += w - line.width; break;
+		default: break;
+		}
+		float penX = lineX;
+		float baseline = y + i * layout.lineHeight + font->ascent;
+		for (unsigned char c : line.text)
+		{
+			if (c < 32 || c >= 127) continue; // ASCII 以外はまだ描けない
+			stbtt_aligned_quad q;
+			stbtt_GetBakedQuad(font->chars, font->dim, font->dim, c - 32, &penX, &baseline, &q, 1);
+			const float uv[4] = { q.s0, q.t0, q.s1, q.t1 };
+			drawQuad(font->texture, q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0, 0, uv, 1);
+		}
 	}
 }
 

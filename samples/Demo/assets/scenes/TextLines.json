@@ -1,0 +1,7 @@
+{
+  "systems": [],
+  "entities": [],
+  "ui": [
+    { "prefab": "ui/textlines.json", "pos": [0, 0], "layer": 0 }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+ "widgets": [
+  {
+   "type": "Text",
+   "text": "LEFT 1\nLEFT LONGER 2\nL3",
+   "fontSize": 24,
+   "anchor": "TOP_LEFT",
+   "pos": [
+    40,
+    40
+   ],
+   "layer": 0,
+   "order": 1
+  },
+  {
+   "type": "Text",
+   "text": "CENTER 1\nCENTER LONGER 2\nC3",
+   "fontSize": 24,
+   "anchor": "CENTER",
+   "pos": [
+    400,
+    300
+   ],
+   "layer": 0,
+   "order": 1
+  },
+  {
+   "type": "Text",
+   "text": "RIGHT 1\nRIGHT LONGER 2\nR3",
+   "fontSize": 24,
+   "anchor": "BOTTOM_RIGHT",
+   "pos": [
+    760,
+    560
+   ],
+   "layer": 0,
+   "order": 1
+  },
+  {
+   "type": "Text",
+   "text": "ONE LINE",
+   "fontSize": 24,
+   "anchor": "TOP_RIGHT",
+   "pos": [
+    760,
+    40
+   ],
+   "layer": 0,
+   "order": 1
+  }
+ ]
+}

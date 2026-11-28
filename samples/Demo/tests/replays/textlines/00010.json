@@ -1,0 +1,26 @@
+{
+  "frame": 10,
+  "resources": {
+    "PlayerStatus": {
+      "hp": 3,
+      "items": {
+        "key": 1
+      }
+    }
+  },
+  "scene": "TextLines",
+  "world": {
+    "entities": [],
+    "systems": [],
+    "ui": [
+      {
+        "layer": 0,
+        "pos": [
+          0,
+          0
+        ],
+        "prefab": "ui/textlines.json"
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "scene": "TextLines",
+  "fps": 60,
+  "seed": 1,
+  "length": 10,
+  "checkpoints": [10],
+  "input": []
+}
