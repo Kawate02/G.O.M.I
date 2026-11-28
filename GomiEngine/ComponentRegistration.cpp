@@ -26,7 +26,10 @@ void registerBuiltinComponents()
 		.field("enable", &RendererComponent::enable)
 		.field("useCamera", &RendererComponent::useCamera)
 		.field("uv", &RendererComponent::uv).omitDefault()
-		.field("flipX", &RendererComponent::flipX).omitDefault();
+		.field("flipX", &RendererComponent::flipX).omitDefault()
+		.field("color", &RendererComponent::color).omitDefault()
+		.field("flashColor", &RendererComponent::flashColor).omitDefault()
+		.field("flash", &RendererComponent::flash).omitDefault();
 
 	r.add<PhysicsComponent>("Physics")
 		.runtime("gravVel", &PhysicsComponent::gravVel)

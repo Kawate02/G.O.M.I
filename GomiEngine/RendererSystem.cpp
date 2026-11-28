@@ -30,6 +30,9 @@ void RendererSystem::update(World& world, int frameCount, float deltaTime)
 		SpriteRenderCommand std = { .assetID = renderer.getComponent(e).path, .position = { tfc.position.x, tfc.position.y }, .scale = { tfc.scale.x, tfc.scale.y }, .angle = MathUtil::toRadians(tfc.rotation.z), .key = {.layer = rendc.layer, .order = rendc.order, .useCamera = rendc.useCamera } };
 		if (rendc.uv.size() == 4) std::copy(rendc.uv.begin(), rendc.uv.end(), std.uv.begin());
 		std.flipX = rendc.flipX;
+		if (rendc.color.size() == 4) std::copy(rendc.color.begin(), rendc.color.end(), std.color.begin());
+		if (rendc.flashColor.size() == 3) std::copy(rendc.flashColor.begin(), rendc.flashColor.end(), std.flash.begin());
+		std.flash[3] = rendc.flash;
 		world.getRenderQueue().addCommand({ std });
 		});
 }

@@ -23,6 +23,7 @@ private:
 	int locUV = -1;
 	int locColor = -1;
 	int locMode = -1;
+	int locFlash = -1;
 
 	std::vector<unsigned int> textures; // ハンドル = この配列の添字
 	std::vector<unsigned char> fontData;
@@ -70,14 +71,14 @@ private:
 	/// </summary>
 	void begin2D();
 	FontAtlas* getFont(int size);
-	void drawQuad(unsigned int texture, float x, float y, float w, float h, float angle, const float uv[4], int mode);
+	void drawQuad(unsigned int texture, float x, float y, float w, float h, float angle, const float uv[4], int mode, const float* color = nullptr, const float* flash = nullptr);
 public:
 	explicit GlDrawer(GlfwWindow& window);
 	~GlDrawer() override;
 	void init() override;
 	void clearScreen(float r, float g, float b) override;
 	ImageResource createTexture(const unsigned char* fileData, size_t size) override;
-	void drawImage(int handle, float x, float y, float w, float h, float angle, const float* uv, bool flipX) override;
+	void drawImage(int handle, float x, float y, float w, float h, float angle, const float* uv, bool flipX, const float* color, const float* flash) override;
 	void drawText(const std::string& text, int fontSize, Anchor anchor, float x, float y) override;
 	int createMesh(const MeshData& mesh) override;
 	void beginScene3D(const Scene3DParams& params) override;

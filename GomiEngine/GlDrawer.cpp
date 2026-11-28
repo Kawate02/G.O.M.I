@@ -46,11 +46,12 @@ in vec2 vUV;
 out vec4 FragColor;
 uniform sampler2D uTex;
 uniform vec4 uColor;
+uniform vec4 uFlash; // 塗りつぶす色 rgb と強さ
 uniform int uMode; // 0: 画像, 1: 文字(赤チャンネルを不透明度に使う)
 void main()
 {
 	vec4 t = texture(uTex, vUV);
-	FragColor = uMode == 1 ? vec4(uColor.rgb, uColor.a * t.r) : t * uColor;
+	FragColor = uMode == 1 ? vec4(uColor.rgb, uColor.a * t.r) : vec4(mix((t * uColor).rgb, uFlash.rgb, uFlash.a), (t * uColor).a);
 }
 )";
 
@@ -184,6 +185,7 @@ void GlDrawer::init()
 	locUV = glGetUniformLocation(program, "uUV");
 	locColor = glGetUniformLocation(program, "uColor");
 	locMode = glGetUniformLocation(program, "uMode");
+	locFlash = glGetUniformLocation(program, "uFlash");
 
 	const float quad[] = { 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1 };
 	glGenVertexArrays(1, &vao);
@@ -248,24 +250,25 @@ ImageResource GlDrawer::createTexture(const unsigned char* fileData, size_t size
 	return { static_cast<int>(textures.size() - 1), w, h };
 }
 
-void GlDrawer::drawQuad(unsigned int texture, float x, float y, float w, float h, float angle, const float uv[4], int mode)
+void GlDrawer::drawQuad(unsigned int texture, float x, float y, float w, float h, float angle, const float uv[4], int mode, const float* color, const float* flash)
 {
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glUniform4f(locRect, x, y, w, h);
 	glUniform1f(locAngle, angle);
 	glUniform4f(locUV, uv[0], uv[1], uv[2], uv[3]);
-	glUniform4f(locColor, 1, 1, 1, 1);
+	if (color) glUniform4f(locColor, color[0], color[1], color[2], color[3]); else glUniform4f(locColor, 1, 1, 1, 1);
+	if (flash) glUniform4f(locFlash, flash[0], flash[1], flash[2], flash[3]); else glUniform4f(locFlash, 1, 1, 1, 0);
 	glUniform1i(locMode, mode);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-void GlDrawer::drawImage(int handle, float x, float y, float w, float h, float angle, const float* uv, bool flipX)
+void GlDrawer::drawImage(int handle, float x, float y, float w, float h, float angle, const float* uv, bool flipX, const float* color, const float* flash)
 {
 	if (handle < 0 || handle >= static_cast<int>(textures.size())) return;
 	float range[4] = { fullUV[0], fullUV[1], fullUV[2], fullUV[3] };
 	if (uv) { for (int i = 0; i < 4; i++) range[i] = uv[i]; }
 	if (flipX) std::swap(range[0], range[2]);
-	drawQuad(textures[handle], x, y, w, h, angle, range, 0);
+	drawQuad(textures[handle], x, y, w, h, angle, range, 0, color, flash);
 }
 
 FontAtlas* GlDrawer::getFont(int size)

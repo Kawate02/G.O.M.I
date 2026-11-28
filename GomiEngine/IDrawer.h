@@ -56,7 +56,7 @@ public:
 	/// (x, y) を左上に w x h の大きさで描く。angle(ラジアン、時計回り)は中心で回す。
 	/// uv は画像の切り出す範囲 [u0, v0, u1, v1](nullptr なら全体)、flipX は左右反転
 	/// </summary>
-    virtual void drawImage(int handle, float x, float y, float w, float h, float angle, const float* uv = nullptr, bool flipX = false) = 0;
+    virtual void drawImage(int handle, float x, float y, float w, float h, float angle, const float* uv = nullptr, bool flipX = false, const float* color = nullptr, const float* flash = nullptr) = 0;
     virtual void drawText(const std::string& text, int fontSize, Anchor anchor, float x, float y) = 0;
 
 	/// <summary>

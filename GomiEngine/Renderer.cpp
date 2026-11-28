@@ -68,7 +68,7 @@ void Renderer::render(IDrawer& drawer, RenderQueue& queue, const Camera& camera)
 			if (res.handle == -1) continue;
 			float uWidth = std::abs(sprite->uv[2] - sprite->uv[0]);
 			float vHeight = std::abs(sprite->uv[3] - sprite->uv[1]);
-			drawer.drawImage(res.handle, sprite->position.x, sprite->position.y, res.width * uWidth * sprite->scale.x, res.height * vHeight * sprite->scale.y, sprite->angle, sprite->uv.data(), sprite->flipX);
+			drawer.drawImage(res.handle, sprite->position.x, sprite->position.y, res.width * uWidth * sprite->scale.x, res.height * vHeight * sprite->scale.y, sprite->angle, sprite->uv.data(), sprite->flipX, sprite->color.data(), sprite->flash.data());
 		}
 		if (TextRenderCommand* text = std::get_if<TextRenderCommand>(&item))
 		{

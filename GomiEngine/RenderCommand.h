@@ -21,6 +21,8 @@ struct SpriteRenderCommand
 	RenderKey key;
 	std::array<float, 4> uv = { 0, 0, 1, 1 }; //画像の切り出す範囲 u0, v0, u1, v1
 	bool flipX = false;
+	std::array<float, 4> color = { 1, 1, 1, 1 }; //掛ける色 RGBA
+	std::array<float, 4> flash = { 1, 1, 1, 0 }; //塗りつぶす色 RGB と強さ
 };
 
 struct TextRenderCommand
