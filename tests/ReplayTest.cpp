@@ -1,5 +1,7 @@
 // 操作の記録・再生・比べる処理のテスト。失敗したら行番号を出して 1 を返す
 #include "Replay.h"
+#include "DebugOptions.h"
+#include "Random.h"
 #include <stb_image_write.h>
 #include <filesystem>
 #include <iostream>
@@ -10,6 +12,23 @@ static int failures = 0;
 int main()
 {
 	namespace fs = std::filesystem;
+
+	// --seed: 引数の読み取りと、起動時の種
+	{
+		DebugOptions d;
+		CHECK(!d.parse(std::vector<std::string>{ "g" }) && !d.hasSeed);
+		DebugOptions e;
+		CHECK(!e.parse(std::vector<std::string>{ "g", "--seed", "42" }) && e.hasSeed && e.seed == 42);
+		DebugOptions bad;
+		CHECK(bad.parse(std::vector<std::string>{ "g", "--seed", "abc" }).has_value());
+		DebugOptions neg;
+		CHECK(neg.parse(std::vector<std::string>{ "g", "--seed", "-1" }).has_value());
+		Random::begin(42);
+		CHECK(Random::startSeed() == 42);
+		int a = Random::range(0, 1000000);
+		Random::begin(42);
+		CHECK(Random::range(0, 1000000) == a);
+	}
 
 	// 記録: 変わった所だけが残る
 	ReplayRecorder rec("Field", 60, 7);

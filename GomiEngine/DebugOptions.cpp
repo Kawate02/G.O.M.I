@@ -76,6 +76,11 @@ std::optional<std::string> DebugOptions::parse(const std::vector<std::string>& a
 		else if (opt == "--record") recordPath = value;
 		else if (opt == "--replay") replayPath = value;
 		else if (opt == "--replay-out") replayOut = value;
+		else if (opt == "--seed")
+		{
+			try { size_t used = 0; unsigned long long v = std::stoull(value, &used); if (used != value.size() || value[0] == '-' || v > 0xFFFFFFFFull) return "bad --seed: " + value; seed = static_cast<uint32_t>(v); hasSeed = true; }
+			catch (...) { return "bad --seed: " + value; }
+		}
 		else if (opt == "--frames")
 		{
 			try { maxFrames = std::stoi(value); }

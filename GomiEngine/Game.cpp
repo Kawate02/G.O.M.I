@@ -41,7 +41,7 @@ void Game::startReplay()
 		debug.startWorld = replay.scene;
 		debug.fixedDeltaTime = replay.deltaTime();
 		debug.maxFrames = replay.length;
-		Random::seed(replay.seed);
+		Random::begin(replay.seed);
 		fs::path out = debug.replayOut.empty() ? fs::temp_directory_path() / "gomi-replay" / replayName : fs::path(debug.replayOut);
 		replayCheck.emplace(Replay::expectedDir(debug.replayPath), out, debug.replayUpdate ? ReplayCheck::Mode::Update : ReplayCheck::Mode::Check);
 		replayPlayer.emplace(std::move(replay));
@@ -50,8 +50,13 @@ void Game::startReplay()
 	{
 		if (debug.fixedDeltaTime <= 0) debug.fixedDeltaTime = 1.0f / TARGET_FPS;
 		const uint32_t seed = 1;
-		Random::seed(seed);
+		Random::begin(seed);
 		recorder.emplace(debug.startWorld, static_cast<int>(std::lround(1.0f / debug.fixedDeltaTime)), seed);
+	}
+	else
+	{
+		Random::begin(debug.hasSeed ? debug.seed : Random::timeSeed());
+		std::cout << "seed " << Random::startSeed() << std::endl;
 	}
 }
 

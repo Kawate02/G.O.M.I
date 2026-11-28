@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -25,6 +26,7 @@
 ///                                  シーン・Δt・乱数の種・終わるフレームは記録のものを使う
 ///   --replay-update                --replay で比べずに、基準を今回の画面と状態で書き直す
 ///   --replay-out <フォルダ>        比べた結果(今回の画面・状態・差分の画像)の置き場。省略時は一時フォルダの gomi-replay/<記録名>
+///   --seed <N>                     普段のプレイ(--replay・--record の無い起動)の Random の種を N にする。無ければ起動した時刻から取る
 ///   --no-wait                      フレームの間を待たずに流す(テストを速く回す)
 /// </summary>
 class DebugOptions
@@ -71,6 +73,8 @@ public:
 	std::string replayPath;
 	std::string replayOut;
 	bool replayUpdate = false;
+	bool hasSeed = false;
+	uint32_t seed = 0; //--seed の値(hasSeed の時だけ)
 	bool noWait = false;
 	bool listCommands = false;
 	bool printVersion = false;

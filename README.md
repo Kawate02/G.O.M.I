@@ -147,6 +147,10 @@ GomiEditor.exe --world Field --type "30:{CTRL+SHIFT+P}" --type "40:複製" --typ
 
 テストは `ctest --test-dir build -C Debug`。
 
+### 乱数の種(`--seed`)
+
+普段のプレイ(`--record`・`--replay` の無い起動)の `Random` の種は、起動した時刻から取り、起動時にコンソールへ `seed <番号>` を出す。`--seed N` を付けるとその種で起動し、同じランを作り直せる。ゲームのコードは `Random::startSeed()` で起動時に入れた種を読める(`--replay` は記録の種、`--record` は 1)。
+
 ### 再現テスト(操作の記録と再生)
 
 操作を記録した JSON を流し、確認点のフレームで画面(png)と状態(World を保存した JSON)を基準と比べる。同じ入力・固定のΔt・同じ乱数の種なので毎回同じになり、違えば終了コード 1 と、違う項目・差分の画像(違う画素が赤)を出す。
