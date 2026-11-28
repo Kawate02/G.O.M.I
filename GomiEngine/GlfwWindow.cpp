@@ -10,7 +10,9 @@
 #include <GLFW/glfw3.h>
 #include <stdexcept>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
+#include <string>
 
 GlfwWindow::~GlfwWindow()
 {
@@ -34,6 +36,10 @@ void GlfwWindow::init(int width, int height, const char* title, bool fullscreen)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
+	// 環境変数 GOMI_HIDDEN=1 の時は窓を出さない(自動の動作確認で、使っている人の画面とフォーカスを奪わない)。
+	// 描画とスクリーンショットはそのまま
+	if (const char* hidden = std::getenv("GOMI_HIDDEN"); hidden && std::string(hidden) == "1")
+		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
 	this->width = width;
 	this->height = height;
