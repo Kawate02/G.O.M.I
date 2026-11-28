@@ -38,8 +38,13 @@ void GlfwWindow::init(int width, int height, const char* title, bool fullscreen)
 	glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
 	// 環境変数 GOMI_HIDDEN=1 の時は窓を出さない(自動の動作確認で、使っている人の画面とフォーカスを奪わない)。
 	// 描画とスクリーンショットはそのまま
+	// 全画面だと GLFW が VISIBLE を無視して表示・フォーカスするので、隠す時は窓モードで作る
 	if (const char* hidden = std::getenv("GOMI_HIDDEN"); hidden && std::string(hidden) == "1")
+	{
 		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+		if (fullscreen) std::cerr << "GOMI_HIDDEN=1 のため全画面にせず隠した窓で動かします" << std::endl;
+		fullscreen = false;
+	}
 
 	this->width = width;
 	this->height = height;
