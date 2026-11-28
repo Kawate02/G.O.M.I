@@ -1930,7 +1930,7 @@ void EditorApp::startRecording()
 	}
 	selected = -1;
 	const uint32_t seed = 1;
-	Random::seed(seed);
+	Random::begin(seed);
 	editor->play();
 	recorder.emplace(SceneEditor::sceneName(path), 60, seed);
 	recordLastFrame = 0;
@@ -1979,7 +1979,7 @@ void EditorApp::startReplay(const std::string& name, ReplayCheck::Mode mode, boo
 		return;
 	}
 	selected = -1;
-	Random::seed(run.replay.seed);
+	Random::begin(run.replay.seed);
 	run.player.emplace(run.replay);
 	run.check.emplace(Replay::expectedDir(path), std::filesystem::temp_directory_path() / "gomi-replay" / name, mode);
 	replayRun = std::move(run);
